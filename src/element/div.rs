@@ -1,7 +1,8 @@
 use bevy::color::Color;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::ecs::system::EntityCommands;
-use bevy::prelude::Commands;
+use bevy::picking::events::{Click, Out, Over, Press, Release, Pointer};
+use bevy::prelude::{Commands, On};
 use bevy::ui::{BackgroundColor, BorderRadius, Node, Val};
 
 use crate::style::styled::Styled;
@@ -17,6 +18,7 @@ pub struct Div {
     pub(crate) bg: Option<Color>,
     pub(crate) border_radius: Option<BorderRadius>,
     pub(crate) children: Vec<Box<dyn Element>>,
+    pub(crate) observers: Vec<Box<dyn FnOnce(&mut EntityCommands) + Send + Sync>>,
 }
 
 impl Div {
@@ -26,6 +28,7 @@ impl Div {
             bg: None,
             border_radius: None,
             children: Vec::new(),
+            observers: Vec::new(),
         }
     }
 
@@ -49,11 +52,49 @@ impl Div {
         self
     }
 
+    pub fn on_click(mut self, callback: impl FnMut(On<Pointer<Click>>) + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.observe(callback);
+        }));
+        self
+    }
+
+    pub fn on_hover(mut self, callback: impl FnMut(On<Pointer<Over>>) + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.observe(callback);
+        }));
+        self
+    }
+
+    pub fn on_hover_out(mut self, callback: impl FnMut(On<Pointer<Out>>) + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.observe(callback);
+        }));
+        self
+    }
+
+    pub fn on_press(mut self, callback: impl FnMut(On<Pointer<Press>>) + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.observe(callback);
+        }));
+        self
+    }
+
+    pub fn on_release(mut self, callback: impl FnMut(On<Pointer<Release>>) + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.observe(callback);
+        }));
+        self
+    }
+
     pub fn spawn<'a>(self, commands: &'a mut Commands) -> EntityCommands<'a> {
         let mut node = self.node;
         if let Some(radius) = self.border_radius {
             node.border_radius = radius;
         }
+
+        let children = self.children;
+        let observers = self.observers;
 
         let mut ec = if let Some(color) = self.bg {
             commands.spawn((node, BackgroundColor(color)))
@@ -61,13 +102,16 @@ impl Div {
             commands.spawn(node)
         };
 
-        if !self.children.is_empty() {
-            let children = self.children;
+        if !children.is_empty() {
             ec.with_children(|parent| {
                 for child in children {
                     child.spawn_with_parent(parent);
                 }
             });
+        }
+
+        for observer in observers {
+            observer(&mut ec);
         }
 
         ec
@@ -93,19 +137,25 @@ impl Element for Div {
             node.border_radius = radius;
         }
 
+        let children = self.children;
+        let observers = self.observers;
+
         let mut ec = if let Some(color) = self.bg {
             parent.spawn((node, BackgroundColor(color)))
         } else {
             parent.spawn(node)
         };
 
-        if !self.children.is_empty() {
-            let children = self.children;
+        if !children.is_empty() {
             ec.with_children(|p| {
                 for child in children {
                     child.spawn_with_parent(p);
                 }
             });
+        }
+
+        for observer in observers {
+            observer(&mut ec);
         }
     }
 }
