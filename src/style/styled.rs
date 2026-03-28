@@ -1,0 +1,1 @@
+// Styled trait definition
