@@ -5,12 +5,8 @@ use bevy::picking::events::{Click, Out, Over, Press, Release, Pointer};
 use bevy::prelude::{Commands, On};
 use bevy::ui::{BackgroundColor, BorderRadius, Node, Val};
 
+use crate::element::Element;
 use crate::style::styled::Styled;
-
-/// Shared interface for things that can be spawned as children.
-pub trait Element {
-    fn spawn_with_parent(self: Box<Self>, parent: &mut ChildSpawnerCommands);
-}
 
 /// A container UI element, analogous to an HTML `<div>`.
 pub struct Div {

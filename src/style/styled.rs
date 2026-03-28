@@ -336,7 +336,7 @@ pub trait Styled: Sized {
         self
     }
 
-    fn px_val(mut self, value: Val) -> Self {
+    fn pad_x(mut self, value: Val) -> Self {
         let s = self.style_mut();
         s.padding.left = value;
         s.padding.right = value;

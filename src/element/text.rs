@@ -6,7 +6,7 @@ use bevy::text::{TextColor, TextFont};
 use bevy::prelude::Text;
 use bevy::ui::Node;
 
-use crate::element::div::Element;
+use crate::element::Element;
 use crate::style::styled::Styled;
 
 /// A text UI element.
