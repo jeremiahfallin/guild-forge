@@ -2,7 +2,7 @@
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use crate::{menus::Menu, screens::Screen, theme::widget};
+use crate::{menus::Menu, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Menu::Pause), spawn_pause_menu);
@@ -13,17 +13,13 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn spawn_pause_menu(mut commands: Commands) {
-    commands.spawn((
-        widget::ui_root("Pause Menu"),
-        GlobalZIndex(2),
-        DespawnOnExit(Menu::Pause),
-        children![
-            widget::header("Game paused"),
-            widget::button("Continue", close_menu),
-            widget::button("Settings", open_settings_menu),
-            widget::button("Quit to title", quit_to_title),
-        ],
-    ));
+    widgets::ui_root("Pause Menu")
+        .insert((GlobalZIndex(2), DespawnOnExit(Menu::Pause)))
+        .child(widgets::header("Game paused"))
+        .child(widgets::game_button("Continue", close_menu))
+        .child(widgets::game_button("Settings", open_settings_menu))
+        .child(widgets::game_button("Quit to title", quit_to_title))
+        .spawn(&mut commands);
 }
 
 fn open_settings_menu(_: On<Pointer<Click>>, mut next_menu: ResMut<NextState<Menu>>) {

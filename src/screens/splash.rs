@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
 };
 
-use crate::{AppSystems, screens::Screen, theme::prelude::*};
+use crate::{AppSystems, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
     // Spawn splash screen.
@@ -48,34 +48,31 @@ const SPLASH_DURATION_SECS: f32 = 1.8;
 const SPLASH_FADE_DURATION_SECS: f32 = 0.6;
 
 fn spawn_splash_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        widget::ui_root("Splash Screen"),
-        BackgroundColor(SPLASH_BACKGROUND_COLOR),
-        DespawnOnExit(Screen::Splash),
-        children![(
-            Name::new("Splash image"),
-            Node {
-                margin: UiRect::all(Val::Auto),
-                width: percent(70),
-                ..default()
-            },
-            ImageNode::new(asset_server.load_with_settings(
-                // This should be an embedded asset for instant loading, but that is
-                // currently [broken on Windows Wasm builds](https://github.com/bevyengine/bevy/issues/14246).
-                "images/splash.png",
-                |settings: &mut ImageLoaderSettings| {
-                    // Make an exception for the splash image in case
-                    // `ImagePlugin::default_nearest()` is used for pixel art.
-                    settings.sampler = ImageSampler::linear();
+    widgets::ui_root("Splash Screen")
+        .bg(SPLASH_BACKGROUND_COLOR)
+        .insert(DespawnOnExit(Screen::Splash))
+        .spawn(&mut commands)
+        .with_children(|parent| {
+            parent.spawn((
+                Name::new("Splash image"),
+                Node {
+                    margin: UiRect::all(Val::Auto),
+                    width: percent(70),
+                    ..default()
                 },
-            )),
-            ImageNodeFadeInOut {
-                total_duration: SPLASH_DURATION_SECS,
-                fade_duration: SPLASH_FADE_DURATION_SECS,
-                t: 0.0,
-            },
-        )],
-    ));
+                ImageNode::new(asset_server.load_with_settings(
+                    "images/splash.png",
+                    |settings: &mut ImageLoaderSettings| {
+                        settings.sampler = ImageSampler::linear();
+                    },
+                )),
+                ImageNodeFadeInOut {
+                    total_duration: SPLASH_DURATION_SECS,
+                    fade_duration: SPLASH_FADE_DURATION_SECS,
+                    t: 0.0,
+                },
+            ));
+        });
 }
 
 #[derive(Component, Reflect)]

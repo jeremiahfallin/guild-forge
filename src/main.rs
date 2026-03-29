@@ -5,9 +5,9 @@
 
 mod asset_tracking;
 mod audio;
-mod demo;
 #[cfg(feature = "dev")]
 mod dev_tools;
+mod hero;
 mod menus;
 mod screens;
 mod theme;
@@ -47,9 +47,9 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             asset_tracking::plugin,
             audio::plugin,
-            demo::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
+            hero::plugin,
             menus::plugin,
             screens::plugin,
             theme::plugin,

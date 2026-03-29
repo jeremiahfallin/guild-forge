@@ -3,8 +3,11 @@
 //! Additional settings and accessibility options should go here.
 
 use bevy::{audio::Volume, input::common_conditions::input_just_pressed, prelude::*};
+use bevy_declarative::element::div::{Div, div};
+use bevy_declarative::style::styled::Styled;
+use bevy_declarative::style::values::px;
 
-use crate::{menus::Menu, screens::Screen, theme::prelude::*};
+use crate::{menus::Menu, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Menu::Settings), spawn_settings_menu);
@@ -20,62 +23,41 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn spawn_settings_menu(mut commands: Commands) {
-    commands.spawn((
-        widget::ui_root("Settings Menu"),
-        GlobalZIndex(2),
-        DespawnOnExit(Menu::Settings),
-        children![
-            widget::header("Settings"),
-            settings_grid(),
-            widget::button("Back", go_back_on_click),
-        ],
-    ));
+    widgets::ui_root("Settings Menu")
+        .insert((GlobalZIndex(2), DespawnOnExit(Menu::Settings)))
+        .child(widgets::header("Settings"))
+        .child(settings_grid())
+        .child(widgets::game_button("Back", go_back_on_click))
+        .spawn(&mut commands);
 }
 
-fn settings_grid() -> impl Bundle {
-    (
-        Name::new("Settings Grid"),
-        Node {
-            display: Display::Grid,
-            row_gap: px(10),
-            column_gap: px(30),
-            grid_template_columns: RepeatedGridTrack::px(2, 400.0),
-            ..default()
-        },
-        children![
-            (
-                widget::label("Master Volume"),
-                Node {
-                    justify_self: JustifySelf::End,
-                    ..default()
-                }
-            ),
-            global_volume_widget(),
-        ],
-    )
+fn settings_grid() -> Div {
+    let mut volume_label = widgets::label("Master Volume");
+    volume_label.style_mut().justify_self = JustifySelf::End;
+
+    let mut grid = div().grid().gap_y(px(10.0)).gap_x(px(30.0));
+    grid.style_mut().grid_template_columns = RepeatedGridTrack::px(2, 400.0);
+
+    grid.insert(Name::new("Settings Grid"))
+        .child(volume_label)
+        .child(global_volume_widget())
 }
 
-fn global_volume_widget() -> impl Bundle {
-    (
-        Name::new("Global Volume Widget"),
-        Node {
-            justify_self: JustifySelf::Start,
-            ..default()
-        },
-        children![
-            widget::button_small("-", lower_global_volume),
-            (
-                Name::new("Current Volume"),
-                Node {
-                    padding: UiRect::horizontal(px(10)),
-                    justify_content: JustifyContent::Center,
-                    ..default()
-                },
-                children![(widget::label(""), GlobalVolumeLabel)],
-            ),
-            widget::button_small("+", raise_global_volume),
-        ],
-    )
+fn global_volume_widget() -> Div {
+    let mut container = div().row();
+    container.style_mut().justify_self = JustifySelf::Start;
+
+    container
+        .insert(Name::new("Global Volume Widget"))
+        .child(widgets::game_button_small("-", lower_global_volume))
+        .child(
+            div()
+                .insert(Name::new("Current Volume"))
+                .pad_x(px(10.0))
+                .justify_center()
+                .child(widgets::label("").insert(GlobalVolumeLabel)),
+        )
+        .child(widgets::game_button_small("+", raise_global_volume))
 }
 
 const MIN_VOLUME: f32 = 0.0;

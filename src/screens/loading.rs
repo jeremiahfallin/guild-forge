@@ -3,7 +3,7 @@
 
 use bevy::prelude::*;
 
-use crate::{asset_tracking::ResourceHandles, screens::Screen, theme::prelude::*};
+use crate::{asset_tracking::ResourceHandles, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Screen::Loading), spawn_loading_screen);
@@ -15,11 +15,10 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn spawn_loading_screen(mut commands: Commands) {
-    commands.spawn((
-        widget::ui_root("Loading Screen"),
-        DespawnOnExit(Screen::Loading),
-        children![widget::label("Loading...")],
-    ));
+    widgets::ui_root("Loading Screen")
+        .insert(DespawnOnExit(Screen::Loading))
+        .child(widgets::label("Loading..."))
+        .spawn(&mut commands);
 }
 
 fn enter_gameplay_screen(mut next_screen: ResMut<NextState<Screen>>) {

@@ -1,0 +1,37 @@
+[
+    (
+        id: Warrior,
+        name: "Warrior",
+        description: "A stalwart frontline fighter who excels in close combat and can absorb punishment that would fell lesser heroes.",
+        stat_weights: (str: 3, dex: 1, con: 3, int: 0, wis: 1, cha: 1),
+        starting_abilities: ["Slash", "Shield Block"],
+    ),
+    (
+        id: Rogue,
+        name: "Rogue",
+        description: "A cunning shadow-dweller who strikes from the flanks, picking locks and pockets with equal ease.",
+        stat_weights: (str: 1, dex: 3, con: 1, int: 1, wis: 1, cha: 2),
+        starting_abilities: ["Backstab", "Evade"],
+    ),
+    (
+        id: Mage,
+        name: "Mage",
+        description: "A wielder of arcane forces whose devastating spells can turn the tide of battle — if they survive long enough to cast them.",
+        stat_weights: (str: 0, dex: 1, con: 1, int: 3, wis: 3, cha: 1),
+        starting_abilities: ["Fireball", "Arcane Shield"],
+    ),
+    (
+        id: Cleric,
+        name: "Cleric",
+        description: "A devout healer whose prayers mend wounds and bolster allies, the backbone of any party that expects to return alive.",
+        stat_weights: (str: 1, dex: 0, con: 2, int: 1, wis: 3, cha: 2),
+        starting_abilities: ["Heal", "Smite"],
+    ),
+    (
+        id: Ranger,
+        name: "Ranger",
+        description: "A keen-eyed wanderer equally at home loosing arrows from afar or tracking quarry through the deepest wilds.",
+        stat_weights: (str: 1, dex: 3, con: 2, int: 0, wis: 2, cha: 1),
+        starting_abilities: ["Power Shot", "Trap"],
+    ),
+]

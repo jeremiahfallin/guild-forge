@@ -1,0 +1,16 @@
+(
+    first_names: [
+        "Aldric", "Brenna", "Cedric", "Dahlia", "Edric",
+        "Freya", "Gareth", "Hilda", "Ivar", "Juna",
+        "Kael", "Lyra", "Magnus", "Nessa", "Osric",
+        "Petra", "Quinn", "Rowan", "Sable", "Theron",
+        "Una", "Voss", "Wren", "Xara", "Yorick",
+        "Zara", "Bram", "Cora", "Dusk", "Ember",
+    ],
+    surnames: [
+        "the Bold", "Ironfist", "Shadowmend", "Thornwall", "the Quiet",
+        "Brightblade", "Ashwalker", "the Wary", "Stormborn", "Duskmantle",
+        "Goldseeker", "the Grim", "Hearthstone", "Nighthollow", "Oakshield",
+        "the Swift", "Ravencrest", "Sunforge", "the Unbroken", "Windstrider",
+    ],
+)

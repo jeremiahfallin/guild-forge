@@ -9,6 +9,8 @@ edition = "2024"
 bevy = { version = "0.18", default-features = false, features = ["2d"] }
 bevy_declarative = { path = "../bevy_declarative" }
 rand = "0.9"
+ron = "0.9"
+serde = { version = "1", features = ["derive"] }
 # Compile out low-severity logs to improve performance.
 # Remove these features if you want to profile your game with tracy.
 # (see <https://github.com/bevyengine/bevy/blob/main/docs/profiling.md#tracy-profiler>)

@@ -1,0 +1,51 @@
+[
+    (
+        id: Brave,
+        name: "Brave",
+        description: "Charges into danger without hesitation. More likely to engage tough enemies head-on.",
+        stat_modifiers: (str: 1, dex: 0, con: 1, int: 0, wis: -1, cha: 1),
+        tags: ["aggressive", "morale_boost"],
+    ),
+    (
+        id: Cautious,
+        name: "Cautious",
+        description: "Hangs back and assesses threats before acting. Less likely to trigger traps or ambushes.",
+        stat_modifiers: (str: 0, dex: 1, con: 0, int: 1, wis: 1, cha: -1),
+        tags: ["defensive", "trap_aware"],
+    ),
+    (
+        id: Greedy,
+        name: "Greedy",
+        description: "Has an eye for treasure and will break formation to grab loot. Finds more gold but takes more risks.",
+        stat_modifiers: (str: 0, dex: 1, con: 0, int: 0, wis: -1, cha: 1),
+        tags: ["loot_seeker", "reckless"],
+    ),
+    (
+        id: Loner,
+        name: "Loner",
+        description: "Fights best when isolated from the group. Gains power when separated but provides no party synergy.",
+        stat_modifiers: (str: 1, dex: 1, con: 0, int: 0, wis: 0, cha: -2),
+        tags: ["solo_fighter", "antisocial"],
+    ),
+    (
+        id: Leader,
+        name: "Leader",
+        description: "Inspires allies and coordinates group tactics. The party fights harder when this hero is present.",
+        stat_modifiers: (str: 0, dex: 0, con: 0, int: 1, wis: 1, cha: 2),
+        tags: ["morale_boost", "coordinator"],
+    ),
+    (
+        id: Cursed,
+        name: "Cursed",
+        description: "Touched by dark forces. Gains unusual power but attracts misfortune to the party.",
+        stat_modifiers: (str: 2, dex: 0, con: -1, int: 2, wis: 0, cha: -2),
+        tags: ["dark_power", "bad_luck"],
+    ),
+    (
+        id: Lucky,
+        name: "Lucky",
+        description: "Fortune favors this hero. Critical hits land more often and narrow escapes are commonplace.",
+        stat_modifiers: (str: 0, dex: 1, con: 0, int: 0, wis: 0, cha: 1),
+        tags: ["crit_bonus", "dodge_bonus"],
+    ),
+]
