@@ -8,6 +8,7 @@ mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod hero;
+mod mission;
 mod menus;
 mod screens;
 mod theme;
@@ -50,6 +51,7 @@ impl Plugin for AppPlugin {
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             hero::plugin,
+            mission::plugin,
             menus::plugin,
             screens::plugin,
             theme::plugin,

@@ -3,6 +3,9 @@
 mod gameplay;
 mod hub;
 mod loading;
+pub mod mission_view;
+pub mod missions;
+mod party_select;
 mod roster;
 mod splash;
 mod title;
@@ -17,6 +20,9 @@ pub(super) fn plugin(app: &mut App) {
         gameplay::plugin,
         hub::plugin,
         loading::plugin,
+        mission_view::plugin,
+        missions::plugin,
+        party_select::plugin,
         roster::plugin,
         splash::plugin,
         title::plugin,
@@ -40,4 +46,7 @@ pub enum GameTab {
     #[default]
     Hub,
     Roster,
+    Missions,
+    PartySelect,
+    MissionView,
 }

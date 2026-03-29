@@ -8,6 +8,7 @@ use bevy_declarative::style::values::{pct, px};
 
 use crate::{
     hero::{Hero, HeroInfo, HeroStats, HeroTraits, data::*},
+    mission::OnMission,
     screens::GameTab,
     theme::{palette::*, widgets},
 };
@@ -38,7 +39,7 @@ struct DetailPanel;
 
 fn spawn_roster(
     mut commands: Commands,
-    heroes: Query<(Entity, &HeroInfo), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
@@ -74,7 +75,7 @@ fn spawn_roster(
 }
 
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: &SelectedHero,
 ) -> Div {
     let mut list = div()
@@ -90,15 +91,29 @@ fn build_hero_list(
             .color(HEADER_TEXT),
     );
 
-    for (entity, info) in heroes.iter() {
+    for (entity, info, on_mission) in heroes.iter() {
         let is_selected = selected.0 == Some(entity);
-        let bg_color = if is_selected {
+        let is_on_mission = on_mission.is_some();
+
+        let bg_color = if is_on_mission {
+            Color::srgba(0.3, 0.3, 0.3, 0.4) // Grayed out
+        } else if is_selected {
             Color::srgba(0.275, 0.400, 0.750, 0.8)
         } else {
             Color::srgba(0.2, 0.2, 0.3, 0.6)
         };
 
-        let class_text = format!("Lv.{} {}", info.level, info.class);
+        let name_color = if is_on_mission {
+            Color::srgba(0.5, 0.5, 0.5, 0.6)
+        } else {
+            HEADER_TEXT
+        };
+
+        let class_text = if is_on_mission {
+            format!("Lv.{} {} (On Mission)", info.level, info.class)
+        } else {
+            format!("Lv.{} {}", info.level, info.class)
+        };
 
         list = list.child(
             div()
@@ -118,7 +133,7 @@ fn build_hero_list(
                         .child(
                             text(&info.name)
                                 .font_size(22.0)
-                                .color(HEADER_TEXT),
+                                .color(name_color),
                         )
                         .child(
                             text(class_text)
@@ -323,7 +338,7 @@ fn select_hero(
 fn refresh_roster_on_selection_change(
     mut commands: Commands,
     roster_ui: Query<Entity, With<RosterUi>>,
-    heroes: Query<(Entity, &HeroInfo), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,

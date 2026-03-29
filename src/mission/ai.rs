@@ -1,0 +1,334 @@
+//! Utility-based hero AI: action scoring and decision making.
+
+use bevy::prelude::*;
+use rand::Rng;
+
+use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
+use crate::hero::data::{HeroClass, HeroTrait};
+
+use super::dungeon::{DungeonMap, RoomType};
+use super::entities::*;
+use super::pathfinding::find_path;
+
+/// The action a hero has decided to take this tick.
+#[derive(Component, Debug, Clone)]
+pub enum HeroAction {
+    /// Move toward a room (index into rooms).
+    MoveTo(usize),
+    /// Attack an enemy entity.
+    Attack(Entity),
+    /// Heal an ally entity (Cleric only).
+    Heal(Entity),
+    /// Stay and hold position.
+    Hold,
+}
+
+/// Run AI decision-making for all hero tokens each simulation tick.
+pub fn hero_ai_system(
+    dungeon: Option<Res<crate::screens::mission_view::ActiveDungeon>>,
+    timer: Res<SimulationTimer>,
+    room_status: Option<Res<RoomStatus>>,
+    mut heroes: Query<
+        (
+            Entity,
+            &HeroToken,
+            &GridPosition,
+            &InRoom,
+            &CombatStats,
+            Option<&MoveTarget>,
+        ),
+        Without<EnemyToken>,
+    >,
+    hero_data: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    enemies: Query<(Entity, &GridPosition, &InRoom, &CombatStats), With<EnemyToken>>,
+    ally_stats: Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
+    mut commands: Commands,
+) {
+    // Only run on tick boundaries
+    if timer.0 > TICK_INTERVAL * 0.1 {
+        return; // Not a fresh tick
+    }
+
+    let Some(dungeon) = dungeon else { return };
+    let Some(room_status) = room_status else { return };
+    let map = &dungeon.0;
+    let mut rng = rand::rng();
+
+    for (entity, hero_token, grid_pos, in_room, combat, existing_move) in &heroes {
+        // Skip dead heroes
+        if combat.hp <= 0 {
+            continue;
+        }
+
+        // Skip heroes that are currently moving to a target
+        if let Some(mt) = existing_move {
+            if mt.path_index < mt.path.len() {
+                continue; // Still moving
+            }
+        }
+
+        let Ok((info, stats, traits)) = hero_data.get(hero_token.0) else {
+            continue;
+        };
+
+        let action = decide_action(
+            entity, info, stats, traits, grid_pos, in_room, combat,
+            map, &room_status, &enemies, &ally_stats, &mut rng,
+        );
+
+        // Apply action
+        match action {
+            HeroAction::MoveTo(room_idx) => {
+                let room = &map.rooms[room_idx];
+                let (gx, gy) = room.center();
+                if let Some(path) = find_path(map, (grid_pos.x, grid_pos.y), (gx, gy)) {
+                    commands.entity(entity).insert(MoveTarget {
+                        path,
+                        path_index: 1, // Skip current position
+                    });
+                }
+            }
+            HeroAction::Attack(_) | HeroAction::Heal(_) | HeroAction::Hold => {
+                // Combat/heal handled by combat system
+            }
+        }
+
+        commands.entity(entity).insert(action);
+    }
+}
+
+fn decide_action(
+    entity: Entity,
+    info: &HeroInfo,
+    stats: &HeroStats,
+    traits: &HeroTraits,
+    grid_pos: &GridPosition,
+    in_room: &InRoom,
+    combat: &CombatStats,
+    map: &DungeonMap,
+    room_status: &RoomStatus,
+    enemies: &Query<(Entity, &GridPosition, &InRoom, &CombatStats), With<EnemyToken>>,
+    allies: &Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
+    rng: &mut impl Rng,
+) -> HeroAction {
+    let hp_pct = combat.hp as f32 / combat.max_hp.max(1) as f32;
+    let current_room = in_room.0;
+
+    // Find enemies in the same room
+    let enemies_in_room: Vec<(Entity, &CombatStats)> = enemies
+        .iter()
+        .filter(|(_, _, er, ec)| {
+            ec.hp > 0 && er.0 == current_room && current_room.is_some()
+        })
+        .map(|(e, _, _, c)| (e, c))
+        .collect();
+
+    // Find injured allies in the same room
+    let injured_allies: Vec<(Entity, &CombatStats)> = allies
+        .iter()
+        .filter(|(e, c, ar)| {
+            *e != entity
+                && c.hp > 0
+                && c.hp < c.max_hp
+                && ar.0 == current_room
+                && current_room.is_some()
+        })
+        .map(|(e, c, _)| (e, c))
+        .collect();
+
+    let allies_in_room = allies
+        .iter()
+        .filter(|(e, c, ar)| *e != entity && c.hp > 0 && ar.0 == current_room && current_room.is_some())
+        .count();
+
+    // Score each possible action
+    let mut best_action = HeroAction::Hold;
+    let mut best_score = 10.0_f32; // Hold base score
+
+    // 1. Attack — if enemies are in the room
+    if !enemies_in_room.is_empty() {
+        let mut attack_score = 60.0;
+
+        // Bonus for low-HP enemies (finisher instinct)
+        let weakest = enemies_in_room
+            .iter()
+            .min_by_key(|(_, c)| c.hp)
+            .unwrap();
+        let enemy_hp_pct = weakest.1.hp as f32 / weakest.1.max_hp.max(1) as f32;
+        if enemy_hp_pct < 0.3 {
+            attack_score += 20.0;
+        }
+
+        // Safety in numbers
+        attack_score += allies_in_room as f32 * 10.0;
+
+        // Class multiplier
+        attack_score *= class_attack_mult(&info.class);
+
+        // Trait multipliers
+        for t in &traits.0 {
+            attack_score *= trait_attack_mult(t, allies_in_room);
+        }
+
+        if attack_score > best_score {
+            best_score = attack_score;
+            best_action = HeroAction::Attack(weakest.0);
+        }
+    }
+
+    // 2. Heal — if cleric or high WIS and injured allies present
+    let can_heal = info.class == HeroClass::Cleric || stats.wisdom > 14;
+    if can_heal && !injured_allies.is_empty() {
+        let most_injured = injured_allies
+            .iter()
+            .max_by_key(|(_, c)| c.max_hp - c.hp)
+            .unwrap();
+        let missing_pct = 1.0 - (most_injured.1.hp as f32 / most_injured.1.max_hp.max(1) as f32);
+
+        let mut heal_score = 70.0 * missing_pct;
+
+        // Class multiplier
+        heal_score *= class_heal_mult(&info.class);
+
+        if heal_score > best_score {
+            best_score = heal_score;
+            best_action = HeroAction::Heal(most_injured.0);
+        }
+    }
+
+    // 3. MoveTo — explore unvisited rooms
+    for (room_idx, room) in map.rooms.iter().enumerate() {
+        if room_status.visited.get(room_idx).copied().unwrap_or(true) {
+            continue; // Already visited
+        }
+
+        let mut move_score = 50.0;
+
+        if room.room_type == RoomType::Treasure {
+            move_score += 10.0;
+        }
+        if room.room_type == RoomType::Boss {
+            // Only go to boss room if other rooms are visited
+            let unvisited_non_boss = map.rooms.iter().enumerate().any(|(i, r)| {
+                r.room_type != RoomType::Boss
+                    && !room_status.visited.get(i).copied().unwrap_or(true)
+            });
+            if unvisited_non_boss {
+                move_score -= 40.0; // Don't rush the boss
+            }
+        }
+
+        // Low HP discourages exploration
+        if hp_pct < 0.3 {
+            move_score -= 30.0;
+        }
+
+        // Class/trait multipliers
+        move_score *= class_move_mult(&info.class);
+        for t in &traits.0 {
+            move_score *= trait_move_mult(t, room.room_type == RoomType::Treasure);
+        }
+
+        if move_score > best_score {
+            best_score = move_score;
+            best_action = HeroAction::MoveTo(room_idx);
+        }
+    }
+
+    // 4. Flee — move toward entrance if low HP
+    if hp_pct < 0.25 {
+        let mut flee_score = 20.0;
+        if hp_pct < 0.25 {
+            flee_score += 40.0;
+        }
+        if enemies_in_room.len() >= 2 {
+            flee_score += 20.0;
+        }
+
+        // Class/trait multipliers
+        flee_score *= class_flee_mult(&info.class);
+        for t in &traits.0 {
+            flee_score *= trait_flee_mult(t);
+        }
+
+        if flee_score > best_score {
+            // Flee to entrance
+            if let Some(entrance_idx) = map.rooms.iter().position(|r| r.room_type == RoomType::Entrance) {
+                best_score = flee_score;
+                best_action = HeroAction::MoveTo(entrance_idx);
+            }
+        }
+    }
+
+    // Add small randomness to break ties
+    let _ = rng.random_range(0.0..2.0_f32);
+
+    best_action
+}
+
+// ── Class multipliers ───────────────────────────────────────────────
+
+fn class_attack_mult(class: &HeroClass) -> f32 {
+    match class {
+        HeroClass::Warrior => 1.3,
+        HeroClass::Rogue => 1.1,
+        HeroClass::Mage => 1.2,
+        HeroClass::Cleric => 0.8,
+        HeroClass::Ranger => 1.1,
+    }
+}
+
+fn class_heal_mult(class: &HeroClass) -> f32 {
+    match class {
+        HeroClass::Cleric => 1.5,
+        HeroClass::Mage => 0.6,
+        _ => 0.5,
+    }
+}
+
+fn class_move_mult(class: &HeroClass) -> f32 {
+    match class {
+        HeroClass::Ranger => 1.3,
+        HeroClass::Rogue => 1.2,
+        HeroClass::Mage => 0.9,
+        _ => 1.0,
+    }
+}
+
+fn class_flee_mult(class: &HeroClass) -> f32 {
+    match class {
+        HeroClass::Warrior => 0.7,
+        HeroClass::Rogue => 1.1,
+        _ => 1.0,
+    }
+}
+
+// ── Trait multipliers ───────────────────────────────────────────────
+
+fn trait_attack_mult(t: &HeroTrait, allies_in_room: usize) -> f32 {
+    match t {
+        HeroTrait::Brave => 1.4,
+        HeroTrait::Cautious => 0.8,
+        HeroTrait::Cursed => 1.3,
+        HeroTrait::Loner if allies_in_room == 0 => 1.3,
+        HeroTrait::Loner => 0.8,
+        _ => 1.0,
+    }
+}
+
+fn trait_move_mult(t: &HeroTrait, is_treasure: bool) -> f32 {
+    match t {
+        HeroTrait::Cautious => 0.7,
+        HeroTrait::Greedy if is_treasure => 1.8,
+        HeroTrait::Greedy => 1.0,
+        _ => 1.0,
+    }
+}
+
+fn trait_flee_mult(t: &HeroTrait) -> f32 {
+    match t {
+        HeroTrait::Brave => 0.3,
+        HeroTrait::Cautious => 1.5,
+        _ => 1.0,
+    }
+}

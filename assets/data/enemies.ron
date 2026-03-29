@@ -1,0 +1,42 @@
+[
+    (
+        id: Goblin,
+        name: "Goblin",
+        hp: 15,
+        attack: 3,
+        defense: 2,
+        xp_reward: 10,
+    ),
+    (
+        id: Skeleton,
+        name: "Skeleton",
+        hp: 20,
+        attack: 4,
+        defense: 4,
+        xp_reward: 15,
+    ),
+    (
+        id: Slime,
+        name: "Slime",
+        hp: 12,
+        attack: 2,
+        defense: 1,
+        xp_reward: 8,
+    ),
+    (
+        id: Orc,
+        name: "Orc",
+        hp: 30,
+        attack: 6,
+        defense: 5,
+        xp_reward: 25,
+    ),
+    (
+        id: BossRat,
+        name: "Boss Rat",
+        hp: 40,
+        attack: 5,
+        defense: 3,
+        xp_reward: 40,
+    ),
+]

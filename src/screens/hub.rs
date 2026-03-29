@@ -28,7 +28,7 @@ fn spawn_hub(mut commands: Commands) {
                 .gap(px(12.0))
                 .items_center()
                 .child(widgets::game_button("Roster", open_roster))
-                .child(disabled_button("Missions"))
+                .child(widgets::game_button("Missions", open_missions))
                 .child(disabled_button("Armory")),
         )
         .spawn(&mut commands);
@@ -53,4 +53,8 @@ fn disabled_button(label: &str) -> bevy_declarative::element::div::Div {
 
 fn open_roster(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
     next_tab.set(GameTab::Roster);
+}
+
+fn open_missions(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
+    next_tab.set(GameTab::Missions);
 }
