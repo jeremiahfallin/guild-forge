@@ -12,6 +12,7 @@ mod mission;
 mod menus;
 mod screens;
 mod theme;
+mod ui;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
 
@@ -55,6 +56,7 @@ impl Plugin for AppPlugin {
             menus::plugin,
             screens::plugin,
             theme::plugin,
+            ui::plugin,
         ));
 
         // Order new `AppSystems` variants by adding them here:
