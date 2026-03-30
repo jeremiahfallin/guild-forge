@@ -314,17 +314,30 @@ pub fn sync_sprite_positions(
     }
 }
 
-/// Clean up mission entities when leaving the mission view.
+/// Clean up mission entities, hero status, and resources when leaving the mission view.
 pub fn cleanup_mission_entities(
     mut commands: Commands,
     entities: Query<Entity, With<MissionEntity>>,
+    missions: Query<(Entity, &MissionParty), With<Mission>>,
 ) {
+    // Despawn all mission-scoped sprites/tokens
     for entity in &entities {
         commands.entity(entity).despawn();
     }
+
+    // Remove OnMission from party heroes and despawn mission entity
+    for (mission_entity, party) in &missions {
+        for &hero_entity in &party.0 {
+            commands.entity(hero_entity).remove::<super::OnMission>();
+        }
+        commands.entity(mission_entity).despawn();
+    }
+
+    // Clean up resources
     commands.remove_resource::<RoomStatus>();
     commands.remove_resource::<SimulationSpeed>();
     commands.remove_resource::<SimulationTimer>();
+    commands.remove_resource::<crate::screens::mission_view::ActiveDungeon>();
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
