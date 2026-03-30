@@ -11,52 +11,91 @@ use super::dungeon::RoomType;
 use super::entities::*;
 use super::{Mission, MissionParty, MissionProgress};
 
+/// Collected combat action to apply after reading hero state.
+enum CombatIntent {
+    Attack {
+        target: Entity,
+        attack: i32,
+        luck_bonus: i32,
+    },
+    Heal {
+        target: Entity,
+        luck_bonus: i32,
+    },
+}
+
 /// Process hero attacks and healing each simulation tick.
+///
+/// Uses `ParamSet` to avoid Bevy B0001: the hero-read query and the
+/// hero-write query both touch `CombatStats` on `HeroToken` entities.
+/// A two-phase collect→apply pattern lets us access them through the
+/// same `ParamSet` without holding conflicting borrows.
 pub fn hero_combat_system(
     timer: Res<SimulationTimer>,
-    heroes: Query<
-        (Entity, &HeroToken, &CombatStats, &InRoom, Option<&HeroAction>),
-        Without<EnemyToken>,
-    >,
+    mut hero_set: ParamSet<(
+        // p0: read heroes
+        Query<(&HeroToken, &CombatStats, Option<&HeroAction>), Without<EnemyToken>>,
+        // p1: write hero CombatStats (for healing)
+        Query<&mut CombatStats, (With<HeroToken>, Without<EnemyToken>)>,
+    )>,
     hero_traits: Query<&HeroTraits, With<Hero>>,
     mut enemy_stats: Query<&mut CombatStats, (With<EnemyToken>, Without<HeroToken>)>,
-    mut ally_stats: Query<&mut CombatStats, (With<HeroToken>, Without<EnemyToken>)>,
 ) {
     // Only run right after a tick
     if timer.0 > TICK_INTERVAL * 0.1 {
         return;
     }
 
+    // Phase 1: Collect intents (read-only borrow via p0)
+    let intents: Vec<CombatIntent> = hero_set
+        .p0()
+        .iter()
+        .filter_map(|(hero_token, combat, action)| {
+            if combat.hp <= 0 {
+                return None;
+            }
+            let action = action?;
+            let lucky = hero_traits
+                .get(hero_token.0)
+                .ok()
+                .is_some_and(|t| t.0.contains(&HeroTrait::Lucky));
+            let luck_bonus = if lucky { 3 } else { 0 };
+
+            match action {
+                HeroAction::Attack(target) => Some(CombatIntent::Attack {
+                    target: *target,
+                    attack: combat.attack,
+                    luck_bonus,
+                }),
+                HeroAction::Heal(target) => Some(CombatIntent::Heal {
+                    target: *target,
+                    luck_bonus,
+                }),
+                _ => None,
+            }
+        })
+        .collect();
+
+    // Phase 2: Apply intents (mutable borrows via p1 and enemy_stats)
     let mut rng = rand::rng();
 
-    for (_entity, hero_token, combat, _in_room, action) in &heroes {
-        if combat.hp <= 0 {
-            continue;
-        }
-
-        let Some(action) = action else { continue };
-
-        // Get trait bonuses
-        let lucky = hero_traits
-            .get(hero_token.0)
-            .ok()
-            .map(|t| t.0.contains(&HeroTrait::Lucky))
-            .unwrap_or(false);
-        let luck_bonus = if lucky { 3 } else { 0 };
-
-        match action {
-            HeroAction::Attack(target) => {
+    for intent in &intents {
+        match intent {
+            CombatIntent::Attack {
+                target,
+                attack,
+                luck_bonus,
+            } => {
                 if let Ok(mut enemy_combat) = enemy_stats.get_mut(*target) {
                     if enemy_combat.hp <= 0 {
                         continue;
                     }
 
-                    // Roll d20 + attack_mod vs defense + 10
-                    let roll = rng.random_range(1..=20) + combat.attack + luck_bonus;
+                    let roll = rng.random_range(1..=20) + attack + luck_bonus;
                     let target_ac = enemy_combat.defense + 10;
 
                     if roll >= target_ac {
-                        let damage = (combat.attack / 2 + rng.random_range(1..=4)).max(1);
+                        let damage = (attack / 2 + rng.random_range(1..=4)).max(1);
                         enemy_combat.hp -= damage;
 
                         if enemy_combat.hp <= 0 {
@@ -65,8 +104,11 @@ pub fn hero_combat_system(
                     }
                 }
             }
-            HeroAction::Heal(target) => {
-                if let Ok(mut ally_combat) = ally_stats.get_mut(*target) {
+            CombatIntent::Heal {
+                target,
+                luck_bonus,
+            } => {
+                if let Ok(mut ally_combat) = hero_set.p1().get_mut(*target) {
                     if ally_combat.hp <= 0 || ally_combat.hp >= ally_combat.max_hp {
                         continue;
                     }
@@ -75,7 +117,6 @@ pub fn hero_combat_system(
                     ally_combat.hp = (ally_combat.hp + heal).min(ally_combat.max_hp);
                 }
             }
-            _ => {}
         }
     }
 }
