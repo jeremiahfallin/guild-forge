@@ -88,7 +88,12 @@ impl Default for SimulationSpeed {
 
 /// Accumulates time for simulation ticks.
 #[derive(Resource, Debug, Default)]
-pub struct SimulationTimer(pub f32);
+pub struct SimulationTimer {
+    pub elapsed: f32,
+    /// Set to `true` by `simulation_tick` when a tick fires, checked by
+    /// downstream systems, then cleared at the end of the frame.
+    pub ticked: bool,
+}
 
 /// Interval between simulation ticks in seconds.
 pub const TICK_INTERVAL: f32 = 0.5;
@@ -262,12 +267,16 @@ pub fn simulation_tick(
     let Some(dungeon) = dungeon else { return };
     let map = &dungeon.0;
 
-    timer.0 += time.delta_secs() * speed.0;
+    // Reset tick flag at start of each frame
+    timer.ticked = false;
 
-    if timer.0 < TICK_INTERVAL {
+    timer.elapsed += time.delta_secs() * speed.0;
+
+    if timer.elapsed < TICK_INTERVAL {
         return;
     }
-    timer.0 -= TICK_INTERVAL;
+    timer.elapsed -= TICK_INTERVAL;
+    timer.ticked = true;
 
     // Move heroes along their paths
     for (mut grid_pos, mut target, mut in_room) in &mut heroes {
@@ -291,7 +300,7 @@ pub fn sync_sprite_positions(
     mut query: Query<(&GridPosition, &mut Transform), With<MissionEntity>>,
 ) {
     // Lerp factor: how far through the current tick we are
-    let lerp_t = (timer.0 / TICK_INTERVAL).clamp(0.0, 1.0);
+    let _lerp_t = (timer.elapsed / TICK_INTERVAL).clamp(0.0, 1.0);
 
     for (grid_pos, mut transform) in &mut query {
         let target_pos = tile_world_pos(grid_pos.x, grid_pos.y);

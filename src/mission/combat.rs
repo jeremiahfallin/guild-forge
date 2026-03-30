@@ -42,7 +42,7 @@ pub fn hero_combat_system(
     mut enemy_stats: Query<&mut CombatStats, (With<EnemyToken>, Without<HeroToken>)>,
 ) {
     // Only run right after a tick
-    if timer.0 > TICK_INTERVAL * 0.1 {
+    if !timer.ticked {
         return;
     }
 
@@ -127,7 +127,7 @@ pub fn enemy_combat_system(
     enemies: Query<(&CombatStats, &InRoom), With<EnemyToken>>,
     mut heroes: Query<(Entity, &mut CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
 ) {
-    if timer.0 > TICK_INTERVAL * 0.1 {
+    if !timer.ticked {
         return;
     }
 
@@ -200,7 +200,7 @@ pub fn update_room_status(
     heroes: Query<&InRoom, (With<HeroToken>, Without<EnemyToken>)>,
     enemies: Query<(&InRoom, &CombatStats), With<EnemyToken>>,
 ) {
-    if timer.0 > TICK_INTERVAL * 0.1 {
+    if !timer.ticked {
         return;
     }
 
@@ -238,7 +238,7 @@ pub fn check_mission_completion(
     mut missions: Query<&mut MissionProgress, With<Mission>>,
     mut next_tab: ResMut<NextState<crate::screens::GameTab>>,
 ) {
-    if timer.0 > TICK_INTERVAL * 0.1 {
+    if !timer.ticked {
         return;
     }
 

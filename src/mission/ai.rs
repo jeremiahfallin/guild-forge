@@ -28,6 +28,7 @@ pub fn hero_ai_system(
     dungeon: Option<Res<crate::screens::mission_view::ActiveDungeon>>,
     timer: Res<SimulationTimer>,
     room_status: Option<Res<RoomStatus>>,
+
     mut heroes: Query<
         (
             Entity,
@@ -45,8 +46,8 @@ pub fn hero_ai_system(
     mut commands: Commands,
 ) {
     // Only run on tick boundaries
-    if timer.0 > TICK_INTERVAL * 0.1 {
-        return; // Not a fresh tick
+    if !timer.ticked {
+        return;
     }
 
     let Some(dungeon) = dungeon else { return };
