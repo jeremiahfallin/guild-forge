@@ -1,7 +1,6 @@
 //! The game's main screen states and transitions between them.
 
 mod gameplay;
-mod hub;
 mod loading;
 pub mod mission_view;
 pub mod missions;
@@ -18,7 +17,6 @@ pub(super) fn plugin(app: &mut App) {
 
     app.add_plugins((
         gameplay::plugin,
-        hub::plugin,
         loading::plugin,
         mission_view::plugin,
         missions::plugin,
@@ -44,7 +42,6 @@ pub enum Screen {
 #[source(Screen = Screen::Gameplay)]
 pub enum GameTab {
     #[default]
-    Hub,
     Roster,
     Missions,
     PartySelect,

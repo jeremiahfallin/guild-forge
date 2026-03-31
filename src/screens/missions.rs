@@ -128,7 +128,7 @@ fn select_mission(
 }
 
 fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
-    next_tab.set(GameTab::Hub);
+    next_tab.set(GameTab::Missions);
 }
 
 pub fn clear_selection(mut commands: Commands) {

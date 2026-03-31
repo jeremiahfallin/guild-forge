@@ -265,7 +265,7 @@ pub fn check_mission_completion(
             });
         }
         info!("Mission failed — all heroes fell!");
-        next_tab.set(crate::screens::GameTab::Hub);
+        next_tab.set(crate::screens::GameTab::Roster);
         return;
     }
 
@@ -339,6 +339,6 @@ pub fn check_mission_completion(
 
             info!("Mission complete — all rooms cleared! +{gold_earned}g, +{total_xp}xp");
         }
-        next_tab.set(crate::screens::GameTab::Hub);
+        next_tab.set(crate::screens::GameTab::Roster);
     }
 }

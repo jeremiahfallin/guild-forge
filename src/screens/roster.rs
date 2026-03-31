@@ -377,7 +377,7 @@ fn refresh_roster_on_selection_change(
 }
 
 fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
-    next_tab.set(GameTab::Hub);
+    next_tab.set(GameTab::Roster);
 }
 
 fn clear_selection(mut selected: ResMut<SelectedHero>) {
