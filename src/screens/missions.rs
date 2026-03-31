@@ -14,7 +14,6 @@ use crate::{
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(GameTab::Missions), spawn_mission_board);
-    app.add_systems(OnExit(GameTab::Missions), clear_selection);
 }
 
 /// Tracks which mission template the player selected.
@@ -132,6 +131,6 @@ fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
     next_tab.set(GameTab::Hub);
 }
 
-fn clear_selection(mut commands: Commands) {
+pub fn clear_selection(mut commands: Commands) {
     commands.remove_resource::<SelectedMission>();
 }
