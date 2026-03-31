@@ -1,8 +1,8 @@
 use bevy::color::Color;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
-use bevy::ecs::system::EntityCommands;
+use bevy::ecs::system::{EntityCommands, IntoObserverSystem};
 use bevy::picking::events::{Click, Out, Over, Press, Release, Pointer};
-use bevy::prelude::{Commands, On};
+use bevy::prelude::{Bundle, Commands};
 use bevy::ui::{BackgroundColor, BorderRadius, Node, Val};
 
 use crate::element::Element;
@@ -48,35 +48,43 @@ impl Div {
         self
     }
 
-    pub fn on_click(mut self, callback: impl FnMut(On<Pointer<Click>>) + Send + Sync + 'static) -> Self {
+    /// Insert an arbitrary bundle of components onto this element's entity.
+    pub fn insert(mut self, bundle: impl Bundle + Send + Sync + 'static) -> Self {
+        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.insert(bundle);
+        }));
+        self
+    }
+
+    pub fn on_click<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Click>, B, M> + Send + Sync + 'static) -> Self {
         self.observers.push(Box::new(move |ec: &mut EntityCommands| {
             ec.observe(callback);
         }));
         self
     }
 
-    pub fn on_hover(mut self, callback: impl FnMut(On<Pointer<Over>>) + Send + Sync + 'static) -> Self {
+    pub fn on_hover<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Over>, B, M> + Send + Sync + 'static) -> Self {
         self.observers.push(Box::new(move |ec: &mut EntityCommands| {
             ec.observe(callback);
         }));
         self
     }
 
-    pub fn on_hover_out(mut self, callback: impl FnMut(On<Pointer<Out>>) + Send + Sync + 'static) -> Self {
+    pub fn on_hover_out<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Out>, B, M> + Send + Sync + 'static) -> Self {
         self.observers.push(Box::new(move |ec: &mut EntityCommands| {
             ec.observe(callback);
         }));
         self
     }
 
-    pub fn on_press(mut self, callback: impl FnMut(On<Pointer<Press>>) + Send + Sync + 'static) -> Self {
+    pub fn on_press<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Press>, B, M> + Send + Sync + 'static) -> Self {
         self.observers.push(Box::new(move |ec: &mut EntityCommands| {
             ec.observe(callback);
         }));
         self
     }
 
-    pub fn on_release(mut self, callback: impl FnMut(On<Pointer<Release>>) + Send + Sync + 'static) -> Self {
+    pub fn on_release<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Release>, B, M> + Send + Sync + 'static) -> Self {
         self.observers.push(Box::new(move |ec: &mut EntityCommands| {
             ec.observe(callback);
         }));
@@ -111,6 +119,13 @@ impl Div {
         }
 
         ec
+    }
+
+    /// Spawn this element as a child of an existing entity.
+    pub fn spawn_as_child_of(self, commands: &mut Commands, parent: bevy::prelude::Entity) -> bevy::prelude::Entity {
+        let child = self.spawn(commands).id();
+        commands.entity(parent).add_child(child);
+        child
     }
 }
 
