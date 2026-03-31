@@ -3,13 +3,16 @@
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::economy::Gold;
 use crate::hero::data::HeroTrait;
-use crate::hero::{Hero, HeroTraits};
+use crate::hero::{Hero, HeroInfo, HeroTraits};
+use crate::ui::toast::{ToastEvent, ToastKind};
 
 use super::ai::HeroAction;
+use super::data::MissionTemplateDatabase;
 use super::dungeon::RoomType;
 use super::entities::*;
-use super::{Mission, MissionParty, MissionProgress};
+use super::{Mission, MissionInfo, MissionParty, MissionProgress};
 
 /// Collected combat action to apply after reading hero state.
 enum CombatIntent {
@@ -231,11 +234,17 @@ pub fn update_room_status(
 }
 
 /// Check if the mission is complete (all rooms cleared) or failed (all heroes dead).
+/// Awards gold, XP, and fires toast notifications on completion.
 pub fn check_mission_completion(
+    mut commands: Commands,
     timer: Res<SimulationTimer>,
     room_status: Option<Res<RoomStatus>>,
-    heroes: Query<&CombatStats, With<HeroToken>>,
-    mut missions: Query<&mut MissionProgress, With<Mission>>,
+    hero_tokens: Query<(&HeroToken, &CombatStats), Without<EnemyToken>>,
+    dead_enemies: Query<&EnemyToken, Without<HeroToken>>,
+    mut missions: Query<(&mut MissionProgress, &MissionInfo, &MissionParty), With<Mission>>,
+    mut hero_infos: Query<&mut HeroInfo>,
+    mut gold: ResMut<Gold>,
+    template_db: Res<MissionTemplateDatabase>,
     mut next_tab: ResMut<NextState<crate::screens::GameTab>>,
 ) {
     if !timer.ticked {
@@ -245,13 +254,17 @@ pub fn check_mission_completion(
     let Some(room_status) = room_status else { return };
 
     // Check if all heroes are dead → mission failed
-    let all_dead = !heroes.is_empty() && heroes.iter().all(|c| c.hp <= 0);
+    let all_dead = !hero_tokens.is_empty() && hero_tokens.iter().all(|(_, c)| c.hp <= 0);
     if all_dead {
-        for mut progress in &mut missions {
+        for (mut progress, info, _) in &mut missions {
             *progress = MissionProgress::Failed;
+            commands.trigger(ToastEvent {
+                title: format!("{} — Failed!", info.name),
+                body: "Party wiped — no rewards".to_string(),
+                kind: ToastKind::Failure,
+            });
         }
         info!("Mission failed — all heroes fell!");
-        // For now, go back to hub (later: results screen)
         next_tab.set(crate::screens::GameTab::Hub);
         return;
     }
@@ -260,10 +273,72 @@ pub fn check_mission_completion(
     let all_cleared = !room_status.cleared.is_empty()
         && room_status.cleared.iter().all(|&c| c);
     if all_cleared {
-        for mut progress in &mut missions {
+        for (mut progress, mission_info, party) in &mut missions {
             *progress = MissionProgress::Complete;
+
+            // Look up template for rewards
+            let template = template_db.0.iter().find(|t| t.id == mission_info.template_id);
+
+            // Sum XP from all dead enemies (hp <= 0 means they were killed)
+            // All enemies in a completed mission count as defeated
+            let enemy_xp: u32 = dead_enemies.iter().map(|e| e.xp_reward).sum();
+
+            let xp_bonus = template.map_or(0, |t| t.xp_bonus);
+            let total_xp = enemy_xp + xp_bonus;
+
+            // Roll gold reward
+            let mut rng = rand::rng();
+            let gold_earned = template.map_or(0, |t| {
+                rng.random_range(t.gold_reward.min..=t.gold_reward.max)
+            });
+            gold.0 += gold_earned;
+
+            // Count survivors and award XP
+            let survivors: Vec<Entity> = hero_tokens
+                .iter()
+                .filter(|(_, cs)| cs.hp > 0)
+                .map(|(ht, _)| ht.0)
+                .collect();
+            let casualties = party.0.len().saturating_sub(survivors.len());
+
+            let mut level_ups = 0u32;
+            for hero_entity in &survivors {
+                if let Ok(mut info) = hero_infos.get_mut(*hero_entity) {
+                    info.xp += total_xp;
+                    while info.xp >= info.xp_to_next {
+                        info.xp -= info.xp_to_next;
+                        info.level += 1;
+                        info.xp_to_next = (info.xp_to_next as f32 * 1.5) as u32;
+                        level_ups += 1;
+                    }
+                }
+            }
+
+            // Build toast body
+            let mut body = format!("+{gold_earned}g, +{total_xp}xp");
+            if casualties > 0 {
+                body.push_str(&format!(
+                    " — {} casualt{}",
+                    casualties,
+                    if casualties == 1 { "y" } else { "ies" }
+                ));
+            }
+            if level_ups > 0 {
+                body.push_str(&format!(
+                    " — {} level up{}!",
+                    level_ups,
+                    if level_ups == 1 { "" } else { "s" }
+                ));
+            }
+
+            commands.trigger(ToastEvent {
+                title: format!("{} — Complete!", mission_info.name),
+                body,
+                kind: ToastKind::Success,
+            });
+
+            info!("Mission complete — all rooms cleared! +{gold_earned}g, +{total_xp}xp");
         }
-        info!("Mission complete — all rooms cleared!");
         next_tab.set(crate::screens::GameTab::Hub);
     }
 }

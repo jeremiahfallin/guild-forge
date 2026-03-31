@@ -7,6 +7,7 @@ mod asset_tracking;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
+mod economy;
 mod hero;
 mod mission;
 mod menus;
@@ -51,6 +52,7 @@ impl Plugin for AppPlugin {
             audio::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
+            economy::plugin,
             hero::plugin,
             mission::plugin,
             menus::plugin,

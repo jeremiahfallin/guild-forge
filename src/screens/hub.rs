@@ -6,6 +6,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
+    economy::Gold,
     screens::GameTab,
     theme::{palette::*, widgets},
 };
@@ -14,10 +15,14 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(GameTab::Hub), spawn_hub);
 }
 
-fn spawn_hub(mut commands: Commands) {
+fn spawn_hub(mut commands: Commands, gold: Res<Gold>) {
     widgets::ui_root("Guild Hub")
         .insert(DespawnOnExit(GameTab::Hub))
         .child(widgets::header("Guild Forge"))
+        .child(
+            widgets::label(format!("Gold: {}", gold.0))
+                .color(Color::srgb(0.9, 0.8, 0.2)),
+        )
         .child(
             widgets::label("Manage your guild of adventurers")
                 .color(LABEL_TEXT),
