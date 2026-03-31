@@ -448,6 +448,11 @@ pub trait Styled: Sized {
         self
     }
 
+    fn overflow_y_scroll(mut self) -> Self {
+        self.style_mut().overflow.y = OverflowAxis::Scroll;
+        self
+    }
+
     // ── Aspect ratio ─────────────────────────────────────────────────
 
     fn aspect_ratio(mut self, ratio: f32) -> Self {
