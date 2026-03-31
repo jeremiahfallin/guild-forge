@@ -32,7 +32,7 @@ pub(super) fn plugin(app: &mut App) {
             in_state(GameTab::PartySelect).and(resource_changed::<SelectedParty>),
         ),
     );
-    app.add_systems(OnExit(GameTab::PartySelect), cleanup_party_select);
+    app.add_systems(OnExit(GameTab::PartySelect), (cleanup_party_select, crate::screens::missions::clear_selection));
 }
 
 /// Tracks which heroes have been selected for the party.
