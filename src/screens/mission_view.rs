@@ -9,7 +9,7 @@ use crate::{
     mission::{
         Mission, MissionParty,
         dungeon::{DungeonMap, Tile, RoomType, generate_dungeon},
-        entities::{CombatStats, MissionEntity, HeroToken, EnemyToken, RoomStatus, SimulationSpeed, SimulationTimer},
+        entities::{CombatStats, MissionEntity, RoomStatus, SimulationSpeed, SimulationTimer},
     },
     screens::GameTab,
     theme::widgets,

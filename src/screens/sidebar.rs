@@ -12,7 +12,7 @@ use crate::{
     screens::GameTab,
     theme::{
         palette::*,
-        widgets::{self, GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRoot},
+        widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRoot},
     },
 };
 
