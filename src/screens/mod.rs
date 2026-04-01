@@ -6,6 +6,7 @@ pub mod mission_view;
 pub mod missions;
 mod party_select;
 mod roster;
+mod sidebar;
 mod splash;
 mod title;
 
@@ -22,6 +23,7 @@ pub(super) fn plugin(app: &mut App) {
         missions::plugin,
         party_select::plugin,
         roster::plugin,
+        sidebar::plugin,
         splash::plugin,
         title::plugin,
     ));
