@@ -44,18 +44,15 @@ fn spawn_roster(
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
 ) {
-    let mut root = widgets::ui_root("Roster Screen")
+    let mut root = widgets::content_area("Roster Screen")
         .insert((DespawnOnExit(GameTab::Roster), RosterUi));
 
-    // Top bar: title + back button
     let top_bar = div()
         .row()
         .w_full()
-        .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Roster"))
-        .child(widgets::game_button("Back", go_back));
+        .child(widgets::header("Roster"));
 
     // Main content: two-panel layout
     let hero_list = build_hero_list(&heroes, &selected);
@@ -348,17 +345,15 @@ fn refresh_roster_on_selection_change(
         commands.entity(entity).despawn();
     }
 
-    let mut root = widgets::ui_root("Roster Screen")
+    let mut root = widgets::content_area("Roster Screen")
         .insert((DespawnOnExit(GameTab::Roster), RosterUi));
 
     let top_bar = div()
         .row()
         .w_full()
-        .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Roster"))
-        .child(widgets::game_button("Back", go_back));
+        .child(widgets::header("Roster"));
 
     let hero_list = build_hero_list(&heroes, &selected);
     let detail = build_detail_panel(&selected, &hero_query, &trait_db);
@@ -374,10 +369,6 @@ fn refresh_roster_on_selection_change(
 
     root = root.child(top_bar).child(content);
     root.spawn(&mut commands);
-}
-
-fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
-    next_tab.set(GameTab::Roster);
 }
 
 fn clear_selection(mut selected: ResMut<SelectedHero>) {
