@@ -71,7 +71,7 @@ fn spawn_party_select(
         .map(|t| t.name.as_str())
         .unwrap_or("Unknown Mission");
 
-    let mut root = widgets::ui_root("Party Select")
+    let mut root = widgets::content_area("Party Select")
         .insert((DespawnOnExit(GameTab::PartySelect), PartySelectUi));
 
     // Top bar
@@ -237,7 +237,7 @@ fn refresh_party_select(
         .map(|t| t.name.as_str())
         .unwrap_or("Unknown Mission");
 
-    let mut root = widgets::ui_root("Party Select")
+    let mut root = widgets::content_area("Party Select")
         .insert((DespawnOnExit(GameTab::PartySelect), PartySelectUi));
 
     // Top bar
