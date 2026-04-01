@@ -7,8 +7,9 @@ use bevy_declarative::style::styled::Styled;
 
 use crate::{
     mission::{
+        Mission, MissionParty,
         dungeon::{DungeonMap, Tile, RoomType, generate_dungeon},
-        entities::{CombatStats, MissionEntity, HeroToken, EnemyToken},
+        entities::{CombatStats, MissionEntity, HeroToken, EnemyToken, RoomStatus, SimulationSpeed, SimulationTimer},
     },
     screens::GameTab,
     theme::widgets,
@@ -88,8 +89,8 @@ fn spawn_mission_view(
     // Fit camera to dungeon
     fit_camera_to_dungeon(&map, &mut camera_q);
 
-    // Spawn UI overlay
-    widgets::ui_root("Mission View UI")
+    // Spawn UI overlay — just the abort button
+    widgets::content_area("Mission View UI")
         .insert((MissionViewUi, GlobalZIndex(10)))
         .child(
             bevy_declarative::element::div::div()
@@ -98,7 +99,7 @@ fn spawn_mission_view(
                     bottom: bevy::ui::Val::Px(20.0),
                     ..default()
                 })
-                .child(widgets::game_button("Retreat", go_back)),
+                .child(widgets::game_button("Abort Mission", abort_mission)),
         )
         .spawn(&mut commands);
 }
@@ -183,8 +184,30 @@ fn fit_camera_to_dungeon(
     }
 }
 
-fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
-    next_tab.set(GameTab::Roster);
+fn abort_mission(
+    _: On<Pointer<Click>>,
+    mut commands: Commands,
+    entities: Query<Entity, With<MissionEntity>>,
+    missions: Query<(Entity, &MissionParty), With<Mission>>,
+    mut next_tab: ResMut<NextState<GameTab>>,
+) {
+    // Cleanup mission entities (tokens, enemies, etc.)
+    for entity in &entities {
+        commands.entity(entity).despawn();
+    }
+    // Remove OnMission from party heroes and despawn mission entity
+    for (mission_entity, party) in &missions {
+        for &hero_entity in &party.0 {
+            commands.entity(hero_entity).remove::<crate::mission::OnMission>();
+        }
+        commands.entity(mission_entity).despawn();
+    }
+    commands.remove_resource::<RoomStatus>();
+    commands.remove_resource::<SimulationSpeed>();
+    commands.remove_resource::<SimulationTimer>();
+    commands.remove_resource::<ActiveDungeon>();
+
+    next_tab.set(GameTab::Missions);
 }
 
 // ── Health bars ─────────────────────────────────────────────────────
