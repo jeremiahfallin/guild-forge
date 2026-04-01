@@ -14,26 +14,25 @@ use crate::screens::GameTab;
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, data::load_mission_databases);
     app.add_systems(OnEnter(GameTab::MissionView), entities::spawn_mission_entities);
-    app.add_systems(OnExit(GameTab::MissionView), entities::cleanup_mission_entities);
+    // Simulation systems run during all of Gameplay so missions continue in background
     app.add_systems(
         Update,
         (
-            // Simulation tick: advance timer & move heroes
             entities::simulation_tick,
-            // AI: decide actions for heroes
             ai::hero_ai_system,
-            // Combat: resolve attacks and healing
             combat::hero_combat_system,
             combat::enemy_combat_system,
-            // Cleanup: handle death, update room status
             combat::handle_death_system,
             combat::update_room_status,
-            // Check win/lose conditions
             combat::check_mission_completion,
-            // Visual: sync sprite positions smoothly
-            entities::sync_sprite_positions,
         )
             .chain()
+            .run_if(in_state(crate::screens::Screen::Gameplay)),
+    );
+    // Visual sync only runs when viewing a mission
+    app.add_systems(
+        Update,
+        entities::sync_sprite_positions
             .run_if(in_state(GameTab::MissionView)),
     );
 }

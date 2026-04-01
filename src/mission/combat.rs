@@ -241,11 +241,11 @@ pub fn check_mission_completion(
     room_status: Option<Res<RoomStatus>>,
     hero_tokens: Query<(&HeroToken, &CombatStats), Without<EnemyToken>>,
     dead_enemies: Query<&EnemyToken, Without<HeroToken>>,
-    mut missions: Query<(&mut MissionProgress, &MissionInfo, &MissionParty), With<Mission>>,
+    mission_entities: Query<Entity, With<MissionEntity>>,
+    mut missions: Query<(Entity, &mut MissionProgress, &MissionInfo, &MissionParty), With<Mission>>,
     mut hero_infos: Query<&mut HeroInfo>,
     mut gold: ResMut<Gold>,
     template_db: Res<MissionTemplateDatabase>,
-    mut next_tab: ResMut<NextState<crate::screens::GameTab>>,
 ) {
     if !timer.ticked {
         return;
@@ -256,16 +256,30 @@ pub fn check_mission_completion(
     // Check if all heroes are dead → mission failed
     let all_dead = !hero_tokens.is_empty() && hero_tokens.iter().all(|(_, c)| c.hp <= 0);
     if all_dead {
-        for (mut progress, info, _) in &mut missions {
+        for (mission_entity_id, mut progress, info, party) in &mut missions {
             *progress = MissionProgress::Failed;
             commands.trigger(ToastEvent {
                 title: format!("{} — Failed!", info.name),
                 body: "Party wiped — no rewards".to_string(),
                 kind: ToastKind::Failure,
             });
+
+            // Clean up mission entities
+            for entity in &mission_entities {
+                commands.entity(entity).despawn();
+            }
+            // Remove OnMission from party heroes
+            for &hero_entity in &party.0 {
+                commands.entity(hero_entity).remove::<super::OnMission>();
+            }
+            commands.entity(mission_entity_id).despawn();
         }
+        // Clean up resources
+        commands.remove_resource::<RoomStatus>();
+        commands.remove_resource::<SimulationTimer>();
+        commands.remove_resource::<SimulationSpeed>();
+        commands.remove_resource::<crate::screens::mission_view::ActiveDungeon>();
         info!("Mission failed — all heroes fell!");
-        next_tab.set(crate::screens::GameTab::Roster);
         return;
     }
 
@@ -273,7 +287,7 @@ pub fn check_mission_completion(
     let all_cleared = !room_status.cleared.is_empty()
         && room_status.cleared.iter().all(|&c| c);
     if all_cleared {
-        for (mut progress, mission_info, party) in &mut missions {
+        for (mission_entity_id, mut progress, mission_info, party) in &mut missions {
             *progress = MissionProgress::Complete;
 
             // Look up template for rewards
@@ -337,8 +351,22 @@ pub fn check_mission_completion(
                 kind: ToastKind::Success,
             });
 
+            // Clean up mission entities
+            for entity in &mission_entities {
+                commands.entity(entity).despawn();
+            }
+            // Remove OnMission from party heroes
+            for &hero_entity in &party.0 {
+                commands.entity(hero_entity).remove::<super::OnMission>();
+            }
+            commands.entity(mission_entity_id).despawn();
+
             info!("Mission complete — all rooms cleared! +{gold_earned}g, +{total_xp}xp");
         }
-        next_tab.set(crate::screens::GameTab::Roster);
+        // Clean up resources
+        commands.remove_resource::<RoomStatus>();
+        commands.remove_resource::<SimulationTimer>();
+        commands.remove_resource::<SimulationSpeed>();
+        commands.remove_resource::<crate::screens::mission_view::ActiveDungeon>();
     }
 }
