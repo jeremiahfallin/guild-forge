@@ -26,6 +26,39 @@ pub fn ui_root(name: impl Into<Cow<'static, str>>) -> Div {
         .insert((Name::new(name), Pickable::IGNORE))
 }
 
+/// Marker for the gameplay root container (sidebar + content area).
+#[derive(Component)]
+pub struct GameplayRoot;
+
+/// Marker for the sidebar UI so reactive systems can find it.
+#[derive(Component)]
+pub struct SidebarRoot;
+
+/// Marker for the gold text display in the sidebar.
+#[derive(Component)]
+pub struct SidebarGoldText;
+
+/// Marker for the active missions container in the sidebar.
+#[derive(Component)]
+pub struct SidebarMissionList;
+
+/// Marker for a nav button, storing which tab it navigates to.
+#[derive(Component)]
+pub struct SidebarNavButton(pub crate::screens::GameTab);
+
+/// A content area that fills the right side of the gameplay layout.
+/// Screens use this instead of `ui_root()` when the sidebar is present.
+pub fn content_area(name: impl Into<Cow<'static, str>>) -> Div {
+    div()
+        .col()
+        .flex_1()
+        .h_full()
+        .items_center()
+        .gap(px(20.0))
+        .overflow_y_hidden()
+        .insert((Name::new(name), Pickable::IGNORE))
+}
+
 /// A simple header label. Bigger than [`label`].
 pub fn header(content: impl Into<String>) -> TextEl {
     text(content).font_size(40.0).color(HEADER_TEXT)

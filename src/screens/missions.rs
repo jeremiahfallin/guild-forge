@@ -30,18 +30,16 @@ fn spawn_mission_board(
 ) {
     commands.init_resource::<SelectedMission>();
 
-    let mut root = widgets::ui_root("Mission Board")
+    let mut root = widgets::content_area("Mission Board")
         .insert(DespawnOnExit(GameTab::Missions));
 
     // Top bar
     let top_bar = div()
         .row()
         .w_full()
-        .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Mission Board"))
-        .child(widgets::game_button("Back", go_back));
+        .child(widgets::header("Mission Board"));
 
     root = root.child(top_bar);
 
@@ -125,10 +123,6 @@ fn select_mission(
         selected.0 = Some(button.0);
         next_tab.set(GameTab::PartySelect);
     }
-}
-
-fn go_back(_: On<Pointer<Click>>, mut next_tab: ResMut<NextState<GameTab>>) {
-    next_tab.set(GameTab::Hub);
 }
 
 pub fn clear_selection(mut commands: Commands) {
