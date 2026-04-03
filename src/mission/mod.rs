@@ -6,13 +6,14 @@ pub mod data;
 pub mod dungeon;
 pub mod entities;
 pub mod pathfinding;
+pub mod tileset;
 
 use bevy::prelude::*;
 
 use crate::screens::GameTab;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, data::load_mission_databases);
+    app.add_systems(Startup, (data::load_mission_databases, tileset::load_sprites));
     app.add_systems(OnEnter(GameTab::MissionView), entities::spawn_mission_entities);
     // Simulation systems run during all of Gameplay so missions continue in background
     app.add_systems(
@@ -27,12 +28,19 @@ pub(super) fn plugin(app: &mut App) {
             combat::check_mission_completion,
         )
             .chain()
-            .run_if(in_state(crate::screens::Screen::Gameplay)),
+            .run_if(in_state(crate::screens::Screen::Gameplay))
+            .run_if(resource_exists::<entities::SimulationTimer>),
     );
     // Visual sync only runs when viewing a mission
     app.add_systems(
         Update,
         entities::sync_sprite_positions
+            .run_if(in_state(GameTab::MissionView)),
+    );
+    // Sprite animation only runs when viewing a mission
+    app.add_systems(
+        Update,
+        tileset::animate_sprites
             .run_if(in_state(GameTab::MissionView)),
     );
 }
