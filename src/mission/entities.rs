@@ -109,6 +109,7 @@ pub fn spawn_mission_entities(
     templates: Option<Res<MissionTemplateDatabase>>,
     enemy_db: Option<Res<EnemyDatabase>>,
     mission_info_q: Query<&super::MissionInfo, With<Mission>>,
+    char_sprites: Option<Res<super::tileset::CharacterSprites>>,
 ) {
     let Some(dungeon) = dungeon else { return };
     let map = &dungeon.0;
@@ -131,32 +132,59 @@ pub fn spawn_mission_entities(
             let hy = (entrance_y as i32 + offset_y).clamp(0, map.height as i32 - 1) as u32;
 
             let pos = tile_world_pos(hx, hy);
-            let color = hero_color(&info.class);
 
             // HP = con×3 + level×5
             let hp = stats.constitution * 3 + info.level as i32 * 5;
             let attack = (stats.strength + stats.dexterity) / 2;
             let defense = (stats.constitution + stats.dexterity) / 2;
 
-            commands.spawn((
-                Name::new(format!("Hero Token: {}", info.name)),
-                MissionEntity,
-                HeroToken(hero_entity),
-                GridPosition { x: hx, y: hy },
-                InRoom(map.room_at(hx, hy)),
-                CombatStats {
-                    hp,
-                    max_hp: hp,
-                    attack,
-                    defense,
-                },
-                Sprite {
-                    color,
-                    custom_size: Some(Vec2::splat(24.0)),
-                    ..default()
-                },
-                Transform::from_translation(pos.with_z(5.0)),
-            ));
+            if let Some(ref char_sprites) = char_sprites {
+                let entry = &char_sprites.hero;
+                commands.spawn((
+                    Name::new(format!("Hero Token: {}", info.name)),
+                    MissionEntity,
+                    HeroToken(hero_entity),
+                    GridPosition { x: hx, y: hy },
+                    InRoom(map.room_at(hx, hy)),
+                    CombatStats {
+                        hp,
+                        max_hp: hp,
+                        attack,
+                        defense,
+                    },
+                    Sprite {
+                        image: entry.texture.clone(),
+                        texture_atlas: Some(TextureAtlas {
+                            layout: entry.layout.clone(),
+                            index: 0,
+                        }),
+                        ..default()
+                    },
+                    super::tileset::SpriteAnimation::new(entry.frame_count),
+                    Transform::from_translation(pos.with_z(5.0)),
+                ));
+            } else {
+                let color = hero_color(&info.class);
+                commands.spawn((
+                    Name::new(format!("Hero Token: {}", info.name)),
+                    MissionEntity,
+                    HeroToken(hero_entity),
+                    GridPosition { x: hx, y: hy },
+                    InRoom(map.room_at(hx, hy)),
+                    CombatStats {
+                        hp,
+                        max_hp: hp,
+                        attack,
+                        defense,
+                    },
+                    Sprite {
+                        color,
+                        custom_size: Some(Vec2::splat(24.0)),
+                        ..default()
+                    },
+                    Transform::from_translation(pos.with_z(5.0)),
+                ));
+            }
         }
     }
 
@@ -171,7 +199,13 @@ pub fn spawn_mission_entities(
     {
         let template = templates.0.iter().find(|t| t.id == template_id);
         if let Some(template) = template {
-            spawn_enemies(&mut commands, map, template, &enemy_db);
+            spawn_enemies(
+                &mut commands,
+                map,
+                template,
+                &enemy_db,
+                char_sprites.as_deref(),
+            );
         }
     }
 
@@ -194,6 +228,7 @@ fn spawn_enemies(
     map: &DungeonMap,
     template: &super::data::MissionTemplate,
     enemy_db: &EnemyDatabase,
+    char_sprites: Option<&super::tileset::CharacterSprites>,
 ) {
     let mut rng = rand::rng();
 
@@ -225,30 +260,60 @@ fn spawn_enemies(
             let ey = room.y + rng.random_range(0..room.h);
 
             let pos = tile_world_pos(ex, ey);
-            let color = enemy_color(enemy_type);
 
-            commands.spawn((
-                Name::new(format!("Enemy: {}", enemy_def.name)),
-                MissionEntity,
-                EnemyToken {
-                    enemy_type,
-                    xp_reward: enemy_def.xp_reward,
-                },
-                GridPosition { x: ex, y: ey },
-                InRoom(Some(room_idx)),
-                CombatStats {
-                    hp: enemy_def.hp,
-                    max_hp: enemy_def.hp,
-                    attack: enemy_def.attack,
-                    defense: enemy_def.defense,
-                },
-                Sprite {
-                    color,
-                    custom_size: Some(Vec2::splat(20.0)),
-                    ..default()
-                },
-                Transform::from_translation(pos.with_z(4.0)),
-            ));
+            if let Some(char_sprites) = char_sprites {
+                let entry = char_sprites.for_enemy(enemy_type);
+                commands.spawn((
+                    Name::new(format!("Enemy: {}", enemy_def.name)),
+                    MissionEntity,
+                    EnemyToken {
+                        enemy_type,
+                        xp_reward: enemy_def.xp_reward,
+                    },
+                    GridPosition { x: ex, y: ey },
+                    InRoom(Some(room_idx)),
+                    CombatStats {
+                        hp: enemy_def.hp,
+                        max_hp: enemy_def.hp,
+                        attack: enemy_def.attack,
+                        defense: enemy_def.defense,
+                    },
+                    Sprite {
+                        image: entry.texture.clone(),
+                        texture_atlas: Some(TextureAtlas {
+                            layout: entry.layout.clone(),
+                            index: 0,
+                        }),
+                        ..default()
+                    },
+                    super::tileset::SpriteAnimation::new(entry.frame_count),
+                    Transform::from_translation(pos.with_z(4.0)),
+                ));
+            } else {
+                let color = enemy_color(enemy_type);
+                commands.spawn((
+                    Name::new(format!("Enemy: {}", enemy_def.name)),
+                    MissionEntity,
+                    EnemyToken {
+                        enemy_type,
+                        xp_reward: enemy_def.xp_reward,
+                    },
+                    GridPosition { x: ex, y: ey },
+                    InRoom(Some(room_idx)),
+                    CombatStats {
+                        hp: enemy_def.hp,
+                        max_hp: enemy_def.hp,
+                        attack: enemy_def.attack,
+                        defense: enemy_def.defense,
+                    },
+                    Sprite {
+                        color,
+                        custom_size: Some(Vec2::splat(20.0)),
+                        ..default()
+                    },
+                    Transform::from_translation(pos.with_z(4.0)),
+                ));
+            }
         }
     }
 }

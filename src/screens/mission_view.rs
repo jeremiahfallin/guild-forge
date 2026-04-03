@@ -41,9 +41,12 @@ pub struct ActiveDungeon(pub DungeonMap);
 
 fn spawn_mission_view(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     active_dungeon: Option<Res<ActiveDungeon>>,
     mut camera_q: Query<(&mut Transform, &mut Projection), With<Camera2d>>,
+    tileset: Option<Res<crate::mission::tileset::DungeonTileset>>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
     // Generate a dungeon if none was provided (temp dev path)
     let map = if let Some(dungeon) = active_dungeon {
         dungeon.0.clone()
@@ -66,21 +69,38 @@ fn spawn_mission_view(
 
     for y in 0..map.height {
         for x in 0..map.width {
-            let tile = map.get(x, y);
-            let color = tile_color(tile, &map, x, y);
-
             let pos = tile_world_pos(x, y);
-            let child = commands
-                .spawn((
-                    Name::new(format!("Tile({x},{y})")),
-                    Sprite {
-                        color,
-                        custom_size: Some(Vec2::splat(TILE_SIZE)),
-                        ..default()
-                    },
-                    Transform::from_translation(pos),
-                ))
-                .id();
+            let child = if let Some(ref tileset) = tileset {
+                let tile_idx = crate::mission::tileset::autotile_index(&map, x, y);
+                commands
+                    .spawn((
+                        Name::new(format!("Tile({x},{y})")),
+                        Sprite {
+                            image: tileset.texture.clone(),
+                            texture_atlas: Some(TextureAtlas {
+                                layout: tileset.layout.clone(),
+                                index: tile_idx as usize,
+                            }),
+                            ..default()
+                        },
+                        Transform::from_translation(pos),
+                    ))
+                    .id()
+            } else {
+                let tile = map.get(x, y);
+                let color = tile_color(tile, &map, x, y);
+                commands
+                    .spawn((
+                        Name::new(format!("Tile({x},{y})")),
+                        Sprite {
+                            color,
+                            custom_size: Some(Vec2::splat(TILE_SIZE)),
+                            ..default()
+                        },
+                        Transform::from_translation(pos),
+                    ))
+                    .id()
+            };
 
             commands.entity(root).add_child(child);
         }
@@ -101,7 +121,7 @@ fn spawn_mission_view(
                 })
                 .child(widgets::game_button("Abort Mission", abort_mission)),
         )
-        .spawn(&mut commands);
+        .spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn cleanup_mission_view(
