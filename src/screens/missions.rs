@@ -26,8 +26,10 @@ struct SelectMissionButton(usize);
 
 fn spawn_mission_board(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     templates: Option<Res<MissionTemplateDatabase>>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
     commands.init_resource::<SelectedMission>();
 
     let mut root = widgets::content_area("Mission Board")
@@ -110,7 +112,7 @@ fn spawn_mission_board(
         root = root.child(widgets::label("Loading missions..."));
     }
 
-    root.spawn(&mut commands);
+    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn select_mission(

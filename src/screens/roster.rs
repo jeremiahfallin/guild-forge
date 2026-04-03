@@ -39,11 +39,13 @@ struct DetailPanel;
 
 fn spawn_roster(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
     let mut root = widgets::content_area("Roster Screen")
         .insert((DespawnOnExit(GameTab::Roster), RosterUi));
 
@@ -68,7 +70,7 @@ fn spawn_roster(
         .child(detail);
 
     root = root.child(top_bar).child(content);
-    root.spawn(&mut commands);
+    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn build_hero_list(
@@ -334,12 +336,15 @@ fn select_hero(
 
 fn refresh_roster_on_selection_change(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
     heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
+
     // Despawn old roster UI and rebuild
     for entity in &roster_ui {
         commands.entity(entity).despawn();
@@ -368,7 +373,7 @@ fn refresh_roster_on_selection_change(
         .child(detail);
 
     root = root.child(top_bar).child(content);
-    root.spawn(&mut commands);
+    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn clear_selection(mut selected: ResMut<SelectedHero>) {

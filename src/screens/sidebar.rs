@@ -172,10 +172,13 @@ fn disabled_nav_button(label: &str) -> bevy_declarative::element::div::Div {
 fn nav_click(
     click: On<Pointer<Click>>,
     buttons: Query<&SidebarNavButton>,
+    current_tab: Res<State<GameTab>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     if let Ok(nav) = buttons.get(click.event_target()) {
-        next_tab.set(nav.0);
+        if nav.0 != **current_tab {
+            next_tab.set(nav.0);
+        }
     }
 }
 

@@ -57,10 +57,12 @@ struct DispatchButton;
 
 fn spawn_party_select(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
     heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>)>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
     commands.init_resource::<SelectedParty>();
 
     let mission_name = selected_mission
@@ -137,7 +139,7 @@ fn spawn_party_select(
         );
 
     root = root.child(top_bar).child(content).child(bottom);
-    root.spawn(&mut commands);
+    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn build_available_panel(
@@ -217,6 +219,7 @@ fn build_available_panel(
 
 fn refresh_party_select(
     mut commands: Commands,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     ui_q: Query<Entity, With<PartySelectUi>>,
     selected_party: Res<SelectedParty>,
     selected_mission: Option<Res<SelectedMission>>,
@@ -224,6 +227,8 @@ fn refresh_party_select(
     heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>)>,
     hero_info: Query<&HeroInfo, With<Hero>>,
 ) {
+    let Ok(root_entity) = gameplay_root.single() else { return };
+
     // Despawn old UI
     for entity in &ui_q {
         commands.entity(entity).despawn();
@@ -355,7 +360,7 @@ fn refresh_party_select(
     };
 
     root = root.child(top_bar).child(content).child(bottom);
-    root.spawn(&mut commands);
+    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn add_hero_to_party(
