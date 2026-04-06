@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo doc:*)",
+      "Bash(grep -r \"ScrollPosition\\\\|OverflowAxis::Scroll\" target/release/build/bevy_ui-*/out)",
+      "Bash(grep -rn ScrollPosition target/debug/build/*/out)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Read(//c/Users/bullf/dev/games/bevy_declarative/**)",
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(find \"C:\\\\Users\\\\bullf\\\\dev\\\\games\\\\guild-forge\\\\assets\" -type f -exec ls -lh {})"
+    ]
+  }
+}
