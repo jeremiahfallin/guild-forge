@@ -32,6 +32,8 @@ dev = [
     "bevy/bevy_ui_debug",
     # Improve error messages coming from Bevy
     "bevy/track_location",
+    # Show system/component names in debug/panic output
+    "bevy/debug",
 ]
 dev_native = [
     "dev",

@@ -15,6 +15,7 @@ use crate::screens::GameTab;
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, (data::load_mission_databases, tileset::load_sprites));
     app.add_systems(OnEnter(GameTab::MissionView), entities::spawn_mission_entities);
+    app.add_systems(OnExit(GameTab::MissionView), entities::cleanup_mission_entities);
     // Simulation systems run during all of Gameplay so missions continue in background
     app.add_systems(
         Update,
@@ -77,3 +78,13 @@ pub struct MissionParty(pub Vec<Entity>);
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct OnMission(pub Entity);
+
+/// Stores the generated dungeon map on the mission entity so it persists
+/// across view transitions and can be restored when re-watching a mission.
+#[derive(Component, Debug, Clone, Reflect)]
+#[reflect(Component)]
+pub struct MissionDungeon(pub dungeon::DungeonMap);
+
+/// Tracks which mission entity is currently being viewed in the MissionView.
+#[derive(Resource, Debug)]
+pub struct ViewedMission(pub Entity);

@@ -8,8 +8,8 @@ use bevy_declarative::style::values::px;
 
 use crate::{
     economy::Gold,
-    mission::{Mission, MissionInfo, MissionProgress},
-    screens::GameTab,
+    mission::{Mission, MissionDungeon, MissionInfo, MissionProgress, ViewedMission},
+    screens::{GameTab, mission_view::ActiveDungeon},
     theme::{
         palette::*,
         widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRoot},
@@ -211,10 +211,23 @@ fn update_mission_list(
     list_q: Query<Entity, With<SidebarMissionList>>,
     missions: Query<(Entity, &MissionInfo, &MissionProgress), With<Mission>>,
     children_q: Query<&Children>,
+    mut last_snapshot: Local<Vec<(Entity, MissionProgress)>>,
 ) {
     let Ok(list_entity) = list_q.single() else {
         return;
     };
+
+    // Build a snapshot of current mission state to detect changes
+    let mut snapshot: Vec<(Entity, MissionProgress)> = missions
+        .iter()
+        .map(|(e, _, p)| (e, *p))
+        .collect();
+    snapshot.sort_by_key(|(e, _)| *e);
+
+    if *last_snapshot == snapshot {
+        return; // Nothing changed — keep existing UI with its click observers
+    }
+    *last_snapshot = snapshot;
 
     // Despawn existing children
     if let Ok(children) = children_q.get(list_entity) {
@@ -224,7 +237,7 @@ fn update_mission_list(
     }
 
     // Rebuild mission entries
-    for (_mission_entity, info, progress) in &missions {
+    for (mission_entity, info, progress) in &missions {
         let status_text = match progress {
             MissionProgress::InProgress => "In Progress",
             MissionProgress::Complete => "Complete",
@@ -244,7 +257,7 @@ fn update_mission_list(
             .gap(px(2.0))
             .bg(bg_color)
             .rounded(px(4.0))
-            .insert(WatchMissionButton(_mission_entity))
+            .insert(WatchMissionButton(mission_entity))
             .on_click(watch_mission)
             .child(
                 text(&info.name)
@@ -267,10 +280,30 @@ struct WatchMissionButton(Entity);
 
 fn watch_mission(
     click: On<Pointer<Click>>,
+    mut commands: Commands,
     buttons: Query<&WatchMissionButton>,
+    dungeons: Query<&MissionDungeon, With<Mission>>,
+    current_tab: Res<State<GameTab>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
-    if let Ok(_button) = buttons.get(click.event_target()) {
-        next_tab.set(GameTab::MissionView);
+    if let Ok(button) = buttons.get(click.event_target()) {
+        let mission_entity = button.0;
+
+        // Set which mission we're viewing
+        commands.insert_resource(ViewedMission(mission_entity));
+
+        // Restore the dungeon map for rendering
+        if let Ok(dungeon) = dungeons.get(mission_entity) {
+            commands.insert_resource(ActiveDungeon(dungeon.0.clone()));
+        }
+
+        if **current_tab == GameTab::MissionView {
+            // Already viewing a mission — trigger in-place respawn (no state bounce)
+            commands.insert_resource(
+                crate::screens::mission_view::RespawnMissionView,
+            );
+        } else {
+            next_tab.set(GameTab::MissionView);
+        }
     }
 }

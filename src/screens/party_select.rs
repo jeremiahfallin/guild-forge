@@ -10,7 +10,8 @@ use rand::Rng;
 use crate::{
     hero::{Hero, HeroInfo},
     mission::{
-        Mission, MissionInfo, MissionParty, MissionProgress, OnMission,
+        Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
+        ViewedMission,
         data::MissionTemplateDatabase,
         dungeon::generate_dungeon,
     },
@@ -414,7 +415,7 @@ fn dispatch_mission(
     let rooms = rng.random_range(template.rooms_min..=template.rooms_max);
     let map = generate_dungeon(40, 30, rooms, &mut rng);
 
-    // Create mission entity
+    // Create mission entity with dungeon stored on it
     let mission_entity = commands
         .spawn((
             Name::new(format!("Mission: {}", template.name)),
@@ -426,6 +427,7 @@ fn dispatch_mission(
             },
             MissionProgress::InProgress,
             MissionParty(party.0.clone()),
+            MissionDungeon(map.clone()),
         ))
         .id();
 
@@ -434,8 +436,9 @@ fn dispatch_mission(
         commands.entity(hero_entity).insert(OnMission(mission_entity));
     }
 
-    // Store dungeon for rendering
+    // Store dungeon for rendering and track which mission we're viewing
     commands.insert_resource(ActiveDungeon(map));
+    commands.insert_resource(ViewedMission(mission_entity));
 
     info!(
         "Dispatched mission '{}' with {} heroes",

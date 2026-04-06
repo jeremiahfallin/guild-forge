@@ -103,23 +103,28 @@ pub const TICK_INTERVAL: f32 = 0.5;
 /// Spawn hero and enemy tokens when entering the mission view.
 pub fn spawn_mission_entities(
     mut commands: Commands,
-    mission_q: Query<&MissionParty, With<Mission>>,
+    mission_q: Query<(Entity, &MissionParty), With<Mission>>,
     hero_q: Query<(&HeroInfo, &HeroStats), With<Hero>>,
     dungeon: Option<Res<crate::screens::mission_view::ActiveDungeon>>,
     templates: Option<Res<MissionTemplateDatabase>>,
     enemy_db: Option<Res<EnemyDatabase>>,
-    mission_info_q: Query<&super::MissionInfo, With<Mission>>,
+    mission_info_q: Query<(Entity, &super::MissionInfo), With<Mission>>,
     char_sprites: Option<Res<super::tileset::CharacterSprites>>,
+    viewed: Option<Res<super::ViewedMission>>,
 ) {
     let Some(dungeon) = dungeon else { return };
+    let Some(viewed) = viewed else { return };
     let map = &dungeon.0;
 
     // Find entrance room for hero placement
     let entrance = map.entrance_room().unwrap_or(&map.rooms[0]);
     let (entrance_x, entrance_y) = entrance.center();
 
-    // Spawn hero tokens
-    for party in mission_q.iter() {
+    // Only spawn tokens for the currently viewed mission
+    for (mission_entity, party) in mission_q.iter() {
+        if mission_entity != viewed.0 {
+            continue;
+        }
         for (i, &hero_entity) in party.0.iter().enumerate() {
             let Ok((info, stats)) = hero_q.get(hero_entity) else {
                 continue;
@@ -188,11 +193,11 @@ pub fn spawn_mission_entities(
         }
     }
 
-    // Spawn enemy tokens based on mission template
+    // Spawn enemy tokens based on mission template (only for viewed mission)
     let template_id = mission_info_q
         .iter()
-        .next()
-        .map(|info| info.template_id.clone());
+        .find(|(e, _)| *e == viewed.0)
+        .map(|(_, info)| info.template_id.clone());
 
     if let (Some(templates), Some(enemy_db), Some(template_id)) =
         (templates, enemy_db, template_id)
@@ -360,10 +365,13 @@ pub fn simulation_tick(
 /// Sync sprite transforms from grid positions with smooth interpolation.
 pub fn sync_sprite_positions(
     time: Res<Time>,
-    speed: Res<SimulationSpeed>,
-    timer: Res<SimulationTimer>,
+    speed: Option<Res<SimulationSpeed>>,
+    timer: Option<Res<SimulationTimer>>,
     mut query: Query<(&GridPosition, &mut Transform), With<MissionEntity>>,
 ) {
+    let Some(speed) = speed else { return };
+    let Some(timer) = timer else { return };
+
     // Lerp factor: how far through the current tick we are
     let _lerp_t = (timer.elapsed / TICK_INTERVAL).clamp(0.0, 1.0);
 
@@ -379,30 +387,23 @@ pub fn sync_sprite_positions(
     }
 }
 
-/// Clean up mission entities, hero status, and resources when leaving the mission view.
+/// Clean up mission entity sprites and simulation resources when leaving the mission view.
+/// Does NOT despawn the mission itself — it continues in the background.
+/// Does NOT remove ViewedMission/ActiveDungeon — they may be needed for bounce-back
+/// navigation and are harmless when stale (overwritten before next MissionView entry).
 pub fn cleanup_mission_entities(
     mut commands: Commands,
     entities: Query<Entity, With<MissionEntity>>,
-    missions: Query<(Entity, &MissionParty), With<Mission>>,
 ) {
-    // Despawn all mission-scoped sprites/tokens
+    // Despawn all mission-scoped sprites/tokens (hero tokens, enemy tokens, etc.)
     for entity in &entities {
         commands.entity(entity).despawn();
     }
 
-    // Remove OnMission from party heroes and despawn mission entity
-    for (mission_entity, party) in &missions {
-        for &hero_entity in &party.0 {
-            commands.entity(hero_entity).remove::<super::OnMission>();
-        }
-        commands.entity(mission_entity).despawn();
-    }
-
-    // Clean up resources
+    // Clean up simulation resources (pauses sim when not viewing)
     commands.remove_resource::<RoomStatus>();
     commands.remove_resource::<SimulationSpeed>();
     commands.remove_resource::<SimulationTimer>();
-    commands.remove_resource::<crate::screens::mission_view::ActiveDungeon>();
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

@@ -25,6 +25,21 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         update_health_bars.run_if(in_state(GameTab::MissionView)),
     );
+    // Respawn chain: cleanup → flush commands → re-spawn → consume trigger.
+    // Uses apply_deferred so despawns take effect before spawns run.
+    app.add_systems(
+        Update,
+        (
+            respawn_cleanup.run_if(resource_exists::<RespawnMissionView>),
+            ApplyDeferred,
+            spawn_mission_view.run_if(resource_exists::<NeedsMissionSpawn>),
+            crate::mission::entities::spawn_mission_entities
+                .run_if(resource_exists::<NeedsMissionSpawn>),
+            consume_needs_spawn.run_if(resource_exists::<NeedsMissionSpawn>),
+        )
+            .chain()
+            .run_if(in_state(GameTab::MissionView)),
+    );
 }
 
 /// Marker for the dungeon root entity.
@@ -38,6 +53,14 @@ struct MissionViewUi;
 /// Resource holding the active dungeon map for the current mission.
 #[derive(Resource)]
 pub struct ActiveDungeon(pub DungeonMap);
+
+/// Marker resource: triggers cleanup of the current mission view, then respawn.
+#[derive(Resource)]
+pub struct RespawnMissionView;
+
+/// Inserted after cleanup completes; triggers the spawn systems to re-run.
+#[derive(Resource)]
+pub struct NeedsMissionSpawn;
 
 fn spawn_mission_view(
     mut commands: Commands,
@@ -146,6 +169,56 @@ fn cleanup_mission_view(
     }
 }
 
+/// Phase 1 of mission view respawn: clean up old view, then signal for re-spawn.
+fn respawn_cleanup(
+    mut commands: Commands,
+    dungeon_q: Query<Entity, With<DungeonRoot>>,
+    ui_q: Query<Entity, With<MissionViewUi>>,
+    token_q: Query<Entity, With<MissionEntity>>,
+    mut camera_q: Query<(&mut Transform, &mut Projection), With<Camera2d>>,
+) {
+    // Consume trigger
+    commands.remove_resource::<RespawnMissionView>();
+
+    // Despawn old dungeon tiles, UI overlay, and mission tokens
+    for entity in &dungeon_q {
+        commands.entity(entity).despawn();
+    }
+    for entity in &ui_q {
+        commands.entity(entity).despawn();
+    }
+    for entity in &token_q {
+        commands.entity(entity).despawn();
+    }
+
+    // Remove RoomStatus so spawn_mission_entities rebuilds it for the new dungeon.
+    // Do NOT remove SimulationTimer/SimulationSpeed: the simulation chain in
+    // mission/mod.rs uses them and runs in parallel with this chain. A set-level
+    // `run_if(resource_exists::<SimulationTimer>)` is evaluated once per frame for
+    // the set, so removing the resource here can cause hero_combat_system's
+    // parameter validation to panic when it actually executes. Leaving the timer
+    // alone is safe — spawn_mission_entities re-runs `init_resource` which is a
+    // no-op when the resource already exists.
+    commands.remove_resource::<crate::mission::entities::RoomStatus>();
+
+    // Reset camera (spawn_mission_view will reconfigure it)
+    if let Ok((mut transform, mut projection)) = camera_q.single_mut() {
+        *transform = Transform::default();
+        if let Projection::Orthographic(ref mut ortho) = *projection {
+            ortho.scaling_mode = ScalingMode::WindowSize;
+            ortho.scale = 1.0;
+        }
+    }
+
+    // Signal for spawn systems to run after commands flush
+    commands.insert_resource(NeedsMissionSpawn);
+}
+
+/// Phase 2 cleanup: consume the NeedsMissionSpawn resource after spawn systems run.
+fn consume_needs_spawn(mut commands: Commands) {
+    commands.remove_resource::<NeedsMissionSpawn>();
+}
+
 /// Convert grid coordinates to world position (centered on tile).
 pub fn tile_world_pos(x: u32, y: u32) -> Vec3 {
     Vec3::new(
@@ -207,25 +280,20 @@ fn fit_camera_to_dungeon(
 fn abort_mission(
     _: On<Pointer<Click>>,
     mut commands: Commands,
-    entities: Query<Entity, With<MissionEntity>>,
+    viewed: Option<Res<crate::mission::ViewedMission>>,
     missions: Query<(Entity, &MissionParty), With<Mission>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
-    // Cleanup mission entities (tokens, enemies, etc.)
-    for entity in &entities {
-        commands.entity(entity).despawn();
-    }
-    // Remove OnMission from party heroes and despawn mission entity
-    for (mission_entity, party) in &missions {
-        for &hero_entity in &party.0 {
-            commands.entity(hero_entity).remove::<crate::mission::OnMission>();
+    // Despawn the viewed mission entity and free its heroes.
+    // Token/resource cleanup is handled by OnExit(MissionView) systems.
+    if let Some(viewed) = viewed {
+        if let Ok((mission_entity, party)) = missions.get(viewed.0) {
+            for &hero_entity in &party.0 {
+                commands.entity(hero_entity).remove::<crate::mission::OnMission>();
+            }
+            commands.entity(mission_entity).despawn();
         }
-        commands.entity(mission_entity).despawn();
     }
-    commands.remove_resource::<RoomStatus>();
-    commands.remove_resource::<SimulationSpeed>();
-    commands.remove_resource::<SimulationTimer>();
-    commands.remove_resource::<ActiveDungeon>();
 
     next_tab.set(GameTab::Missions);
 }
