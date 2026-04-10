@@ -6,6 +6,7 @@ use rand::Rng;
 use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
 use crate::hero::data::{HeroClass, HeroTrait};
 
+use super::Mission;
 use super::dungeon::{DungeonMap, RoomType};
 use super::entities::*;
 use super::pathfinding::find_path;
@@ -24,12 +25,12 @@ pub enum HeroAction {
 }
 
 /// Run AI decision-making for all hero tokens each simulation tick.
+///
+/// Iterates missions and walks `Children` so each mission's heroes only
+/// target enemies within their own dungeon.
 pub fn hero_ai_system(
-    dungeon: Option<Res<crate::screens::mission_view::ActiveDungeon>>,
-    timer: Res<SimulationTimer>,
-    room_status: Option<Res<RoomStatus>>,
-
-    mut heroes: Query<
+    missions: Query<(&super::MissionDungeon, &RoomStatus, &Children), With<Mission>>,
+    heroes: Query<
         (
             Entity,
             &HeroToken,
@@ -45,59 +46,79 @@ pub fn hero_ai_system(
     ally_stats: Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
     mut commands: Commands,
 ) {
-    // Only run on tick boundaries
-    if !timer.ticked {
-        return;
-    }
-
-    let Some(dungeon) = dungeon else { return };
-    let Some(room_status) = room_status else { return };
-    let map = &dungeon.0;
     let mut rng = rand::rng();
 
-    for (entity, hero_token, grid_pos, in_room, combat, existing_move) in &heroes {
-        // Skip dead heroes
-        if combat.hp <= 0 {
-            continue;
-        }
+    for (dungeon, room_status, children) in &missions {
+        let map = &dungeon.0;
 
-        // Skip heroes that are currently moving to a target
-        if let Some(mt) = existing_move {
-            if mt.path_index < mt.path.len() {
-                continue; // Still moving
+        // Collect this mission's token entities
+        let mission_hero_entities: Vec<Entity> = children
+            .iter()
+            .filter(|c| heroes.get(*c).is_ok())
+            .collect();
+        let mission_enemy_entities: Vec<Entity> = children
+            .iter()
+            .filter(|c| enemies.get(*c).is_ok())
+            .collect();
+
+        for hero_entity in &mission_hero_entities {
+            let Ok((entity, hero_token, grid_pos, in_room, combat, existing_move)) =
+                heroes.get(*hero_entity)
+            else {
+                continue;
+            };
+
+            if combat.hp <= 0 {
+                continue;
             }
-        }
 
-        let Ok((info, stats, traits)) = hero_data.get(hero_token.0) else {
-            continue;
-        };
-
-        let action = decide_action(
-            entity, info, stats, traits, grid_pos, in_room, combat,
-            map, &room_status, &enemies, &ally_stats, &mut rng,
-        );
-
-        // Apply action
-        match action {
-            HeroAction::MoveTo(room_idx) => {
-                let room = &map.rooms[room_idx];
-                let (gx, gy) = room.center();
-                if let Some(path) = find_path(map, (grid_pos.x, grid_pos.y), (gx, gy)) {
-                    commands.entity(entity).insert(MoveTarget {
-                        path,
-                        path_index: 1, // Skip current position
-                    });
+            if let Some(mt) = existing_move {
+                if mt.path_index < mt.path.len() {
+                    continue; // Still moving
                 }
             }
-            HeroAction::Attack(_) | HeroAction::Heal(_) | HeroAction::Hold => {
-                // Combat/heal handled by combat system
-            }
-        }
 
-        commands.entity(entity).insert(action);
+            let Ok((info, stats, traits)) = hero_data.get(hero_token.0) else {
+                continue;
+            };
+
+            let action = decide_action(
+                entity,
+                info,
+                stats,
+                traits,
+                grid_pos,
+                in_room,
+                combat,
+                map,
+                room_status,
+                &enemies,
+                &mission_enemy_entities,
+                &ally_stats,
+                &mission_hero_entities,
+                &mut rng,
+            );
+
+            match action {
+                HeroAction::MoveTo(room_idx) => {
+                    let room = &map.rooms[room_idx];
+                    let (gx, gy) = room.center();
+                    if let Some(path) = find_path(map, (grid_pos.x, grid_pos.y), (gx, gy)) {
+                        commands.entity(entity).insert(MoveTarget {
+                            path,
+                            path_index: 1, // Skip current position
+                        });
+                    }
+                }
+                HeroAction::Attack(_) | HeroAction::Heal(_) | HeroAction::Hold => {}
+            }
+
+            commands.entity(entity).insert(action);
+        }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn decide_action(
     entity: Entity,
     info: &HeroInfo,
@@ -109,37 +130,56 @@ fn decide_action(
     map: &DungeonMap,
     room_status: &RoomStatus,
     enemies: &Query<(Entity, &GridPosition, &InRoom, &CombatStats), With<EnemyToken>>,
+    mission_enemies: &[Entity],
     allies: &Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
+    mission_allies: &[Entity],
     rng: &mut impl Rng,
 ) -> HeroAction {
     let hp_pct = combat.hp as f32 / combat.max_hp.max(1) as f32;
     let current_room = in_room.0;
 
-    // Find enemies in the same room
-    let enemies_in_room: Vec<(Entity, &CombatStats)> = enemies
+    // Find this mission's enemies in the same room
+    let enemies_in_room: Vec<(Entity, &CombatStats)> = mission_enemies
         .iter()
-        .filter(|(_, _, er, ec)| {
-            ec.hp > 0 && er.0 == current_room && current_room.is_some()
+        .filter_map(|&e| {
+            let (_, _, er, ec) = enemies.get(e).ok()?;
+            if ec.hp > 0 && er.0 == current_room && current_room.is_some() {
+                Some((e, ec))
+            } else {
+                None
+            }
         })
-        .map(|(e, _, _, c)| (e, c))
         .collect();
 
-    // Find injured allies in the same room
-    let injured_allies: Vec<(Entity, &CombatStats)> = allies
+    // Find this mission's injured allies in the same room
+    let injured_allies: Vec<(Entity, &CombatStats)> = mission_allies
         .iter()
-        .filter(|(e, c, ar)| {
-            *e != entity
-                && c.hp > 0
-                && c.hp < c.max_hp
-                && ar.0 == current_room
-                && current_room.is_some()
+        .filter_map(|&e| {
+            if e == entity {
+                return None;
+            }
+            let (_, c, ar) = allies.get(e).ok()?;
+            if c.hp > 0 && c.hp < c.max_hp && ar.0 == current_room && current_room.is_some() {
+                Some((e, c))
+            } else {
+                None
+            }
         })
-        .map(|(e, c, _)| (e, c))
         .collect();
 
-    let allies_in_room = allies
+    let allies_in_room = mission_allies
         .iter()
-        .filter(|(e, c, ar)| *e != entity && c.hp > 0 && ar.0 == current_room && current_room.is_some())
+        .filter_map(|&e| {
+            if e == entity {
+                return None;
+            }
+            let (_, c, ar) = allies.get(e).ok()?;
+            if c.hp > 0 && ar.0 == current_room && current_room.is_some() {
+                Some(())
+            } else {
+                None
+            }
+        })
         .count();
 
     // Score each possible action

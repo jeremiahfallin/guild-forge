@@ -14,13 +14,18 @@ use crate::screens::GameTab;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, (data::load_mission_databases, tileset::load_sprites));
-    app.add_systems(OnEnter(GameTab::MissionView), entities::spawn_mission_entities);
-    app.add_systems(OnExit(GameTab::MissionView), entities::cleanup_mission_entities);
-    // Simulation systems run during all of Gameplay so missions continue in background
+
+    // Fixed simulation tick at 2 Hz. Time<Virtual>::relative_speed scales this
+    // naturally for a future "speed up" control.
+    app.insert_resource(Time::<Fixed>::from_hz(2.0));
+
+    // All mission simulation runs in FixedUpdate, fully independent of the
+    // mission view. Each system iterates missions via `Children` so cost
+    // scales with live missions, not total tokens.
     app.add_systems(
-        Update,
+        FixedUpdate,
         (
-            entities::simulation_tick,
+            entities::move_tokens_along_paths,
             ai::hero_ai_system,
             combat::hero_combat_system,
             combat::enemy_combat_system,
@@ -29,20 +34,24 @@ pub(super) fn plugin(app: &mut App) {
             combat::check_mission_completion,
         )
             .chain()
-            .run_if(in_state(crate::screens::Screen::Gameplay))
-            .run_if(resource_exists::<entities::SimulationTimer>),
+            .run_if(in_state(crate::screens::Screen::Gameplay)),
     );
-    // Visual sync only runs when viewing a mission
+
+    // Proxy sync only runs while viewing a mission.
     app.add_systems(
         Update,
-        entities::sync_sprite_positions
+        (
+            entities::sync_proxy_visuals,
+            entities::cleanup_orphaned_proxies,
+        )
+            .chain()
             .run_if(in_state(GameTab::MissionView)),
     );
-    // Sprite animation only runs when viewing a mission
+
+    // Sprite animation only runs when viewing a mission.
     app.add_systems(
         Update,
-        tileset::animate_sprites
-            .run_if(in_state(GameTab::MissionView)),
+        tileset::animate_sprites.run_if(in_state(GameTab::MissionView)),
     );
 }
 
@@ -79,8 +88,9 @@ pub struct MissionParty(pub Vec<Entity>);
 #[reflect(Component)]
 pub struct OnMission(pub Entity);
 
-/// Stores the generated dungeon map on the mission entity so it persists
-/// across view transitions and can be restored when re-watching a mission.
+/// Stores the generated dungeon map on the mission entity. Authoritative
+/// source of truth for the dungeon — read by sim systems and by the view
+/// layer when rendering.
 #[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component)]
 pub struct MissionDungeon(pub dungeon::DungeonMap);

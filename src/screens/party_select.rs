@@ -8,17 +8,17 @@ use bevy_declarative::style::values::{pct, px};
 use rand::Rng;
 
 use crate::{
-    hero::{Hero, HeroInfo},
+    hero::{Hero, HeroInfo, HeroStats},
     mission::{
         Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
         ViewedMission,
-        data::MissionTemplateDatabase,
+        data::{EnemyDatabase, MissionTemplateDatabase},
         dungeon::generate_dungeon,
+        entities::RoomStatus,
     },
     screens::{
         GameTab,
         missions::SelectedMission,
-        mission_view::ActiveDungeon,
     },
     theme::{palette::*, widgets},
 };
@@ -395,16 +395,20 @@ fn dispatch_mission(
     party: Res<SelectedParty>,
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
+    enemy_db: Option<Res<EnemyDatabase>>,
+    hero_q: Query<(&HeroInfo, &HeroStats), With<Hero>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     let Some(mission_idx) = selected_mission.as_ref().and_then(|sm| sm.0) else {
         warn!("No mission selected for dispatch");
         return;
     };
-    let Some(template) = templates.as_ref().and_then(|t| t.0.get(mission_idx)) else {
+    let Some(templates) = templates else { return };
+    let Some(template) = templates.0.get(mission_idx) else {
         warn!("Invalid mission template index: {mission_idx}");
         return;
     };
+    let Some(enemy_db) = enemy_db else { return };
     if party.0.is_empty() {
         warn!("Cannot dispatch with empty party");
         return;
@@ -415,7 +419,7 @@ fn dispatch_mission(
     let rooms = rng.random_range(template.rooms_min..=template.rooms_max);
     let map = generate_dungeon(40, 30, rooms, &mut rng);
 
-    // Create mission entity with dungeon stored on it
+    // Create mission entity with dungeon and room status
     let mission_entity = commands
         .spawn((
             Name::new(format!("Mission: {}", template.name)),
@@ -428,16 +432,29 @@ fn dispatch_mission(
             MissionProgress::InProgress,
             MissionParty(party.0.clone()),
             MissionDungeon(map.clone()),
+            RoomStatus::new_for_dungeon(&map),
         ))
         .id();
+
+    // Spawn logical hero/enemy tokens as children of the mission
+    let mission_party = MissionParty(party.0.clone());
+    crate::mission::entities::spawn_tokens_for_mission(
+        &mut commands,
+        mission_entity,
+        &map,
+        &mission_party,
+        &hero_q,
+        &templates,
+        &enemy_db,
+        &template.id,
+    );
 
     // Mark heroes as on-mission
     for &hero_entity in &party.0 {
         commands.entity(hero_entity).insert(OnMission(mission_entity));
     }
 
-    // Store dungeon for rendering and track which mission we're viewing
-    commands.insert_resource(ActiveDungeon(map));
+    // Track which mission we're viewing
     commands.insert_resource(ViewedMission(mission_entity));
 
     info!(

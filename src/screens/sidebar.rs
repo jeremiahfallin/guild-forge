@@ -8,8 +8,8 @@ use bevy_declarative::style::values::px;
 
 use crate::{
     economy::Gold,
-    mission::{Mission, MissionDungeon, MissionInfo, MissionProgress, ViewedMission},
-    screens::{GameTab, mission_view::ActiveDungeon},
+    mission::{Mission, MissionInfo, MissionProgress, ViewedMission},
+    screens::GameTab,
     theme::{
         palette::*,
         widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRoot},
@@ -282,27 +282,15 @@ fn watch_mission(
     click: On<Pointer<Click>>,
     mut commands: Commands,
     buttons: Query<&WatchMissionButton>,
-    dungeons: Query<&MissionDungeon, With<Mission>>,
     current_tab: Res<State<GameTab>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     if let Ok(button) = buttons.get(click.event_target()) {
-        let mission_entity = button.0;
+        // Set which mission we're viewing — change detection in
+        // rebuild_view_on_viewed_change handles in-place view swap.
+        commands.insert_resource(ViewedMission(button.0));
 
-        // Set which mission we're viewing
-        commands.insert_resource(ViewedMission(mission_entity));
-
-        // Restore the dungeon map for rendering
-        if let Ok(dungeon) = dungeons.get(mission_entity) {
-            commands.insert_resource(ActiveDungeon(dungeon.0.clone()));
-        }
-
-        if **current_tab == GameTab::MissionView {
-            // Already viewing a mission — trigger in-place respawn (no state bounce)
-            commands.insert_resource(
-                crate::screens::mission_view::RespawnMissionView,
-            );
-        } else {
+        if **current_tab != GameTab::MissionView {
             next_tab.set(GameTab::MissionView);
         }
     }
