@@ -124,7 +124,7 @@ fn decide_action(
     info: &HeroInfo,
     stats: &HeroStats,
     traits: &HeroTraits,
-    grid_pos: &GridPosition,
+    _grid_pos: &GridPosition,
     in_room: &InRoom,
     combat: &CombatStats,
     map: &DungeonMap,
@@ -295,7 +295,7 @@ fn decide_action(
         if flee_score > best_score {
             // Flee to entrance
             if let Some(entrance_idx) = map.rooms.iter().position(|r| r.room_type == RoomType::Entrance) {
-                best_score = flee_score;
+                let _ = flee_score; // consumed by the comparison above
                 best_action = HeroAction::MoveTo(entrance_idx);
             }
         }

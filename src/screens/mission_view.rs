@@ -452,9 +452,9 @@ fn abort_mission(
 #[derive(Component)]
 struct HealthBarBg;
 
-/// Marker for health bar fill sprite.
+/// Marker for health bar fill sprite. Stores the owning proxy entity.
 #[derive(Component)]
-struct HealthBarFill(Entity);
+struct HealthBarFill(#[allow(dead_code)] Entity);
 
 const HEALTH_BAR_WIDTH: f32 = 24.0;
 const HEALTH_BAR_HEIGHT: f32 = 3.0;
