@@ -31,9 +31,13 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         (
             rebuild_view_on_viewed_change,
-            update_health_bars,
             bounce_to_missions_if_viewed_despawned,
+            // Flush despawns from rebuild/bounce before health bars try to
+            // attach children to proxies that may have just been destroyed.
+            ApplyDeferred,
+            update_health_bars,
         )
+            .chain()
             .run_if(in_state(GameTab::MissionView)),
     );
 }
@@ -164,7 +168,6 @@ fn spawn_proxies(
                 commands.spawn((
                     Name::new("Hero Proxy"),
                     RenderProxyOf(child),
-                    DungeonRoot, // so cleanup catches it
                     Sprite {
                         image: entry.texture.clone(),
                         texture_atlas: Some(TextureAtlas {
@@ -180,7 +183,6 @@ fn spawn_proxies(
                 commands.spawn((
                     Name::new("Hero Proxy"),
                     RenderProxyOf(child),
-                    DungeonRoot,
                     Sprite {
                         color: hero_color(&class),
                         custom_size: Some(Vec2::splat(TILE_SIZE * 0.6)),
@@ -200,7 +202,6 @@ fn spawn_proxies(
                 commands.spawn((
                     Name::new("Enemy Proxy"),
                     RenderProxyOf(child),
-                    DungeonRoot,
                     Sprite {
                         image: entry.texture.clone(),
                         texture_atlas: Some(TextureAtlas {
@@ -216,7 +217,6 @@ fn spawn_proxies(
                 commands.spawn((
                     Name::new("Enemy Proxy"),
                     RenderProxyOf(child),
-                    DungeonRoot,
                     Sprite {
                         color: enemy_color(enemy_token.enemy_type),
                         custom_size: Some(Vec2::splat(TILE_SIZE * 0.5)),

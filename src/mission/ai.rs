@@ -276,12 +276,37 @@ fn decide_action(
         }
     }
 
-    // 4. Flee — move toward entrance if low HP
-    if hp_pct < 0.25 {
-        let mut flee_score = 20.0;
-        if hp_pct < 0.25 {
-            flee_score += 40.0;
+    // 4. Return to visited-but-uncleared rooms (enemies still alive there)
+    for (room_idx, _room) in map.rooms.iter().enumerate() {
+        let visited = room_status.visited.get(room_idx).copied().unwrap_or(false);
+        let cleared = room_status.cleared.get(room_idx).copied().unwrap_or(false);
+        if !visited || cleared {
+            continue; // Only target rooms we've seen but haven't finished
         }
+        // Already in this room — combat will handle it
+        if current_room == Some(room_idx) {
+            continue;
+        }
+
+        let mut return_score = 45.0; // Slightly below explore (50) but well above Hold (10)
+
+        if hp_pct < 0.3 {
+            return_score -= 20.0;
+        }
+
+        return_score *= class_attack_mult(&info.class); // fighters eager to return
+
+        if return_score > best_score {
+            best_score = return_score;
+            best_action = HeroAction::MoveTo(room_idx);
+        }
+    }
+
+    // 5. Flee — move toward entrance if low HP (but not if already there)
+    let entrance_idx = map.rooms.iter().position(|r| r.room_type == RoomType::Entrance);
+    let already_at_entrance = entrance_idx.is_some_and(|idx| current_room == Some(idx));
+    if hp_pct < 0.25 && !already_at_entrance {
+        let mut flee_score = 60.0;
         if enemies_in_room.len() >= 2 {
             flee_score += 20.0;
         }
@@ -293,9 +318,7 @@ fn decide_action(
         }
 
         if flee_score > best_score {
-            // Flee to entrance
-            if let Some(entrance_idx) = map.rooms.iter().position(|r| r.room_type == RoomType::Entrance) {
-                let _ = flee_score; // consumed by the comparison above
+            if let Some(entrance_idx) = entrance_idx {
                 best_action = HeroAction::MoveTo(entrance_idx);
             }
         }

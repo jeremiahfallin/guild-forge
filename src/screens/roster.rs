@@ -18,9 +18,11 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(GameTab::Roster), spawn_roster);
     app.add_systems(
         Update,
-        refresh_roster_on_selection_change.run_if(
-            in_state(GameTab::Roster).and(resource_changed::<SelectedHero>),
-        ),
+        (
+            refresh_roster_on_selection_change.run_if(resource_changed::<SelectedHero>),
+            detect_mission_status_changes,
+        )
+            .run_if(in_state(GameTab::Roster)),
     );
     app.add_systems(OnExit(GameTab::Roster), clear_selection);
 }
@@ -378,4 +380,24 @@ fn refresh_roster_on_selection_change(
 
 fn clear_selection(mut selected: ResMut<SelectedHero>) {
     selected.0 = None;
+}
+
+/// Detect when heroes gain or lose `OnMission` and force a roster rebuild
+/// by touching the `SelectedHero` resource (triggers change detection).
+fn detect_mission_status_changes(
+    heroes: Query<(Entity, Option<&OnMission>), With<Hero>>,
+    mut last_on_mission: Local<Vec<Entity>>,
+    mut selected: ResMut<SelectedHero>,
+) {
+    let mut current: Vec<Entity> = heroes
+        .iter()
+        .filter_map(|(e, om)| om.map(|_| e))
+        .collect();
+    current.sort();
+
+    if *last_on_mission != current {
+        *last_on_mission = current;
+        // Touch the resource to trigger refresh_roster_on_selection_change
+        selected.set_changed();
+    }
 }
