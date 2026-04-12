@@ -14,6 +14,7 @@ mod hero;
 mod materials;
 mod menus;
 mod mission;
+mod recruiting;
 mod reputation;
 mod screens;
 mod theme;
@@ -63,6 +64,7 @@ impl Plugin for AppPlugin {
             materials::plugin,
             mission::plugin,
             menus::plugin,
+            recruiting::plugin,
             reputation::plugin,
             screens::plugin,
             theme::plugin,

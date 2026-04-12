@@ -30,7 +30,7 @@ pub struct HeroInfo {
 }
 
 /// The six core stats for a hero.
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component)]
 pub struct HeroStats {
     pub strength: i32,
