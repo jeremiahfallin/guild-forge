@@ -15,6 +15,19 @@ pub enum MaterialType {
 }
 
 impl MaterialType {
+    /// All material types in display order: raw, then refined, then high-tier.
+    pub const ALL: &[MaterialType] = &[
+        // Raw
+        MaterialType::IronOre, MaterialType::RawLeather, MaterialType::Wood,
+        MaterialType::RawHerbs, MaterialType::RoughGems,
+        // Refined
+        MaterialType::SteelIngot, MaterialType::CuredLeather, MaterialType::Lumber,
+        MaterialType::Potion, MaterialType::CutGem,
+        // High-tier
+        MaterialType::EnchantedSteel, MaterialType::DragonLeather, MaterialType::ArcaneWood,
+        MaterialType::ElixirOfPower, MaterialType::PrismaticGem,
+    ];
+
     pub fn name(&self) -> &'static str {
         match self {
             Self::IronOre => "Iron Ore",

@@ -9,7 +9,7 @@ use bevy_declarative::style::values::px;
 use crate::{
     buildings::{BuildingDatabase, BuildingType, GuildBuildings, UpgradeBuilding},
     economy::Gold,
-    materials::{ConversionDatabase, ConvertMaterials, Materials},
+    materials::{ConversionDatabase, ConvertMaterials, MaterialType, Materials},
     screens::GameTab,
     theme::{palette::*, widgets},
 };
@@ -89,6 +89,72 @@ fn build_guild_ui(
         .gap(px(12.0))
         .p(px(16.0))
         .overflow_y_hidden();
+
+    // Stockpile panel — show all owned materials
+    let owned: Vec<(MaterialType, u32)> = MaterialType::ALL
+        .iter()
+        .filter_map(|&mat| {
+            let count = materials.get(mat);
+            if count > 0 { Some((mat, count)) } else { None }
+        })
+        .collect();
+
+    if !owned.is_empty() {
+        let mut stockpile = div()
+            .col()
+            .w_full()
+            .p(px(12.0))
+            .gap(px(8.0))
+            .bg(Color::srgba(0.15, 0.18, 0.25, 0.7))
+            .rounded(px(6.0))
+            .child(
+                text("Stockpile")
+                    .font_size(24.0)
+                    .color(HEADER_TEXT),
+            );
+
+        // Grid-like layout: wrap rows of material entries
+        let mut row = div()
+            .row()
+            .w_full()
+            .gap(px(8.0))
+            .insert(Node {
+                flex_wrap: FlexWrap::Wrap,
+                ..default()
+            });
+
+        for (mat, count) in &owned {
+            row = row.child(
+                div()
+                    .row()
+                    .gap(px(4.0))
+                    .p(px(6.0))
+                    .bg(Color::srgba(0.2, 0.2, 0.3, 0.6))
+                    .rounded(px(4.0))
+                    .child(
+                        text(format!("{}", count))
+                            .font_size(16.0)
+                            .color(HEADER_TEXT),
+                    )
+                    .child(
+                        text(mat.name())
+                            .font_size(16.0)
+                            .color(LABEL_TEXT),
+                    ),
+            );
+        }
+
+        stockpile = stockpile.child(row);
+        content = content.child(stockpile);
+
+        // Divider
+        content = content.child(
+            div()
+                .w_full()
+                .h(px(2.0))
+                .bg(Color::srgba(0.4, 0.4, 0.5, 0.6)),
+        );
+    }
 
     // Building cards
     for &building_type in BuildingType::ALL {
