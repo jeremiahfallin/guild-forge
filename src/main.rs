@@ -18,6 +18,7 @@ mod recruiting;
 mod reputation;
 mod screens;
 mod theme;
+mod training;
 mod ui;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -64,10 +65,13 @@ impl Plugin for AppPlugin {
             materials::plugin,
             mission::plugin,
             menus::plugin,
+        ));
+        app.add_plugins((
             recruiting::plugin,
             reputation::plugin,
             screens::plugin,
             theme::plugin,
+            training::plugin,
             ui::plugin,
         ));
 

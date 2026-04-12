@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::buildings::{BuildingType, GuildBuildings};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
 pub enum MaterialType {
     // Raw
@@ -64,6 +66,39 @@ impl Materials {
     }
 }
 
+#[derive(Event)]
+pub struct ConvertMaterials {
+    pub recipe_index: usize,
+    pub quantity: u32,
+}
+
+fn handle_convert_materials(
+    trigger: On<ConvertMaterials>,
+    mut materials: ResMut<Materials>,
+    conversion_db: Res<ConversionDatabase>,
+    buildings: Res<GuildBuildings>,
+) {
+    let event = trigger.event();
+    let Some(recipe) = conversion_db.0.get(event.recipe_index) else {
+        return;
+    };
+
+    let workshop_level = buildings.level(BuildingType::Workshop);
+    if workshop_level < recipe.workshop_level_required {
+        return;
+    }
+
+    let available = materials.get(recipe.input_type);
+    let max_runs = available / recipe.input_count;
+    let runs = event.quantity.min(max_runs);
+    if runs == 0 {
+        return;
+    }
+
+    materials.try_spend(recipe.input_type, runs * recipe.input_count);
+    materials.add(recipe.output_type, runs * recipe.output_count);
+}
+
 fn load_materials_database(mut commands: Commands) {
     let data: MaterialsData =
         ron::from_str(include_str!("../assets/data/materials.ron"))
@@ -74,4 +109,5 @@ fn load_materials_database(mut commands: Commands) {
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<Materials>();
     app.add_systems(Startup, load_materials_database);
+    app.add_observer(handle_convert_materials);
 }
