@@ -8,6 +8,7 @@ edition = "2024"
 # Use only features needed for a 2D game to improve compile time and size
 bevy = { version = "0.18", default-features = false, features = ["2d"] }
 bevy_declarative = { path = "../bevy_declarative" }
+dirs = "6"
 rand = "0.9"
 ron = "0.9"
 serde = { version = "1", features = ["derive"] }
