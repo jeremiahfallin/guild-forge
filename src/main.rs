@@ -5,6 +5,7 @@
 
 mod asset_tracking;
 mod audio;
+mod buildings;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod economy;
@@ -52,6 +53,7 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             asset_tracking::plugin,
             audio::plugin,
+            buildings::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             economy::plugin,

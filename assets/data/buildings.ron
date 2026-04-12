@@ -1,0 +1,49 @@
+(
+    buildings: [
+        (
+            id: Armory,
+            max_level: 3,
+            level_costs: [
+                (gold: 100, materials: [(IronOre, 5), (Wood, 5)]),
+                (gold: 300, materials: [(SteelIngot, 5), (Lumber, 5)]),
+                (gold: 700, materials: [(EnchantedSteel, 3), (ArcaneWood, 3)]),
+            ],
+        ),
+        (
+            id: TrainingGrounds,
+            max_level: 3,
+            level_costs: [
+                (gold: 80, materials: [(Wood, 8)]),
+                (gold: 250, materials: [(Lumber, 6), (IronOre, 4)]),
+                (gold: 600, materials: [(ArcaneWood, 4), (SteelIngot, 3)]),
+            ],
+        ),
+        (
+            id: Barracks,
+            max_level: 3,
+            level_costs: [
+                (gold: 60, materials: [(Wood, 6), (RawLeather, 3)]),
+                (gold: 200, materials: [(Lumber, 5), (CuredLeather, 3)]),
+                (gold: 500, materials: [(ArcaneWood, 3), (DragonLeather, 2)]),
+            ],
+        ),
+        (
+            id: RecruitmentOffice,
+            max_level: 3,
+            level_costs: [
+                (gold: 50, materials: [(Wood, 4)]),
+                (gold: 150, materials: [(Lumber, 4), (CutGem, 2)]),
+                (gold: 400, materials: [(ArcaneWood, 3), (PrismaticGem, 1)]),
+            ],
+        ),
+        (
+            id: Workshop,
+            max_level: 3,
+            level_costs: [
+                (gold: 75, materials: [(IronOre, 6), (Wood, 4)]),
+                (gold: 250, materials: [(SteelIngot, 4), (Lumber, 4)]),
+                (gold: 600, materials: [(EnchantedSteel, 3), (ArcaneWood, 3)]),
+            ],
+        ),
+    ],
+)
