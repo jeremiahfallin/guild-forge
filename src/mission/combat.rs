@@ -46,10 +46,10 @@ pub fn hero_combat_system(
 
     for children in &missions {
         // Phase 1: collect intents for this mission's heroes
-        let intents: Vec<CombatIntent> = hero_set
-            .p0()
+        let p0 = hero_set.p0();
+        let intents: Vec<CombatIntent> = children
             .iter()
-            .filter(|(e, _, _, _)| children.contains(e))
+            .filter_map(|c| p0.get(c).ok())
             .filter_map(|(_, hero_token, combat, action)| {
                 if combat.hp <= 0 {
                     return None;
@@ -99,10 +99,7 @@ pub fn hero_combat_system(
                         }
                     }
                 }
-                CombatIntent::Heal {
-                    target,
-                    luck_bonus,
-                } => {
+                CombatIntent::Heal { target, luck_bonus } => {
                     if let Ok(mut ally_combat) = hero_set.p1().get_mut(*target) {
                         if ally_combat.hp <= 0 || ally_combat.hp >= ally_combat.max_hp {
                             continue;
@@ -126,29 +123,19 @@ pub fn enemy_combat_system(
     let mut rng = rand::rng();
 
     for children in &missions {
-        // Collect this mission's enemies (snapshot) and hero entities
-        let mission_enemies: Vec<(Entity, i32, i32, Option<usize>)> = children
-            .iter()
-            .filter_map(|c| {
-                let (_, ec, er) = enemies.get(c).ok()?;
-                Some((c, ec.hp, ec.attack, er.0))
-            })
-            .collect();
-        let mission_heroes: Vec<Entity> = children
-            .iter()
-            .filter(|c| heroes.get(*c).is_ok())
-            .collect();
-
-        for (_, hp, attack, room) in &mission_enemies {
-            if *hp <= 0 {
+        for c in children.iter() {
+            let Ok((_, ec, er)) = enemies.get(c) else {
+                continue;
+            };
+            if ec.hp <= 0 {
                 continue;
             }
-            let Some(room_idx) = *room else { continue };
+            let Some(room_idx) = er.0 else { continue };
 
             // Find lowest-HP living hero in same room (within this mission)
-            let target = mission_heroes
+            let target = children
                 .iter()
-                .filter_map(|&e| heroes.get(e).ok().map(|(ent, c, r)| (ent, c.hp, r.0)))
+                .filter_map(|h| heroes.get(h).ok().map(|(ent, c, r)| (ent, c.hp, r.0)))
                 .filter(|(_, hp, r)| *hp > 0 && *r == Some(room_idx))
                 .min_by_key(|(_, hp, _)| *hp)
                 .map(|(e, _, _)| e);
@@ -160,10 +147,10 @@ pub fn enemy_combat_system(
                 continue;
             };
 
-            let roll = rng.random_range(1..=20) + *attack;
+            let roll = rng.random_range(1..=20) + ec.attack;
             let target_ac = hero_combat.defense + 10;
             if roll >= target_ac {
-                let damage = (*attack / 2 + rng.random_range(1..=3)).max(1);
+                let damage = (ec.attack / 2 + rng.random_range(1..=3)).max(1);
                 hero_combat.hp -= damage;
                 if hero_combat.hp <= 0 {
                     info!("Hero fell!");
@@ -248,6 +235,8 @@ pub fn check_mission_completion(
     mut hero_infos: Query<&mut HeroInfo>,
     mut gold: ResMut<Gold>,
     template_db: Res<MissionTemplateDatabase>,
+    mut materials: ResMut<crate::materials::Materials>,
+    mut reputation: ResMut<crate::reputation::Reputation>,
 ) {
     let mut rng = rand::rng();
 
@@ -263,8 +252,7 @@ pub fn check_mission_completion(
             .collect();
 
         // Failure: all heroes dead
-        let all_dead =
-            !mission_heroes.is_empty() && mission_heroes.iter().all(|(_, c)| c.hp <= 0);
+        let all_dead = !mission_heroes.is_empty() && mission_heroes.iter().all(|(_, c)| c.hp <= 0);
         if all_dead {
             *progress = MissionProgress::Failed;
             commands.trigger(ToastEvent {
@@ -281,8 +269,7 @@ pub fn check_mission_completion(
         }
 
         // Completion: all rooms cleared
-        let all_cleared =
-            !room_status.cleared.is_empty() && room_status.cleared.iter().all(|&c| c);
+        let all_cleared = !room_status.cleared.is_empty() && room_status.cleared.iter().all(|&c| c);
         if !all_cleared {
             continue;
         }
@@ -306,6 +293,16 @@ pub fn check_mission_completion(
             rng.random_range(t.gold_reward.min..=t.gold_reward.max)
         });
         gold.0 += gold_earned;
+
+        // Award materials
+        if let Some(template) = &template {
+            for &(mat_type, min, max) in &template.material_drops {
+                let amount = rng.random_range(min..=max);
+                materials.add(mat_type, amount);
+            }
+            // Award reputation
+            reputation.0 += template.reputation_reward;
+        }
 
         // Count survivors and award XP
         let survivors: Vec<Entity> = mission_heroes
@@ -342,6 +339,11 @@ pub fn check_mission_completion(
                 level_ups,
                 if level_ups == 1 { "" } else { "s" }
             ));
+        }
+        if let Some(template) = &template {
+            if template.reputation_reward > 0 {
+                body.push_str(&format!(", +{} rep", template.reputation_reward));
+            }
         }
 
         commands.trigger(ToastEvent {

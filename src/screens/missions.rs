@@ -28,6 +28,7 @@ fn spawn_mission_board(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     templates: Option<Res<MissionTemplateDatabase>>,
+    reputation: Res<crate::reputation::Reputation>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
     commands.init_resource::<SelectedMission>();
@@ -56,11 +57,35 @@ fn spawn_mission_board(
             .insert(Name::new("Mission List"));
 
         for (idx, template) in templates.0.iter().enumerate() {
+            if reputation.0 < template.reputation_required {
+                continue;
+            }
             let difficulty_stars = "★".repeat(template.difficulty as usize);
             let gold_range = format!(
                 "Gold: {}-{}",
                 template.gold_reward.min, template.gold_reward.max
             );
+
+            let mut info_row = div()
+                .row()
+                .gap(px(16.0))
+                .child(
+                    text(format!("Difficulty: {difficulty_stars}"))
+                        .font_size(16.0)
+                        .color(Color::srgb(0.9, 0.7, 0.2)),
+                )
+                .child(
+                    text(gold_range)
+                        .font_size(16.0)
+                        .color(Color::srgb(0.8, 0.7, 0.3)),
+                );
+            if template.reputation_required > 0 {
+                info_row = info_row.child(
+                    text(format!("Req: {} rep", template.reputation_required))
+                        .font_size(16.0)
+                        .color(Color::srgb(0.6, 0.8, 0.9)),
+                );
+            }
 
             list = list.child(
                 div()
@@ -88,21 +113,7 @@ fn spawn_mission_board(
                                     .font_size(16.0)
                                     .color(LABEL_TEXT),
                             )
-                            .child(
-                                div()
-                                    .row()
-                                    .gap(px(16.0))
-                                    .child(
-                                        text(format!("Difficulty: {difficulty_stars}"))
-                                            .font_size(16.0)
-                                            .color(Color::srgb(0.9, 0.7, 0.2)),
-                                    )
-                                    .child(
-                                        text(gold_range)
-                                            .font_size(16.0)
-                                            .color(Color::srgb(0.8, 0.7, 0.3)),
-                                    ),
-                            ),
+                            .child(info_row),
                     ),
             );
         }

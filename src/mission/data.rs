@@ -3,6 +3,8 @@
 use bevy::prelude::*;
 use serde::Deserialize;
 
+use crate::materials::MaterialType;
+
 /// Enemy type identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
 pub enum EnemyType {
@@ -55,6 +57,9 @@ pub struct MissionTemplate {
     pub rooms_max: u32,
     pub gold_reward: GoldReward,
     pub xp_bonus: u32,
+    pub reputation_required: u32,
+    pub reputation_reward: u32,
+    pub material_drops: Vec<(MaterialType, u32, u32)>, // (type, min, max)
 }
 
 /// Database of enemy definitions.

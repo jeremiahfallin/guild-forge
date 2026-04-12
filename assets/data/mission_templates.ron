@@ -9,6 +9,9 @@
         rooms_max: 6,
         gold_reward: (min: 20, max: 50),
         xp_bonus: 20,
+        reputation_required: 0,
+        reputation_reward: 10,
+        material_drops: [(IronOre, 1, 3), (RawLeather, 1, 2)],
     ),
     (
         id: "skeleton_crypt",
@@ -20,6 +23,9 @@
         rooms_max: 7,
         gold_reward: (min: 40, max: 80),
         xp_bonus: 35,
+        reputation_required: 50,
+        reputation_reward: 25,
+        material_drops: [(IronOre, 2, 5), (RoughGems, 1, 3), (RawHerbs, 1, 2)],
     ),
     (
         id: "orc_stronghold",
@@ -31,5 +37,8 @@
         rooms_max: 8,
         gold_reward: (min: 70, max: 120),
         xp_bonus: 50,
+        reputation_required: 150,
+        reputation_reward: 50,
+        material_drops: [(IronOre, 3, 6), (RawLeather, 2, 4), (Wood, 2, 5), (RoughGems, 1, 3)],
     ),
 ]
