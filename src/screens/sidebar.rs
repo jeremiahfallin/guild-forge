@@ -9,10 +9,11 @@ use bevy_declarative::style::values::px;
 use crate::{
     economy::Gold,
     mission::{Mission, MissionInfo, MissionProgress, ViewedMission},
+    reputation::Reputation,
     screens::GameTab,
     theme::{
         palette::*,
-        widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRoot},
+        widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRepText, SidebarRoot},
     },
 };
 
@@ -25,6 +26,7 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         (
             update_gold_display.run_if(resource_changed::<Gold>),
+            update_rep_display.run_if(resource_changed::<Reputation>),
             update_active_tab_highlight.run_if(state_changed::<GameTab>),
             update_mission_list,
         )
@@ -35,8 +37,9 @@ pub(super) fn plugin(app: &mut App) {
 /// The sidebar width in pixels.
 const SIDEBAR_WIDTH: f32 = 220.0;
 
-fn spawn_gameplay_root(mut commands: Commands, gold: Option<Res<Gold>>) {
+fn spawn_gameplay_root(mut commands: Commands, gold: Option<Res<Gold>>, rep: Option<Res<Reputation>>) {
     let gold_amount = gold.map_or(0, |g| g.0);
+    let rep_amount = rep.map_or(0, |r| r.0);
 
     // Gameplay root: row containing sidebar + content area
     let mut root = div()
@@ -52,13 +55,13 @@ fn spawn_gameplay_root(mut commands: Commands, gold: Option<Res<Gold>>) {
         ));
 
     // Build sidebar
-    let sidebar = build_sidebar(gold_amount);
+    let sidebar = build_sidebar(gold_amount, rep_amount);
     root = root.child(sidebar);
 
     root.spawn(&mut commands);
 }
 
-fn build_sidebar(gold_amount: u32) -> bevy_declarative::element::div::Div {
+fn build_sidebar(gold_amount: u32, rep_amount: u32) -> bevy_declarative::element::div::Div {
     let mut sidebar = div()
         .col()
         .w(px(SIDEBAR_WIDTH))
@@ -85,6 +88,13 @@ fn build_sidebar(gold_amount: u32) -> bevy_declarative::element::div::Div {
                 .color(Color::srgb(0.9, 0.8, 0.2))
                 .insert(SidebarGoldText),
         )
+        // Reputation
+        .child(
+            text(format!("Rep: {rep_amount}"))
+                .font_size(16.0)
+                .color(Color::srgb(0.6, 0.8, 0.9))
+                .insert(SidebarRepText),
+        )
         // Divider
         .child(
             div()
@@ -95,7 +105,9 @@ fn build_sidebar(gold_amount: u32) -> bevy_declarative::element::div::Div {
         // Nav buttons
         .child(nav_button("Roster", GameTab::Roster))
         .child(nav_button("Missions", GameTab::Missions))
-        .child(disabled_nav_button("Armory"))
+        .child(nav_button("Guild", GameTab::Guild))
+        .child(nav_button("Armory", GameTab::Armory))
+        .child(nav_button("Recruiting", GameTab::Recruiting))
         // Divider
         .child(
             div()
@@ -153,22 +165,6 @@ fn nav_button(label: &str, tab: GameTab) -> bevy_declarative::element::div::Div 
         )
 }
 
-fn disabled_nav_button(label: &str) -> bevy_declarative::element::div::Div {
-    div()
-        .w_full()
-        .h(px(40.0))
-        .items_center()
-        .justify_center()
-        .bg(Color::srgba(0.2, 0.2, 0.2, 0.5))
-        .rounded(px(4.0))
-        .insert(Name::new(format!("Nav: {label} (disabled)")))
-        .child(
-            text(format!("{label} (Soon)"))
-                .font_size(16.0)
-                .color(Color::srgba(0.5, 0.5, 0.5, 0.8)),
-        )
-}
-
 fn nav_click(
     click: On<Pointer<Click>>,
     buttons: Query<&SidebarNavButton>,
@@ -190,6 +186,15 @@ fn update_gold_display(
 ) {
     for mut t in &mut texts {
         **t = format!("Gold: {}", gold.0);
+    }
+}
+
+fn update_rep_display(
+    rep: Res<Reputation>,
+    mut texts: Query<&mut Text, With<SidebarRepText>>,
+) {
+    for mut t in &mut texts {
+        **t = format!("Rep: {} (Tier {})", rep.0, rep.tier());
     }
 }
 

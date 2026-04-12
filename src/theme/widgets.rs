@@ -38,6 +38,10 @@ pub struct SidebarRoot;
 #[derive(Component)]
 pub struct SidebarGoldText;
 
+/// Marker for the reputation text display in the sidebar.
+#[derive(Component)]
+pub struct SidebarRepText;
+
 /// Marker for the active missions container in the sidebar.
 #[derive(Component)]
 pub struct SidebarMissionList;

@@ -48,4 +48,7 @@ pub enum GameTab {
     Missions,
     PartySelect,
     MissionView,
+    Guild,
+    Armory,
+    Recruiting,
 }
