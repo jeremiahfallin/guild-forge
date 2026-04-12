@@ -47,6 +47,7 @@ pub struct GearStats {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GearTier {
     pub name: String,
+    #[allow(dead_code)]
     pub tier: u32,
     pub stats: GearStats,
     pub gold_cost: u32,

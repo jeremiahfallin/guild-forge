@@ -75,6 +75,7 @@ impl Materials {
         }
     }
 
+    #[allow(dead_code)]
     pub fn try_spend_all(&mut self, costs: &[(MaterialType, u32)]) -> bool {
         for &(mat, amount) in costs {
             if self.get(mat) < amount {
