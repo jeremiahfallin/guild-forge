@@ -66,6 +66,20 @@ fn spawn_mission_board(
                 template.gold_reward.min, template.gold_reward.max
             );
 
+            // Material drops summary
+            let drops_text: String = template
+                .material_drops
+                .iter()
+                .map(|(mat, min, max)| {
+                    if min == max {
+                        format!("{} {}", min, mat.name())
+                    } else {
+                        format!("{}-{} {}", min, max, mat.name())
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
             let mut info_row = div()
                 .row()
                 .gap(px(16.0))
@@ -86,6 +100,20 @@ fn spawn_mission_board(
                         .color(Color::srgb(0.6, 0.8, 0.9)),
                 );
             }
+
+            let drops_row = div()
+                .row()
+                .gap(px(4.0))
+                .child(
+                    text("Drops:")
+                        .font_size(14.0)
+                        .color(Color::srgb(0.6, 0.7, 0.6)),
+                )
+                .child(
+                    text(drops_text)
+                        .font_size(14.0)
+                        .color(Color::srgb(0.5, 0.7, 0.5)),
+                );
 
             list = list.child(
                 div()
@@ -113,7 +141,8 @@ fn spawn_mission_board(
                                     .font_size(16.0)
                                     .color(LABEL_TEXT),
                             )
-                            .child(info_row),
+                            .child(info_row)
+                            .child(drops_row),
                     ),
             );
         }
