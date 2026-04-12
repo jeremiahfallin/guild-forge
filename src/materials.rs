@@ -14,6 +14,28 @@ pub enum MaterialType {
     EnchantedSteel, DragonLeather, ArcaneWood, ElixirOfPower, PrismaticGem,
 }
 
+impl MaterialType {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::IronOre => "Iron Ore",
+            Self::RawLeather => "Raw Leather",
+            Self::Wood => "Wood",
+            Self::RawHerbs => "Raw Herbs",
+            Self::RoughGems => "Rough Gems",
+            Self::SteelIngot => "Steel Ingot",
+            Self::CuredLeather => "Cured Leather",
+            Self::Lumber => "Lumber",
+            Self::Potion => "Potion",
+            Self::CutGem => "Cut Gem",
+            Self::EnchantedSteel => "Enchanted Steel",
+            Self::DragonLeather => "Dragon Leather",
+            Self::ArcaneWood => "Arcane Wood",
+            Self::ElixirOfPower => "Elixir of Power",
+            Self::PrismaticGem => "Prismatic Gem",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConversionRecipe {
     pub input_type: MaterialType,

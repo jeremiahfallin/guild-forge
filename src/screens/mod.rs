@@ -1,10 +1,13 @@
 //! The game's main screen states and transitions between them.
 
+mod armory;
 mod gameplay;
+mod guild;
 mod loading;
 pub mod mission_view;
 pub mod missions;
 mod party_select;
+mod recruiting_screen;
 mod roster;
 mod sidebar;
 mod splash;
@@ -17,11 +20,14 @@ pub(super) fn plugin(app: &mut App) {
     app.add_sub_state::<GameTab>();
 
     app.add_plugins((
+        armory::plugin,
         gameplay::plugin,
+        guild::plugin,
         loading::plugin,
         mission_view::plugin,
         missions::plugin,
         party_select::plugin,
+        recruiting_screen::plugin,
         roster::plugin,
         sidebar::plugin,
         splash::plugin,
