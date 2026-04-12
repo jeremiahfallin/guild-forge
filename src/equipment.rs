@@ -142,6 +142,7 @@ pub struct CraftGear {
 
 fn handle_craft_gear(
     trigger: On<CraftGear>,
+    mut commands: Commands,
     mut heroes: Query<(&crate::hero::HeroInfo, &mut HeroEquipment)>,
     equipment_db: Res<EquipmentDatabase>,
     buildings: Res<GuildBuildings>,
@@ -203,6 +204,13 @@ fn handle_craft_gear(
 
     // Upgrade tier
     equipment.set_tier(event.slot, next_tier);
+
+    commands.trigger(crate::ui::toast::ToastEvent {
+        title: format!("Crafted {}!", tier_def.name),
+        body: format!("Equipped to {}", info.name),
+        kind: crate::ui::toast::ToastKind::Success,
+    });
+
     info!(
         "Crafted {} for hero (tier {})",
         tier_def.name, next_tier

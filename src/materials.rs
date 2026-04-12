@@ -96,6 +96,7 @@ pub struct ConvertMaterials {
 
 fn handle_convert_materials(
     trigger: On<ConvertMaterials>,
+    mut commands: Commands,
     mut materials: ResMut<Materials>,
     conversion_db: Res<ConversionDatabase>,
     buildings: Res<GuildBuildings>,
@@ -117,8 +118,23 @@ fn handle_convert_materials(
         return;
     }
 
-    materials.try_spend(recipe.input_type, runs * recipe.input_count);
-    materials.add(recipe.output_type, runs * recipe.output_count);
+    let input_total = runs * recipe.input_count;
+    let output_total = runs * recipe.output_count;
+
+    materials.try_spend(recipe.input_type, input_total);
+    materials.add(recipe.output_type, output_total);
+
+    commands.trigger(crate::ui::toast::ToastEvent {
+        title: "Materials converted!".to_string(),
+        body: format!(
+            "{} {} \u{2192} {} {}",
+            input_total,
+            recipe.input_type.name(),
+            output_total,
+            recipe.output_type.name()
+        ),
+        kind: crate::ui::toast::ToastKind::Info,
+    });
 }
 
 fn load_materials_database(mut commands: Commands) {

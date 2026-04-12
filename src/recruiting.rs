@@ -214,6 +214,9 @@ fn handle_hire_applicant(
     gold.0 -= cost;
     let applicant = board.applicants.remove(idx);
 
+    let hero_name = applicant.name.clone();
+    let hero_class = applicant.class;
+
     // Spawn hero entity
     commands.spawn((
         Name::new(applicant.name.clone()),
@@ -229,6 +232,12 @@ fn handle_hire_applicant(
         HeroTraits(applicant.traits),
         HeroEquipment::default(),
     ));
+
+    commands.trigger(crate::ui::toast::ToastEvent {
+        title: format!("{hero_name} joined the guild!"),
+        body: format!("{hero_class} — hired for {cost}g"),
+        kind: crate::ui::toast::ToastKind::Success,
+    });
 
     info!("Hired applicant for {} gold", cost);
 }

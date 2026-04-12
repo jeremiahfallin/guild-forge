@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::economy::Gold;
 use crate::materials::{MaterialType, Materials};
+use crate::ui::toast::{ToastEvent, ToastKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
 pub enum BuildingType {
@@ -104,6 +105,7 @@ pub struct UpgradeBuilding(pub BuildingType);
 
 fn handle_upgrade_building(
     trigger: On<UpgradeBuilding>,
+    mut commands: Commands,
     mut buildings: ResMut<GuildBuildings>,
     building_db: Res<BuildingDatabase>,
     mut gold: ResMut<Gold>,
@@ -127,7 +129,14 @@ fn handle_upgrade_building(
         materials.try_spend(mat, amt);
     }
 
-    buildings.0.insert(building_type, current_level + 1);
+    let new_level = current_level + 1;
+    buildings.0.insert(building_type, new_level);
+
+    commands.trigger(ToastEvent {
+        title: format!("{} upgraded!", building_type.name()),
+        body: format!("Now at level {new_level}"),
+        kind: ToastKind::Success,
+    });
 }
 
 fn load_building_database(mut commands: Commands) {
