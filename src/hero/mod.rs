@@ -151,5 +151,6 @@ fn spawn_random_hero(
         },
         stats,
         HeroTraits(hero_traits),
+        crate::equipment::HeroEquipment::default(),
     ));
 }

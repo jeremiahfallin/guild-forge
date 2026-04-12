@@ -100,7 +100,8 @@ pub fn spawn_tokens_for_mission(
     mission_entity: Entity,
     map: &DungeonMap,
     party: &MissionParty,
-    hero_q: &Query<(&HeroInfo, &HeroStats), With<Hero>>,
+    hero_q: &Query<(&HeroInfo, &HeroStats, Option<&crate::equipment::HeroEquipment>), With<Hero>>,
+    equipment_db: &crate::equipment::EquipmentDatabase,
     templates: &MissionTemplateDatabase,
     enemy_db: &EnemyDatabase,
     template_id: &str,
@@ -111,7 +112,7 @@ pub fn spawn_tokens_for_mission(
 
     // Spawn hero tokens
     for (i, &hero_entity) in party.0.iter().enumerate() {
-        let Ok((info, stats)) = hero_q.get(hero_entity) else {
+        let Ok((info, stats, maybe_equipment)) = hero_q.get(hero_entity) else {
             continue;
         };
 
@@ -122,9 +123,17 @@ pub fn spawn_tokens_for_mission(
         let hy = (entrance_y as i32 + offset_y).clamp(0, map.height as i32 - 1) as u32;
 
         // HP = con×3 + level×5
-        let hp = stats.constitution * 3 + info.level as i32 * 5;
-        let attack = (stats.strength + stats.dexterity) / 2;
-        let defense = (stats.constitution + stats.dexterity) / 2;
+        let mut hp = stats.constitution * 3 + info.level as i32 * 5;
+        let mut attack = (stats.strength + stats.dexterity) / 2;
+        let mut defense = (stats.constitution + stats.dexterity) / 2;
+
+        // Apply equipment bonuses
+        if let Some(equipment) = maybe_equipment {
+            let gear_stats = equipment.total_stats(equipment_db, info.class);
+            attack += gear_stats.attack;
+            defense += gear_stats.defense;
+            hp += gear_stats.hp;
+        }
 
         commands.spawn((
             Name::new(format!("Hero Token: {}", info.name)),

@@ -9,6 +9,7 @@ mod buildings;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod economy;
+mod equipment;
 mod hero;
 mod materials;
 mod menus;
@@ -57,6 +58,7 @@ impl Plugin for AppPlugin {
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             economy::plugin,
+            equipment::plugin,
             hero::plugin,
             materials::plugin,
             mission::plugin,

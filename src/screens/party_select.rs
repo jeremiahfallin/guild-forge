@@ -396,7 +396,8 @@ fn dispatch_mission(
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
     enemy_db: Option<Res<EnemyDatabase>>,
-    hero_q: Query<(&HeroInfo, &HeroStats), With<Hero>>,
+    hero_q: Query<(&HeroInfo, &HeroStats, Option<&crate::equipment::HeroEquipment>), With<Hero>>,
+    equipment_db: Option<Res<crate::equipment::EquipmentDatabase>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     let Some(mission_idx) = selected_mission.as_ref().and_then(|sm| sm.0) else {
@@ -409,6 +410,7 @@ fn dispatch_mission(
         return;
     };
     let Some(enemy_db) = enemy_db else { return };
+    let Some(equipment_db) = equipment_db else { return };
     if party.0.is_empty() {
         warn!("Cannot dispatch with empty party");
         return;
@@ -444,6 +446,7 @@ fn dispatch_mission(
         &map,
         &mission_party,
         &hero_q,
+        &equipment_db,
         &templates,
         &enemy_db,
         &template.id,

@@ -1,0 +1,148 @@
+EquipmentData(
+    paths: [
+        // ── Warrior ────────────────────────────────────────────
+        GearPath(
+            class: Warrior,
+            slot: Weapon,
+            tiers: [
+                GearTier(name: "Iron Sword",       tier: 1, stats: GearStats(attack: 5, defense: 0, hp: 0),  gold_cost: 30, material_cost: [(IronOre, 3)],          armory_level_required: 1),
+                GearTier(name: "Steel Sword",       tier: 2, stats: GearStats(attack: 12, defense: 0, hp: 0), gold_cost: 80, material_cost: [(SteelIngot, 3)],       armory_level_required: 2),
+                GearTier(name: "Enchanted Blade",   tier: 3, stats: GearStats(attack: 22, defense: 0, hp: 5), gold_cost: 200, material_cost: [(EnchantedSteel, 3)],  armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Warrior,
+            slot: Armor,
+            tiers: [
+                GearTier(name: "Chainmail",    tier: 1, stats: GearStats(attack: 0, defense: 5, hp: 5),   gold_cost: 35, material_cost: [(IronOre, 4)],          armory_level_required: 1),
+                GearTier(name: "Plate Armor",  tier: 2, stats: GearStats(attack: 0, defense: 12, hp: 10), gold_cost: 90, material_cost: [(SteelIngot, 4)],       armory_level_required: 2),
+                GearTier(name: "Runic Plate",  tier: 3, stats: GearStats(attack: 3, defense: 22, hp: 20), gold_cost: 220, material_cost: [(EnchantedSteel, 4)],  armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Warrior,
+            slot: Accessory,
+            tiers: [
+                GearTier(name: "Iron Shield",   tier: 1, stats: GearStats(attack: 0, defense: 3, hp: 3),   gold_cost: 25, material_cost: [(IronOre, 2)],          armory_level_required: 1),
+                GearTier(name: "Tower Shield",  tier: 2, stats: GearStats(attack: 0, defense: 8, hp: 8),   gold_cost: 70, material_cost: [(SteelIngot, 2)],       armory_level_required: 2),
+                GearTier(name: "Aegis",         tier: 3, stats: GearStats(attack: 5, defense: 15, hp: 15), gold_cost: 180, material_cost: [(EnchantedSteel, 2)],  armory_level_required: 3),
+            ],
+        ),
+
+        // ── Rogue ──────────────────────────────────────────────
+        GearPath(
+            class: Rogue,
+            slot: Weapon,
+            tiers: [
+                GearTier(name: "Iron Daggers",    tier: 1, stats: GearStats(attack: 6, defense: 0, hp: 0),  gold_cost: 28, material_cost: [(IronOre, 2)],          armory_level_required: 1),
+                GearTier(name: "Steel Daggers",   tier: 2, stats: GearStats(attack: 14, defense: 0, hp: 0), gold_cost: 75, material_cost: [(SteelIngot, 2)],       armory_level_required: 2),
+                GearTier(name: "Shadow Blades",   tier: 3, stats: GearStats(attack: 25, defense: 0, hp: 0), gold_cost: 190, material_cost: [(EnchantedSteel, 2)],  armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Rogue,
+            slot: Armor,
+            tiers: [
+                GearTier(name: "Leather Armor",    tier: 1, stats: GearStats(attack: 0, defense: 4, hp: 3),   gold_cost: 30, material_cost: [(RawLeather, 4)],       armory_level_required: 1),
+                GearTier(name: "Studded Leather",  tier: 2, stats: GearStats(attack: 2, defense: 9, hp: 6),   gold_cost: 80, material_cost: [(CuredLeather, 4)],     armory_level_required: 2),
+                GearTier(name: "Shadowweave",      tier: 3, stats: GearStats(attack: 5, defense: 18, hp: 12), gold_cost: 200, material_cost: [(DragonLeather, 3)],   armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Rogue,
+            slot: Accessory,
+            tiers: [
+                GearTier(name: "Smoke Bombs",        tier: 1, stats: GearStats(attack: 2, defense: 2, hp: 0),  gold_cost: 25, material_cost: [(RawHerbs, 3)],         armory_level_required: 1),
+                GearTier(name: "Poison Vials",       tier: 2, stats: GearStats(attack: 6, defense: 4, hp: 0),  gold_cost: 65, material_cost: [(Potion, 3)],           armory_level_required: 2),
+                GearTier(name: "Cloak of Shadows",   tier: 3, stats: GearStats(attack: 10, defense: 10, hp: 5), gold_cost: 170, material_cost: [(DragonLeather, 2)], armory_level_required: 3),
+            ],
+        ),
+
+        // ── Mage ───────────────────────────────────────────────
+        GearPath(
+            class: Mage,
+            slot: Weapon,
+            tiers: [
+                GearTier(name: "Crystal Staff",   tier: 1, stats: GearStats(attack: 6, defense: 0, hp: 0),  gold_cost: 32, material_cost: [(RoughGems, 2), (Wood, 2)],     armory_level_required: 1),
+                GearTier(name: "Arcane Staff",    tier: 2, stats: GearStats(attack: 14, defense: 0, hp: 3), gold_cost: 85, material_cost: [(CutGem, 2), (Lumber, 2)],       armory_level_required: 2),
+                GearTier(name: "Staff of Power",  tier: 3, stats: GearStats(attack: 26, defense: 0, hp: 8), gold_cost: 220, material_cost: [(PrismaticGem, 2), (ArcaneWood, 2)], armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Mage,
+            slot: Armor,
+            tiers: [
+                GearTier(name: "Enchanted Robes",      tier: 1, stats: GearStats(attack: 2, defense: 2, hp: 3),   gold_cost: 28, material_cost: [(RawLeather, 2), (RawHerbs, 2)],        armory_level_required: 1),
+                GearTier(name: "Arcane Vestments",      tier: 2, stats: GearStats(attack: 4, defense: 6, hp: 8),   gold_cost: 75, material_cost: [(CuredLeather, 2), (Potion, 2)],        armory_level_required: 2),
+                GearTier(name: "Robes of the Archmage", tier: 3, stats: GearStats(attack: 8, defense: 12, hp: 18), gold_cost: 210, material_cost: [(DragonLeather, 2), (ElixirOfPower, 2)], armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Mage,
+            slot: Accessory,
+            tiers: [
+                GearTier(name: "Crystal Amulet", tier: 1, stats: GearStats(attack: 3, defense: 0, hp: 2),   gold_cost: 30, material_cost: [(RoughGems, 3)],       armory_level_required: 1),
+                GearTier(name: "Arcane Focus",   tier: 2, stats: GearStats(attack: 8, defense: 2, hp: 5),   gold_cost: 80, material_cost: [(CutGem, 3)],          armory_level_required: 2),
+                GearTier(name: "Orb of Insight", tier: 3, stats: GearStats(attack: 15, defense: 5, hp: 10), gold_cost: 200, material_cost: [(PrismaticGem, 3)],   armory_level_required: 3),
+            ],
+        ),
+
+        // ── Cleric ─────────────────────────────────────────────
+        GearPath(
+            class: Cleric,
+            slot: Weapon,
+            tiers: [
+                GearTier(name: "Iron Mace",      tier: 1, stats: GearStats(attack: 4, defense: 1, hp: 0),  gold_cost: 30, material_cost: [(IronOre, 3)],          armory_level_required: 1),
+                GearTier(name: "Steel Mace",     tier: 2, stats: GearStats(attack: 10, defense: 3, hp: 0), gold_cost: 80, material_cost: [(SteelIngot, 3)],       armory_level_required: 2),
+                GearTier(name: "Holy Avenger",   tier: 3, stats: GearStats(attack: 20, defense: 5, hp: 5), gold_cost: 210, material_cost: [(EnchantedSteel, 3)],  armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Cleric,
+            slot: Armor,
+            tiers: [
+                GearTier(name: "Chain Vestments", tier: 1, stats: GearStats(attack: 0, defense: 4, hp: 5),   gold_cost: 35, material_cost: [(IronOre, 3), (RawLeather, 2)],       armory_level_required: 1),
+                GearTier(name: "Blessed Armor",   tier: 2, stats: GearStats(attack: 0, defense: 10, hp: 12), gold_cost: 90, material_cost: [(SteelIngot, 3), (CuredLeather, 2)],   armory_level_required: 2),
+                GearTier(name: "Divine Raiment",  tier: 3, stats: GearStats(attack: 3, defense: 20, hp: 22), gold_cost: 240, material_cost: [(EnchantedSteel, 3), (DragonLeather, 2)], armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Cleric,
+            slot: Accessory,
+            tiers: [
+                GearTier(name: "Herbal Pouch",    tier: 1, stats: GearStats(attack: 0, defense: 1, hp: 5),   gold_cost: 25, material_cost: [(RawHerbs, 4)],        armory_level_required: 1),
+                GearTier(name: "Healing Totem",   tier: 2, stats: GearStats(attack: 0, defense: 3, hp: 12),  gold_cost: 70, material_cost: [(Potion, 4)],          armory_level_required: 2),
+                GearTier(name: "Relic of Faith",  tier: 3, stats: GearStats(attack: 5, defense: 8, hp: 20),  gold_cost: 190, material_cost: [(ElixirOfPower, 3)],  armory_level_required: 3),
+            ],
+        ),
+
+        // ── Ranger ─────────────────────────────────────────────
+        GearPath(
+            class: Ranger,
+            slot: Weapon,
+            tiers: [
+                GearTier(name: "Short Bow",       tier: 1, stats: GearStats(attack: 5, defense: 0, hp: 0),  gold_cost: 28, material_cost: [(Wood, 3)],            armory_level_required: 1),
+                GearTier(name: "Longbow",         tier: 2, stats: GearStats(attack: 13, defense: 0, hp: 0), gold_cost: 75, material_cost: [(Lumber, 3)],           armory_level_required: 2),
+                GearTier(name: "Windrunner Bow",  tier: 3, stats: GearStats(attack: 24, defense: 0, hp: 3), gold_cost: 195, material_cost: [(ArcaneWood, 3)],     armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Ranger,
+            slot: Armor,
+            tiers: [
+                GearTier(name: "Hide Armor",        tier: 1, stats: GearStats(attack: 0, defense: 4, hp: 3),   gold_cost: 30, material_cost: [(RawLeather, 4)],       armory_level_required: 1),
+                GearTier(name: "Beastscale Armor",  tier: 2, stats: GearStats(attack: 2, defense: 10, hp: 8),  gold_cost: 85, material_cost: [(CuredLeather, 4)],     armory_level_required: 2),
+                GearTier(name: "Wildweave Armor",   tier: 3, stats: GearStats(attack: 5, defense: 18, hp: 15), gold_cost: 210, material_cost: [(DragonLeather, 3)],   armory_level_required: 3),
+            ],
+        ),
+        GearPath(
+            class: Ranger,
+            slot: Accessory,
+            tiers: [
+                GearTier(name: "Herb Satchel",       tier: 1, stats: GearStats(attack: 1, defense: 1, hp: 3),   gold_cost: 25, material_cost: [(RawHerbs, 2), (Wood, 2)],       armory_level_required: 1),
+                GearTier(name: "Quiver of Plenty",   tier: 2, stats: GearStats(attack: 5, defense: 3, hp: 6),   gold_cost: 70, material_cost: [(Lumber, 2), (Potion, 2)],       armory_level_required: 2),
+                GearTier(name: "Wolf Companion",     tier: 3, stats: GearStats(attack: 12, defense: 8, hp: 12), gold_cost: 250, material_cost: [(ArcaneWood, 2), (ElixirOfPower, 1)], armory_level_required: 3),
+            ],
+        ),
+    ],
+)
