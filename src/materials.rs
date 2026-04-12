@@ -1,0 +1,77 @@
+use bevy::prelude::*;
+use serde::Deserialize;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+pub enum MaterialType {
+    // Raw
+    IronOre, RawLeather, Wood, RawHerbs, RoughGems,
+    // Refined (tier 2)
+    SteelIngot, CuredLeather, Lumber, Potion, CutGem,
+    // Refined (tier 3)
+    EnchantedSteel, DragonLeather, ArcaneWood, ElixirOfPower, PrismaticGem,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConversionRecipe {
+    pub input_type: MaterialType,
+    pub input_count: u32,
+    pub output_type: MaterialType,
+    pub output_count: u32,
+    pub workshop_level_required: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MaterialsData {
+    pub conversions: Vec<ConversionRecipe>,
+}
+
+#[derive(Resource, Debug, Clone)]
+pub struct ConversionDatabase(pub Vec<ConversionRecipe>);
+
+#[derive(Resource, Debug, Clone, Default)]
+pub struct Materials(pub HashMap<MaterialType, u32>);
+
+impl Materials {
+    pub fn get(&self, mat: MaterialType) -> u32 {
+        self.0.get(&mat).copied().unwrap_or(0)
+    }
+
+    pub fn add(&mut self, mat: MaterialType, amount: u32) {
+        *self.0.entry(mat).or_insert(0) += amount;
+    }
+
+    pub fn try_spend(&mut self, mat: MaterialType, amount: u32) -> bool {
+        let entry = self.0.entry(mat).or_insert(0);
+        if *entry >= amount {
+            *entry -= amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn try_spend_all(&mut self, costs: &[(MaterialType, u32)]) -> bool {
+        for &(mat, amount) in costs {
+            if self.get(mat) < amount {
+                return false;
+            }
+        }
+        for &(mat, amount) in costs {
+            self.try_spend(mat, amount);
+        }
+        true
+    }
+}
+
+fn load_materials_database(mut commands: Commands) {
+    let data: MaterialsData =
+        ron::from_str(include_str!("../assets/data/materials.ron"))
+            .expect("Failed to parse materials.ron");
+    commands.insert_resource(ConversionDatabase(data.conversions));
+}
+
+pub(super) fn plugin(app: &mut App) {
+    app.init_resource::<Materials>();
+    app.add_systems(Startup, load_materials_database);
+}

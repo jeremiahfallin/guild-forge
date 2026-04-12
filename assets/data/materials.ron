@@ -1,0 +1,15 @@
+(
+    conversions: [
+        (input_type: IronOre,    input_count: 3, output_type: SteelIngot,   output_count: 1, workshop_level_required: 1),
+        (input_type: RawLeather, input_count: 3, output_type: CuredLeather, output_count: 1, workshop_level_required: 1),
+        (input_type: Wood,       input_count: 3, output_type: Lumber,       output_count: 1, workshop_level_required: 1),
+        (input_type: RawHerbs,   input_count: 3, output_type: Potion,       output_count: 1, workshop_level_required: 1),
+        (input_type: RoughGems,  input_count: 3, output_type: CutGem,       output_count: 1, workshop_level_required: 1),
+
+        (input_type: SteelIngot,   input_count: 3, output_type: EnchantedSteel,  output_count: 1, workshop_level_required: 2),
+        (input_type: CuredLeather, input_count: 3, output_type: DragonLeather,   output_count: 1, workshop_level_required: 2),
+        (input_type: Lumber,       input_count: 3, output_type: ArcaneWood,      output_count: 1, workshop_level_required: 2),
+        (input_type: Potion,       input_count: 3, output_type: ElixirOfPower,   output_count: 1, workshop_level_required: 2),
+        (input_type: CutGem,       input_count: 3, output_type: PrismaticGem,    output_count: 1, workshop_level_required: 2),
+    ],
+)

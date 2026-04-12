@@ -9,6 +9,7 @@ mod audio;
 mod dev_tools;
 mod economy;
 mod hero;
+mod materials;
 mod menus;
 mod mission;
 mod screens;
@@ -54,6 +55,7 @@ impl Plugin for AppPlugin {
             dev_tools::plugin,
             economy::plugin,
             hero::plugin,
+            materials::plugin,
             mission::plugin,
             menus::plugin,
             screens::plugin,
