@@ -1,12 +1,12 @@
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::economy::Gold;
 use crate::materials::{MaterialType, Materials};
 use crate::ui::toast::{ToastEvent, ToastKind};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum BuildingType {
     Armory,
     TrainingGrounds,

@@ -1,10 +1,10 @@
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::buildings::{BuildingType, GuildBuildings};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum MaterialType {
     // Raw
     IronOre, RawLeather, Wood, RawHerbs, RoughGems,

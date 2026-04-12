@@ -2,9 +2,10 @@
 
 use bevy::prelude::*;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 /// Tile types in the dungeon grid.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub enum Tile {
     Wall,
     Floor,
@@ -13,7 +14,7 @@ pub enum Tile {
 }
 
 /// What kind of room this is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub enum RoomType {
     Normal,
     Entrance,
@@ -22,7 +23,7 @@ pub enum RoomType {
 }
 
 /// A room in the dungeon.
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub struct Room {
     pub x: u32,
     pub y: u32,
@@ -38,7 +39,7 @@ impl Room {
 }
 
 /// A procedurally generated dungeon map.
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize, Reflect)]
 pub struct DungeonMap {
     pub width: u32,
     pub height: u32,
