@@ -1,15 +1,293 @@
 //! Save system: serialize/deserialize full game state to/from a RON file.
 
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
-use crate::buildings::BuildingType;
+use crate::buildings::{BuildingType, GuildBuildings};
+use crate::economy::Gold;
+use crate::equipment::HeroEquipment;
 use crate::hero::data::{HeroClass, HeroTrait};
-use crate::materials::MaterialType;
-use crate::mission::MissionProgress;
-use crate::mission::data::EnemyType;
+use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
+use crate::materials::{MaterialType, Materials};
 use crate::mission::dungeon::DungeonMap;
+use crate::mission::entities::{
+    CombatStats, EnemyToken, GridPosition, HeroToken, InRoom, MoveTarget, RoomStatus,
+};
+use crate::mission::{
+    Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
+};
+use crate::recruiting::ApplicantBoard;
+use crate::reputation::Reputation;
+use crate::mission::data::EnemyType;
+use crate::time_bank::OfflineTimeBank;
+use crate::training::TrainingTimer;
+use crate::ui::toast::{ToastEvent, ToastKind};
+
+// ── Plugin ─────────────────────────────────────────────────────────
+
+pub(super) fn plugin(app: &mut App) {
+    app.init_resource::<AutosaveTimer>();
+    app.add_observer(handle_save);
+    app.add_systems(
+        Update,
+        tick_autosave.run_if(in_state(crate::screens::Screen::Gameplay)),
+    );
+}
+
+// ── Resources & Events ─────────────────────────────────────────────
+
+/// Timer that fires an autosave every 300 seconds.
+#[derive(Resource, Debug)]
+pub struct AutosaveTimer(pub f32);
+
+impl Default for AutosaveTimer {
+    fn default() -> Self {
+        Self(300.0)
+    }
+}
+
+/// Fire this event to trigger a save (manual or autosave).
+#[derive(Event, Debug)]
+pub struct SaveGame;
+
+// ── Systems ────────────────────────────────────────────────────────
+
+/// Tick the autosave timer; fire `SaveGame` when it expires.
+fn tick_autosave(time: Res<Time>, mut timer: ResMut<AutosaveTimer>, mut commands: Commands) {
+    timer.0 -= time.delta_secs();
+    if timer.0 <= 0.0 {
+        timer.0 = 300.0;
+        commands.trigger(SaveGame);
+    }
+}
+
+/// Observer that performs the full save when `SaveGame` is triggered.
+fn handle_save(
+    _trigger: On<SaveGame>,
+    mut commands: Commands,
+    gold: Res<Gold>,
+    reputation: Res<Reputation>,
+    materials: Res<Materials>,
+    buildings: Res<GuildBuildings>,
+    training_timer: Res<TrainingTimer>,
+    applicant_board: Res<ApplicantBoard>,
+    offline_bank: Res<OfflineTimeBank>,
+    heroes: Query<
+        (
+            Entity,
+            &HeroInfo,
+            &HeroStats,
+            &HeroTraits,
+            &HeroEquipment,
+            Option<&OnMission>,
+        ),
+        With<Hero>,
+    >,
+    missions: Query<
+        (
+            Entity,
+            &MissionInfo,
+            &MissionProgress,
+            &MissionParty,
+            &MissionDungeon,
+            &RoomStatus,
+            &Children,
+        ),
+        With<Mission>,
+    >,
+    hero_tokens: Query<
+        (
+            &HeroToken,
+            &GridPosition,
+            &CombatStats,
+            &InRoom,
+            Option<&MoveTarget>,
+        ),
+        Without<EnemyToken>,
+    >,
+    enemy_tokens: Query<
+        (&EnemyToken, &GridPosition, &CombatStats, &InRoom),
+        Without<HeroToken>,
+    >,
+) {
+    // 1. Build hero roster and entity→index mapping.
+    let mut hero_dtos = Vec::new();
+    let mut entity_to_index: HashMap<Entity, usize> = HashMap::new();
+
+    for (entity, info, stats, traits, equipment, on_mission) in &heroes {
+        let idx = hero_dtos.len();
+        entity_to_index.insert(entity, idx);
+
+        hero_dtos.push(HeroSaveDto {
+            name: info.name.clone(),
+            class: info.class,
+            level: info.level,
+            xp: info.xp,
+            xp_to_next: info.xp_to_next,
+            stats: HeroStatsSave {
+                strength: stats.strength,
+                dexterity: stats.dexterity,
+                constitution: stats.constitution,
+                intelligence: stats.intelligence,
+                wisdom: stats.wisdom,
+                charisma: stats.charisma,
+            },
+            traits: traits.0.clone(),
+            equipment: HeroEquipmentSave {
+                weapon_tier: equipment.weapon_tier,
+                armor_tier: equipment.armor_tier,
+                accessory_tier: equipment.accessory_tier,
+            },
+            on_mission: on_mission.is_some(),
+        });
+    }
+
+    // 2. Build applicant DTOs.
+    let applicant_dtos: Vec<ApplicantSaveDto> = applicant_board
+        .applicants
+        .iter()
+        .map(|a| ApplicantSaveDto {
+            name: a.name.clone(),
+            class: a.class,
+            traits: a.traits.clone(),
+            stats: HeroStatsSave {
+                strength: a.stats.strength,
+                dexterity: a.stats.dexterity,
+                constitution: a.stats.constitution,
+                intelligence: a.stats.intelligence,
+                wisdom: a.stats.wisdom,
+                charisma: a.stats.charisma,
+            },
+            hire_cost: a.hire_cost,
+            time_remaining: a.time_remaining,
+        })
+        .collect();
+
+    // 3. Build mission DTOs.
+    let mut mission_dtos = Vec::new();
+
+    for (_entity, info, progress, party, dungeon, room_status, children) in &missions {
+        // Map party entities to hero roster indices.
+        let party_hero_indices: Vec<usize> = party
+            .0
+            .iter()
+            .filter_map(|e| entity_to_index.get(e).copied())
+            .collect();
+
+        // Collect hero tokens that are children of this mission.
+        let mut hero_token_dtos = Vec::new();
+        let mut enemy_token_dtos = Vec::new();
+
+        for child in children.iter() {
+            if let Ok((ht, pos, combat, in_room, move_target)) = hero_tokens.get(child) {
+                let roster_index = entity_to_index.get(&ht.0).copied().unwrap_or(0);
+                hero_token_dtos.push(HeroTokenDto {
+                    roster_index,
+                    grid_x: pos.x,
+                    grid_y: pos.y,
+                    in_room: in_room.0,
+                    hp: combat.hp,
+                    max_hp: combat.max_hp,
+                    attack: combat.attack,
+                    defense: combat.defense,
+                    path: move_target.as_ref().map(|mt| mt.path.clone()),
+                    path_index: move_target.as_ref().map_or(0, |mt| mt.path_index),
+                });
+            }
+
+            if let Ok((et, pos, combat, in_room)) = enemy_tokens.get(child) {
+                enemy_token_dtos.push(EnemyTokenDto {
+                    enemy_type: et.enemy_type,
+                    xp_reward: et.xp_reward,
+                    grid_x: pos.x,
+                    grid_y: pos.y,
+                    in_room: in_room.0,
+                    hp: combat.hp,
+                    max_hp: combat.max_hp,
+                    attack: combat.attack,
+                    defense: combat.defense,
+                });
+            }
+        }
+
+        mission_dtos.push(MissionSaveDto {
+            template_id: info.template_id.clone(),
+            name: info.name.clone(),
+            difficulty: info.difficulty,
+            progress: *progress,
+            rng_seed: 0,
+            party_hero_indices,
+            dungeon_map: dungeon.0.clone(),
+            room_visited: room_status.visited.clone(),
+            room_cleared: room_status.cleared.clone(),
+            hero_tokens: hero_token_dtos,
+            enemy_tokens: enemy_token_dtos,
+        });
+    }
+
+    // 4. Get unix timestamp.
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    // 5. Assemble SaveData.
+    let save_data = SaveData {
+        last_save_timestamp: timestamp,
+        gold: gold.0,
+        reputation: reputation.0,
+        banked_seconds: offline_bank.banked_seconds,
+        materials: materials.0.clone(),
+        buildings: buildings.0.clone(),
+        heroes: hero_dtos,
+        applicants: applicant_dtos,
+        next_arrival_timer: applicant_board.next_arrival_timer,
+        training_timer: training_timer.0,
+        missions: mission_dtos,
+    };
+
+    // 6. Serialize to RON.
+    let ron_string =
+        match ron::ser::to_string_pretty(&save_data, ron::ser::PrettyConfig::default()) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("Failed to serialize save data: {e}");
+                return;
+            }
+        };
+
+    // 7. Write to disk.
+    let Some(path) = save_file_path() else {
+        warn!("Could not determine save file path");
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            warn!("Failed to create save directory: {e}");
+            return;
+        }
+    }
+
+    if let Err(e) = std::fs::write(&path, ron_string) {
+        warn!("Failed to write save file: {e}");
+        return;
+    }
+
+    info!("Game saved to {}", path.display());
+
+    // 8. Fire toast.
+    commands.trigger(ToastEvent {
+        title: "Game Saved".to_string(),
+        body: "Game saved.".to_string(),
+        kind: ToastKind::Info,
+    });
+}
+
+// ── Helpers ────────────────────────────────────────────────────────
 
 /// Return the save file path: `<data_dir>/guild-forge/save.ron`.
 pub fn save_file_path() -> Option<PathBuf> {
@@ -20,6 +298,8 @@ pub fn save_file_path() -> Option<PathBuf> {
 pub fn has_save_file() -> bool {
     save_file_path().is_some_and(|p| p.exists())
 }
+
+// ── DTOs ───────────────────────────────────────────────────────────
 
 /// Top-level save data structure.
 #[derive(Serialize, Deserialize)]

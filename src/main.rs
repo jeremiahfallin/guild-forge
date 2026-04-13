@@ -71,6 +71,7 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             recruiting::plugin,
             reputation::plugin,
+            save::plugin,
             screens::plugin,
             theme::plugin,
             time_bank::plugin,
