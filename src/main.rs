@@ -15,10 +15,11 @@ mod materials;
 mod menus;
 mod mission;
 mod recruiting;
-mod save;
 mod reputation;
+mod save;
 mod screens;
 mod theme;
+mod time_bank;
 mod training;
 mod ui;
 
@@ -72,6 +73,7 @@ impl Plugin for AppPlugin {
             reputation::plugin,
             screens::plugin,
             theme::plugin,
+            time_bank::plugin,
             training::plugin,
             ui::plugin,
         ));
