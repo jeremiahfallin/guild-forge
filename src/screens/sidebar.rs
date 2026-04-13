@@ -13,8 +13,9 @@ use crate::{
     screens::GameTab,
     theme::{
         palette::*,
-        widgets::{GameplayRoot, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRepText, SidebarRoot},
+        widgets::{GameplayRoot, SidebarBankText, SidebarGoldText, SidebarMissionList, SidebarNavButton, SidebarRepText, SidebarRoot, SpeedButton},
     },
+    time_bank::{GameSpeed, OfflineTimeBank, SetGameSpeed, format_banked_time},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -27,6 +28,7 @@ pub(super) fn plugin(app: &mut App) {
         (
             update_gold_display.run_if(resource_changed::<Gold>),
             update_rep_display.run_if(resource_changed::<Reputation>),
+            update_bank_display.run_if(resource_changed::<OfflineTimeBank>),
             update_active_tab_highlight.run_if(state_changed::<GameTab>),
             update_mission_list,
         )
@@ -37,9 +39,17 @@ pub(super) fn plugin(app: &mut App) {
 /// The sidebar width in pixels.
 const SIDEBAR_WIDTH: f32 = 220.0;
 
-fn spawn_gameplay_root(mut commands: Commands, gold: Option<Res<Gold>>, rep: Option<Res<Reputation>>) {
+fn spawn_gameplay_root(
+    mut commands: Commands,
+    gold: Option<Res<Gold>>,
+    rep: Option<Res<Reputation>>,
+    bank: Option<Res<OfflineTimeBank>>,
+    speed: Option<Res<GameSpeed>>,
+) {
     let gold_amount = gold.map_or(0, |g| g.0);
     let rep_amount = rep.map_or(0, |r| r.0);
+    let banked = bank.map_or(0.0, |b| b.banked_seconds);
+    let current_speed = speed.map_or(1.0, |s| s.0);
 
     // Gameplay root: row containing sidebar + content area
     let mut root = div()
@@ -55,13 +65,13 @@ fn spawn_gameplay_root(mut commands: Commands, gold: Option<Res<Gold>>, rep: Opt
         ));
 
     // Build sidebar
-    let sidebar = build_sidebar(gold_amount, rep_amount);
+    let sidebar = build_sidebar(gold_amount, rep_amount, banked, current_speed);
     root = root.child(sidebar);
 
     root.spawn(&mut commands);
 }
 
-fn build_sidebar(gold_amount: u32, rep_amount: u32) -> bevy_declarative::element::div::Div {
+fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32) -> bevy_declarative::element::div::Div {
     let mut sidebar = div()
         .col()
         .w(px(SIDEBAR_WIDTH))
@@ -94,6 +104,23 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32) -> bevy_declarative::element
                 .font_size(16.0)
                 .color(Color::srgb(0.6, 0.8, 0.9))
                 .insert(SidebarRepText),
+        )
+        // Speed control
+        .child(
+            div()
+                .row()
+                .w_full()
+                .gap(px(4.0))
+                .items_center()
+                .child(speed_btn(1.0, speed))
+                .child(speed_btn(2.0, speed))
+                .child(speed_btn(3.0, speed))
+                .child(
+                    text(format!("Bank: {}", format_banked_time(banked)))
+                        .font_size(14.0)
+                        .color(Color::srgb(0.7, 0.8, 0.9))
+                        .insert(SidebarBankText),
+                ),
         )
         // Divider
         .child(
@@ -178,6 +205,49 @@ fn nav_click(
     }
 }
 
+fn speed_btn(multiplier: f32, current_speed: f32) -> bevy_declarative::element::div::Div {
+    let label = format!("{}x", multiplier as u32);
+    let is_active = (current_speed - multiplier).abs() < 0.01;
+    let bg = if is_active {
+        Color::srgb(0.3, 0.5, 0.7)
+    } else {
+        BUTTON_BACKGROUND
+    };
+
+    div()
+        .p(px(4.0))
+        .items_center()
+        .justify_center()
+        .bg(bg)
+        .rounded(px(3.0))
+        .insert((
+            Button,
+            SpeedButton(multiplier),
+            crate::theme::interaction::InteractionPalette {
+                none: bg,
+                hovered: BUTTON_HOVERED_BACKGROUND,
+                pressed: BUTTON_PRESSED_BACKGROUND,
+            },
+        ))
+        .on_click(on_speed_click)
+        .child(
+            text(label)
+                .font_size(14.0)
+                .color(BUTTON_TEXT)
+                .insert(Pickable::IGNORE),
+        )
+}
+
+fn on_speed_click(
+    click: On<Pointer<Click>>,
+    buttons: Query<&SpeedButton>,
+    mut commands: Commands,
+) {
+    if let Ok(btn) = buttons.get(click.event_target()) {
+        commands.trigger(SetGameSpeed(btn.0));
+    }
+}
+
 // -- Reactive update systems --
 
 fn update_gold_display(
@@ -195,6 +265,15 @@ fn update_rep_display(
 ) {
     for mut t in &mut texts {
         **t = format!("Rep: {} (Tier {})", rep.0, rep.tier());
+    }
+}
+
+fn update_bank_display(
+    bank: Res<OfflineTimeBank>,
+    mut texts: Query<&mut Text, With<SidebarBankText>>,
+) {
+    for mut t in &mut texts {
+        **t = format!("Bank: {}", format_banked_time(bank.banked_seconds));
     }
 }
 

@@ -131,3 +131,11 @@ pub fn game_button<B: Bundle, M>(
                 .insert(Pickable::IGNORE),
         )
 }
+
+/// Marker for the bank time text in the sidebar.
+#[derive(Component)]
+pub struct SidebarBankText;
+
+/// Marker for speed buttons — stores the speed multiplier.
+#[derive(Component)]
+pub struct SpeedButton(pub f32);
