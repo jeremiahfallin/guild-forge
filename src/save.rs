@@ -64,7 +64,7 @@ pub struct SaveLoaded;
 // ── Systems ────────────────────────────────────────────────────────
 
 /// Tick the autosave timer; fire `SaveGame` when it expires.
-fn tick_autosave(time: Res<Time>, mut timer: ResMut<AutosaveTimer>, mut commands: Commands) {
+fn tick_autosave(time: Res<Time<Real>>, mut timer: ResMut<AutosaveTimer>, mut commands: Commands) {
     timer.0 -= time.delta_secs();
     if timer.0 <= 0.0 {
         timer.0 = 300.0;
