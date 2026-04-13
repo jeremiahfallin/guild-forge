@@ -158,7 +158,7 @@ fn seed_applicant_board(
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
 ) {
-    if !board.applicants.is_empty() {
+    if !board.applicants.is_empty() || crate::save::has_save_file() {
         return;
     }
 

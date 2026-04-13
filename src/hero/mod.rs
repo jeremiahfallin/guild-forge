@@ -71,7 +71,7 @@ fn spawn_starter_heroes(
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
 ) {
-    if !existing_heroes.is_empty() {
+    if !existing_heroes.is_empty() || crate::save::has_save_file() {
         return;
     }
 

@@ -19,7 +19,7 @@ use crate::mission::entities::{
 use crate::mission::{
     Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
 };
-use crate::recruiting::ApplicantBoard;
+use crate::recruiting::{Applicant, ApplicantBoard};
 use crate::reputation::Reputation;
 use crate::mission::data::EnemyType;
 use crate::time_bank::OfflineTimeBank;
@@ -31,6 +31,10 @@ use crate::ui::toast::{ToastEvent, ToastKind};
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<AutosaveTimer>();
     app.add_observer(handle_save);
+    app.add_systems(
+        OnEnter(crate::screens::Screen::Gameplay),
+        load_save,
+    );
     app.add_systems(
         Update,
         tick_autosave.run_if(in_state(crate::screens::Screen::Gameplay)),
@@ -53,6 +57,10 @@ impl Default for AutosaveTimer {
 #[derive(Event, Debug)]
 pub struct SaveGame;
 
+/// Marker resource: indicates a save was loaded this session.
+#[derive(Resource)]
+pub struct SaveLoaded;
+
 // ── Systems ────────────────────────────────────────────────────────
 
 /// Tick the autosave timer; fire `SaveGame` when it expires.
@@ -62,6 +70,211 @@ fn tick_autosave(time: Res<Time>, mut timer: ResMut<AutosaveTimer>, mut commands
         timer.0 = 300.0;
         commands.trigger(SaveGame);
     }
+}
+
+/// Load game state from disk on entering Gameplay (if a save file exists).
+fn load_save(
+    mut commands: Commands,
+    existing_heroes: Query<(), With<Hero>>,
+) {
+    // Already have heroes — skip (re-entry or already loaded).
+    if !existing_heroes.is_empty() {
+        return;
+    }
+
+    // Read the save file.
+    let Some(path) = save_file_path() else {
+        return;
+    };
+    let Ok(ron_string) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let save_data: SaveData = match ron::from_str(&ron_string) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("Failed to deserialize save file: {e}");
+            return;
+        }
+    };
+
+    info!("Loading save from {}", path.display());
+
+    // ── Restore resources ──────────────────────────────────────────
+    commands.insert_resource(Gold(save_data.gold));
+    commands.insert_resource(Reputation(save_data.reputation));
+    commands.insert_resource(Materials(save_data.materials));
+    commands.insert_resource(GuildBuildings(save_data.buildings));
+    commands.insert_resource(TrainingTimer(save_data.training_timer));
+
+    // ── Restore applicant board ────────────────────────────────────
+    let applicants: Vec<Applicant> = save_data
+        .applicants
+        .iter()
+        .map(|a| Applicant {
+            name: a.name.clone(),
+            class: a.class,
+            traits: a.traits.clone(),
+            stats: HeroStats {
+                strength: a.stats.strength,
+                dexterity: a.stats.dexterity,
+                constitution: a.stats.constitution,
+                intelligence: a.stats.intelligence,
+                wisdom: a.stats.wisdom,
+                charisma: a.stats.charisma,
+            },
+            hire_cost: a.hire_cost,
+            time_remaining: a.time_remaining,
+        })
+        .collect();
+    commands.insert_resource(ApplicantBoard {
+        applicants,
+        next_arrival_timer: save_data.next_arrival_timer,
+    });
+
+    // ── Spawn heroes — track entities for mission cross-references ─
+    let mut hero_entities: Vec<Entity> = Vec::with_capacity(save_data.heroes.len());
+    for dto in &save_data.heroes {
+        let entity = commands
+            .spawn((
+                Name::new(dto.name.clone()),
+                Hero,
+                HeroInfo {
+                    name: dto.name.clone(),
+                    class: dto.class,
+                    level: dto.level,
+                    xp: dto.xp,
+                    xp_to_next: dto.xp_to_next,
+                },
+                HeroStats {
+                    strength: dto.stats.strength,
+                    dexterity: dto.stats.dexterity,
+                    constitution: dto.stats.constitution,
+                    intelligence: dto.stats.intelligence,
+                    wisdom: dto.stats.wisdom,
+                    charisma: dto.stats.charisma,
+                },
+                HeroTraits(dto.traits.clone()),
+                HeroEquipment {
+                    weapon_tier: dto.equipment.weapon_tier,
+                    armor_tier: dto.equipment.armor_tier,
+                    accessory_tier: dto.equipment.accessory_tier,
+                },
+            ))
+            .id();
+        hero_entities.push(entity);
+    }
+
+    // ── Spawn missions with tokens as children ─────────────────────
+    for mdto in &save_data.missions {
+        let party_entities: Vec<Entity> = mdto
+            .party_hero_indices
+            .iter()
+            .filter_map(|&idx| hero_entities.get(idx).copied())
+            .collect();
+
+        let mission_entity = commands
+            .spawn((
+                Name::new(mdto.name.clone()),
+                Mission,
+                MissionInfo {
+                    template_id: mdto.template_id.clone(),
+                    name: mdto.name.clone(),
+                    difficulty: mdto.difficulty,
+                },
+                mdto.progress,
+                MissionParty(party_entities.clone()),
+                MissionDungeon(mdto.dungeon_map.clone()),
+                RoomStatus {
+                    visited: mdto.room_visited.clone(),
+                    cleared: mdto.room_cleared.clone(),
+                },
+            ))
+            .id();
+
+        // Mark party heroes as on-mission.
+        for &hero_entity in &party_entities {
+            commands.entity(hero_entity).insert(OnMission(mission_entity));
+        }
+
+        // Spawn hero tokens as children.
+        for ht in &mdto.hero_tokens {
+            let roster_entity = hero_entities
+                .get(ht.roster_index)
+                .copied()
+                .unwrap_or(Entity::PLACEHOLDER);
+            let mut token = commands.spawn((
+                Name::new(format!("Hero Token")),
+                HeroToken(roster_entity),
+                GridPosition {
+                    x: ht.grid_x,
+                    y: ht.grid_y,
+                },
+                InRoom(ht.in_room),
+                CombatStats {
+                    hp: ht.hp,
+                    max_hp: ht.max_hp,
+                    attack: ht.attack,
+                    defense: ht.defense,
+                },
+                ChildOf(mission_entity),
+            ));
+            if let Some(ref path) = ht.path {
+                if ht.path_index < path.len() {
+                    token.insert(MoveTarget {
+                        path: path.clone(),
+                        path_index: ht.path_index,
+                    });
+                }
+            }
+        }
+
+        // Spawn enemy tokens as children.
+        for et in &mdto.enemy_tokens {
+            commands.spawn((
+                Name::new(format!("Enemy Token")),
+                EnemyToken {
+                    enemy_type: et.enemy_type,
+                    xp_reward: et.xp_reward,
+                },
+                GridPosition {
+                    x: et.grid_x,
+                    y: et.grid_y,
+                },
+                InRoom(et.in_room),
+                CombatStats {
+                    hp: et.hp,
+                    max_hp: et.max_hp,
+                    attack: et.attack,
+                    defense: et.defense,
+                },
+                ChildOf(mission_entity),
+            ));
+        }
+    }
+
+    // ── Offline time calculation ───────────────────────────────────
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let elapsed = now.saturating_sub(save_data.last_save_timestamp) as f32;
+    let new_banked = (save_data.banked_seconds + elapsed).min(86400.0);
+    commands.insert_resource(OfflineTimeBank {
+        banked_seconds: new_banked,
+    });
+
+    // Fire toast with banked time info.
+    let formatted = crate::time_bank::format_banked_time(new_banked);
+    commands.trigger(ToastEvent {
+        title: "Welcome Back!".to_string(),
+        body: format!("Banked time: {formatted}"),
+        kind: ToastKind::Info,
+    });
+
+    // Insert marker resource.
+    commands.insert_resource(SaveLoaded);
+
+    info!("Save loaded successfully ({} heroes, {} missions)", hero_entities.len(), save_data.missions.len());
 }
 
 /// Observer that performs the full save when `SaveGame` is triggered.
