@@ -189,12 +189,8 @@ fn build_recruiting_ui(
                             Name::new("Hire Button"),
                             Button,
                             HireButton(idx),
-                            crate::theme::interaction::InteractionPalette {
-                                none: BUTTON_BACKGROUND,
-                                hovered: BUTTON_HOVERED_BACKGROUND,
-                                pressed: BUTTON_PRESSED_BACKGROUND,
-                            },
                         ))
+                        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_hire_click)
                         .child(
                             text("Hire")

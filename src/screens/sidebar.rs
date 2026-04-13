@@ -164,8 +164,6 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32) -> 
 }
 
 fn nav_button(label: &str, tab: GameTab) -> bevy_declarative::element::div::Div {
-    use crate::theme::interaction::InteractionPalette;
-
     div()
         .w_full()
         .h(px(40.0))
@@ -177,12 +175,8 @@ fn nav_button(label: &str, tab: GameTab) -> bevy_declarative::element::div::Div 
             Name::new(format!("Nav: {label}")),
             Button,
             SidebarNavButton(tab),
-            InteractionPalette {
-                none: BUTTON_BACKGROUND,
-                hovered: BUTTON_HOVERED_BACKGROUND,
-                pressed: BUTTON_PRESSED_BACKGROUND,
-            },
         ))
+        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
         .on_click(nav_click)
         .child(
             text(label)
@@ -223,12 +217,8 @@ fn speed_btn(multiplier: f32, current_speed: f32) -> bevy_declarative::element::
         .insert((
             Button,
             SpeedButton(multiplier),
-            crate::theme::interaction::InteractionPalette {
-                none: bg,
-                hovered: BUTTON_HOVERED_BACKGROUND,
-                pressed: BUTTON_PRESSED_BACKGROUND,
-            },
         ))
+        .interaction_palette(bg, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
         .on_click(on_speed_click)
         .child(
             text(label)

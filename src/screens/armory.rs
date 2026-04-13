@@ -283,12 +283,8 @@ fn build_gear_panel(
                             Name::new("Craft Button"),
                             Button,
                             CraftButton { hero: entity, slot },
-                            crate::theme::interaction::InteractionPalette {
-                                none: BUTTON_BACKGROUND,
-                                hovered: BUTTON_HOVERED_BACKGROUND,
-                                pressed: BUTTON_PRESSED_BACKGROUND,
-                            },
                         ))
+                        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_craft_click)
                         .child(
                             text("Craft")

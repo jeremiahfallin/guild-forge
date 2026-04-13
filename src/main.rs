@@ -56,6 +56,7 @@ impl Plugin for AppPlugin {
 
         // Add other plugins.
         app.add_plugins((
+            bevy_declarative::BevyDeclarativePlugin,
             asset_tracking::plugin,
             audio::plugin,
             buildings::plugin,
