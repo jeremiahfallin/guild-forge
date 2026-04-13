@@ -1,7 +1,7 @@
 use bevy::color::Color;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::ecs::system::{EntityCommands, IntoObserverSystem};
-use bevy::picking::events::{Click, Out, Over, Press, Release, Pointer};
+use bevy::picking::events::{Click, Out, Over, Pointer, Press, Release};
 use bevy::prelude::{Bundle, Commands};
 use bevy::ui::{BackgroundColor, BorderRadius, Node, Val};
 
@@ -50,44 +50,84 @@ impl Div {
 
     /// Insert an arbitrary bundle of components onto this element's entity.
     pub fn insert(mut self, bundle: impl Bundle + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.insert(bundle);
-        }));
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.insert(bundle);
+            }));
         self
     }
 
-    pub fn on_click<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Click>, B, M> + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.observe(callback);
-        }));
+    pub fn on_click<B: Bundle, M>(
+        mut self,
+        callback: impl IntoObserverSystem<Pointer<Click>, B, M> + Send + Sync + 'static,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.observe(callback);
+            }));
         self
     }
 
-    pub fn on_hover<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Over>, B, M> + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.observe(callback);
-        }));
+    pub fn on_hover<B: Bundle, M>(
+        mut self,
+        callback: impl IntoObserverSystem<Pointer<Over>, B, M> + Send + Sync + 'static,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.observe(callback);
+            }));
         self
     }
 
-    pub fn on_hover_out<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Out>, B, M> + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.observe(callback);
-        }));
+    pub fn on_hover_out<B: Bundle, M>(
+        mut self,
+        callback: impl IntoObserverSystem<Pointer<Out>, B, M> + Send + Sync + 'static,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.observe(callback);
+            }));
         self
     }
 
-    pub fn on_press<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Press>, B, M> + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.observe(callback);
-        }));
+    pub fn on_press<B: Bundle, M>(
+        mut self,
+        callback: impl IntoObserverSystem<Pointer<Press>, B, M> + Send + Sync + 'static,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.observe(callback);
+            }));
         self
     }
 
-    pub fn on_release<B: Bundle, M>(mut self, callback: impl IntoObserverSystem<Pointer<Release>, B, M> + Send + Sync + 'static) -> Self {
-        self.observers.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.observe(callback);
-        }));
+    pub fn on_release<B: Bundle, M>(
+        mut self,
+        callback: impl IntoObserverSystem<Pointer<Release>, B, M> + Send + Sync + 'static,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.observe(callback);
+            }));
+        self
+    }
+
+    /// Attach an [`InteractionPalette`] that automatically changes
+    /// [`BackgroundColor`] on hover, press, and release.
+    pub fn interaction_palette(
+        mut self,
+        none: bevy::color::Color,
+        hovered: bevy::color::Color,
+        pressed: bevy::color::Color,
+    ) -> Self {
+        self.observers
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.insert(crate::interaction::InteractionPalette {
+                    none,
+                    hovered,
+                    pressed,
+                });
+            }));
         self
     }
 
@@ -122,7 +162,11 @@ impl Div {
     }
 
     /// Spawn this element as a child of an existing entity.
-    pub fn spawn_as_child_of(self, commands: &mut Commands, parent: bevy::prelude::Entity) -> bevy::prelude::Entity {
+    pub fn spawn_as_child_of(
+        self,
+        commands: &mut Commands,
+        parent: bevy::prelude::Entity,
+    ) -> bevy::prelude::Entity {
         let child = self.spawn(commands).id();
         commands.entity(parent).add_child(child);
         child
@@ -199,6 +243,16 @@ mod tests {
     fn div_bg_sets_color() {
         let d = div().bg(Color::srgb(1.0, 0.0, 0.0));
         assert!(d.bg.is_some());
+    }
+
+    #[test]
+    fn interaction_palette_adds_observer() {
+        let d = div().interaction_palette(
+            Color::srgb(0.0, 0.0, 0.0),
+            Color::srgb(0.5, 0.5, 0.5),
+            Color::srgb(1.0, 1.0, 1.0),
+        );
+        assert_eq!(d.observers.len(), 1);
     }
 
     #[test]

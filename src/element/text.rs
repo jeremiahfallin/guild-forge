@@ -1,9 +1,8 @@
 use bevy::color::Color;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::ecs::system::EntityCommands;
-use bevy::prelude::Commands;
+use bevy::prelude::{Bundle, Commands, Text};
 use bevy::text::{TextColor, TextFont};
-use bevy::prelude::Text;
 use bevy::ui::Node;
 
 use crate::element::Element;
@@ -15,6 +14,7 @@ pub struct TextEl {
     pub(crate) content: String,
     pub(crate) color: Option<Color>,
     pub(crate) font_size: Option<f32>,
+    pub(crate) insertions: Vec<Box<dyn FnOnce(&mut EntityCommands) + Send + Sync>>,
 }
 
 impl TextEl {
@@ -24,7 +24,16 @@ impl TextEl {
             content: content.into(),
             color: None,
             font_size: None,
+            insertions: Vec::new(),
         }
+    }
+
+    /// Insert an arbitrary bundle of components onto this element's entity.
+    pub fn insert(mut self, bundle: impl Bundle + Send + Sync + 'static) -> Self {
+        self.insertions.push(Box::new(move |ec: &mut EntityCommands| {
+            ec.insert(bundle);
+        }));
+        self
     }
 
     pub fn color(mut self, color: Color) -> Self {
@@ -64,6 +73,10 @@ impl TextEl {
             });
         }
 
+        for insertion in self.insertions {
+            insertion(&mut ec);
+        }
+
         ec
     }
 }
@@ -88,6 +101,10 @@ impl Element for TextEl {
                 font_size: size,
                 ..Default::default()
             });
+        }
+
+        for insertion in self.insertions {
+            insertion(&mut ec);
         }
     }
 }
