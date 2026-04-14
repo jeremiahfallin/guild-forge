@@ -1,6 +1,5 @@
 //! The guild management screen — view buildings and upgrade them.
 
-use bevy::ecs::event::Trigger;
 use bevy::prelude::*;
 use bevy_declarative::element::div::{Div, div};
 use bevy_declarative::element::text::text;
@@ -85,7 +84,6 @@ fn build_guild_ui(
         .p(px(16.0))
         .insert((
             Name::new("Guild Screen"),
-            // Pickable::IGNORE,
             DespawnOnExit(GameTab::Guild),
             GuildUi,
             ScrollPosition::default(),
