@@ -93,10 +93,14 @@ fn spawn_party_select(
     let party_panel = div()
         .col()
         .w(pct(50.0))
+        .h_full()
+        .min_h(px(0.0))
         .gap(px(8.0))
         .p(px(16.0))
         .bg(Color::srgba(0.15, 0.2, 0.15, 0.6))
         .rounded(px(8.0))
+        .overflow_y_scroll()
+        .insert(ScrollPosition::default())
         .child(
             text("Selected Party (0/4)")
                 .font_size(24.0)
@@ -112,6 +116,7 @@ fn spawn_party_select(
         .row()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(16.0))
         .p(px(16.0))
         .child(available_panel)
@@ -150,11 +155,14 @@ fn build_available_panel(
     let mut panel = div()
         .col()
         .w(pct(50.0))
+        .h_full()
+        .min_h(px(0.0))
         .gap(px(8.0))
         .p(px(16.0))
         .bg(Color::srgba(0.15, 0.15, 0.25, 0.6))
         .rounded(px(8.0))
-        .insert(Name::new("Available Heroes"));
+        .overflow_y_scroll()
+        .insert((Name::new("Available Heroes"), ScrollPosition::default()));
 
     panel = panel.child(
         text("Available Heroes")
@@ -263,11 +271,14 @@ fn refresh_party_select(
     let mut party_panel = div()
         .col()
         .w(pct(50.0))
+        .h_full()
+        .min_h(px(0.0))
         .gap(px(8.0))
         .p(px(16.0))
         .bg(Color::srgba(0.15, 0.2, 0.15, 0.6))
         .rounded(px(8.0))
-        .insert(Name::new("Selected Party"));
+        .overflow_y_scroll()
+        .insert((Name::new("Selected Party"), ScrollPosition::default()));
 
     party_panel = party_panel.child(
         text(format!(
@@ -326,6 +337,7 @@ fn refresh_party_select(
         .row()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(16.0))
         .p(px(16.0))
         .child(available_panel)

@@ -66,6 +66,7 @@ fn spawn_roster(
         .row()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(16.0))
         .p(px(16.0))
         .child(hero_list)
@@ -82,9 +83,11 @@ fn build_hero_list(
     let mut list = div()
         .col()
         .w(pct(30.0))
+        .h_full()
+        .min_h(px(0.0))
         .gap(px(8.0))
-        .overflow_y_hidden()
-        .insert(Name::new("Hero List"));
+        .overflow_y_scroll()
+        .insert((Name::new("Hero List"), ScrollPosition::default()));
 
     list = list.child(
         text("Heroes")
@@ -156,11 +159,14 @@ fn build_detail_panel(
     let panel = div()
         .col()
         .flex_1()
+        .h_full()
+        .min_h(px(0.0))
         .p(px(20.0))
         .gap(px(16.0))
         .bg(Color::srgba(0.15, 0.15, 0.25, 0.6))
         .rounded(px(8.0))
-        .insert((Name::new("Detail Panel"), DetailPanel));
+        .overflow_y_scroll()
+        .insert((Name::new("Detail Panel"), DetailPanel, ScrollPosition::default()));
 
     let Some(entity) = selected.0 else {
         return panel.child(
@@ -369,6 +375,7 @@ fn refresh_roster_on_selection_change(
         .row()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(16.0))
         .p(px(16.0))
         .child(hero_list)

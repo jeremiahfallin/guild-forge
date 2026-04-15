@@ -20,10 +20,7 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         rebuild_recruiting_screen
             .run_if(in_state(GameTab::Recruiting))
-            .run_if(
-                resource_changed::<ApplicantBoard>
-                    .or(timer_tick),
-            ),
+            .run_if(timer_tick),
     );
 }
 
@@ -100,9 +97,11 @@ fn build_recruiting_ui(
         .col()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(12.0))
         .p(px(16.0))
-        .overflow_y_hidden();
+        .overflow_y_scroll()
+        .insert(ScrollPosition::default());
 
     if board.applicants.is_empty() {
         content = content.child(

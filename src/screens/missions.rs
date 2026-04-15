@@ -51,10 +51,13 @@ fn spawn_mission_board(
         let mut list = div()
             .col()
             .w_full()
+            .flex_1()
+            .min_h(px(0.0))
             .gap(px(12.0))
             .p(px(16.0))
             .items_center()
-            .insert(Name::new("Mission List"));
+            .overflow_y_scroll()
+            .insert((Name::new("Mission List"), ScrollPosition::default()));
 
         for (idx, template) in templates.0.iter().enumerate() {
             if reputation.0 < template.reputation_required {

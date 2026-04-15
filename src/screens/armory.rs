@@ -98,6 +98,7 @@ fn build_armory_ui(
         .row()
         .w_full()
         .flex_1()
+        .min_h(px(0.0))
         .gap(px(16.0))
         .p(px(16.0))
         .child(hero_list)
@@ -114,9 +115,11 @@ fn build_hero_list(
     let mut list = div()
         .col()
         .w(pct(30.0))
+        .h_full()
+        .min_h(px(0.0))
         .gap(px(8.0))
-        .overflow_y_hidden()
-        .insert(Name::new("Armory Hero List"));
+        .overflow_y_scroll()
+        .insert((Name::new("Armory Hero List"), ScrollPosition::default()));
 
     list = list.child(
         text("Heroes")
@@ -177,11 +180,14 @@ fn build_gear_panel(
     let panel = div()
         .col()
         .flex_1()
+        .h_full()
+        .min_h(px(0.0))
         .p(px(20.0))
         .gap(px(16.0))
         .bg(Color::srgba(0.15, 0.15, 0.25, 0.6))
         .rounded(px(8.0))
-        .insert(Name::new("Gear Panel"));
+        .overflow_y_scroll()
+        .insert((Name::new("Gear Panel"), ScrollPosition::default()));
 
     let Some(entity) = selected.0 else {
         return panel.child(
