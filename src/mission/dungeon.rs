@@ -70,14 +70,16 @@ impl DungeonMap {
 
     /// Find which room contains a given position, if any.
     pub fn room_at(&self, x: u32, y: u32) -> Option<usize> {
-        self.rooms.iter().position(|r| {
-            x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h
-        })
+        self.rooms
+            .iter()
+            .position(|r| x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
     }
 
     /// Get the entrance room.
     pub fn entrance_room(&self) -> Option<&Room> {
-        self.rooms.iter().find(|r| r.room_type == RoomType::Entrance)
+        self.rooms
+            .iter()
+            .find(|r| r.room_type == RoomType::Entrance)
     }
 }
 
@@ -156,11 +158,18 @@ fn split_node(node: &mut BspNode, depth: u32, max_depth: u32, rng: &mut impl Rng
 
     // Decide split direction
     let split_horizontal = if node.w < MIN_LEAF_SIZE * 2 {
-        true // Too narrow to split vertically
+        true
     } else if node.h < MIN_LEAF_SIZE * 2 {
-        false // Too short to split horizontally
+        false
     } else {
-        rng.random_bool(0.5)
+        let ratio = node.w as f32 / node.h as f32;
+        if ratio > 1.25 {
+            false // Much wider than tall, force a vertical slice
+        } else if ratio < 0.8 {
+            true // Much taller than wide, force a horizontal slice
+        } else {
+            rng.random_bool(0.5) // Roughly square, pick randomly
+        }
     };
 
     if split_horizontal {
@@ -269,8 +278,8 @@ fn connect_rooms(node: &BspNode, map: &mut DungeonMap, rng: &mut impl Rng) {
         connect_rooms(right, map, rng);
 
         // Connect the two subtrees
-        let left_center = find_room_center(left);
-        let right_center = find_room_center(right);
+        let left_center = find_room_center(left, rng);
+        let right_center = find_room_center(right, rng);
 
         if let (Some((lx, ly)), Some((rx, ry))) = (left_center, right_center) {
             carve_corridor(map, lx, ly, rx, ry, rng);
@@ -278,19 +287,35 @@ fn connect_rooms(node: &BspNode, map: &mut DungeonMap, rng: &mut impl Rng) {
     }
 }
 
-fn find_room_center(node: &BspNode) -> Option<(u32, u32)> {
+fn find_room_center(node: &BspNode, rng: &mut impl Rng) -> Option<(u32, u32)> {
     if let Some(ref room) = node.room {
         return Some(room.center());
     }
-    // Try left child first, then right
-    if let Some(ref left) = node.left {
-        if let Some(center) = find_room_center(left) {
-            return Some(center);
+
+    // Randomly choose which child to search first
+    let search_left_first = rng.random_bool(0.5);
+
+    if search_left_first {
+        if let Some(ref left) = node.left {
+            if let Some(center) = find_room_center(left, rng) {
+                return Some(center);
+            }
         }
-    }
-    if let Some(ref right) = node.right {
-        if let Some(center) = find_room_center(right) {
-            return Some(center);
+        if let Some(ref right) = node.right {
+            if let Some(center) = find_room_center(right, rng) {
+                return Some(center);
+            }
+        }
+    } else {
+        if let Some(ref right) = node.right {
+            if let Some(center) = find_room_center(right, rng) {
+                return Some(center);
+            }
+        }
+        if let Some(ref left) = node.left {
+            if let Some(center) = find_room_center(left, rng) {
+                return Some(center);
+            }
         }
     }
     None
@@ -369,11 +394,7 @@ mod tests {
         for room in &map.rooms {
             let cx = room.x + room.w / 2;
             let cy = room.y + room.h / 2;
-            assert_eq!(
-                map.get(cx, cy),
-                Tile::Floor,
-                "Room center should be floor"
-            );
+            assert_eq!(map.get(cx, cy), Tile::Floor, "Room center should be floor");
         }
     }
 
