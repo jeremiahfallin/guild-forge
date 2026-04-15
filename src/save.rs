@@ -697,7 +697,7 @@ fn restore_growth(
     class_db: &ClassDatabase,
 ) -> HeroGrowth {
     if is_zero_growth(saved) {
-        if let Some(class_def) = class_db.0.iter().find(|c| c.id == class) {
+        if let Some(class_def) = class_db.get(class) {
             let mut rng = rand::rng();
             return roll_growth(class_def, 0.5, &mut rng);
         }
