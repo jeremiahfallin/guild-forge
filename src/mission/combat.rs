@@ -8,7 +8,7 @@ use rand::Rng;
 
 use crate::economy::Gold;
 use crate::hero::data::HeroTrait;
-use crate::hero::{Hero, HeroInfo, HeroTraits};
+use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
 use crate::ui::toast::{ToastEvent, ToastKind};
 
 use super::ai::HeroAction;
@@ -232,7 +232,10 @@ pub fn check_mission_completion(
     >,
     hero_tokens: Query<(&HeroToken, &CombatStats), Without<EnemyToken>>,
     enemy_tokens: Query<&EnemyToken>,
-    mut hero_infos: Query<&mut HeroInfo>,
+    mut hero_infos: Query<
+        (&mut HeroInfo, &mut HeroStats, &crate::hero::HeroGrowth, &mut crate::hero::HeroStatProgress),
+        With<Hero>,
+    >,
     mut gold: ResMut<Gold>,
     template_db: Res<MissionTemplateDatabase>,
     mut materials: ResMut<crate::materials::Materials>,
@@ -314,14 +317,14 @@ pub fn check_mission_completion(
 
         let mut level_ups = 0u32;
         for hero_entity in &survivors {
-            if let Ok(mut hinfo) = hero_infos.get_mut(*hero_entity) {
-                hinfo.xp += total_xp;
-                while hinfo.xp >= hinfo.xp_to_next {
-                    hinfo.xp -= hinfo.xp_to_next;
-                    hinfo.level += 1;
-                    hinfo.xp_to_next = (hinfo.xp_to_next as f32 * 1.5) as u32;
-                    level_ups += 1;
-                }
+            if let Ok((mut hinfo, mut hstats, hgrowth, mut hprog)) = hero_infos.get_mut(*hero_entity) {
+                level_ups += crate::hero::award_xp(
+                    &mut hinfo,
+                    &mut hstats,
+                    hgrowth,
+                    &mut hprog,
+                    total_xp,
+                );
             }
         }
 
