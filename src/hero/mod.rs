@@ -168,6 +168,9 @@ fn spawn_random_hero(
     // XP to next level: 100 for level 1 → 2
     let xp_to_next = 100;
 
+    // Roll growth at neutral quality (starter heroes have no recruitment context).
+    let growth = roll_growth(class_def, 0.5, rng);
+
     commands.spawn((
         Name::new(name.clone()),
         Hero,
@@ -181,6 +184,8 @@ fn spawn_random_hero(
         stats,
         HeroTraits(hero_traits),
         crate::equipment::HeroEquipment::default(),
+        growth,
+        HeroStatProgress::default(),
     ));
 }
 
