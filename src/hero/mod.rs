@@ -9,6 +9,8 @@ use crate::screens::Screen;
 use data::*;
 
 pub(super) fn plugin(app: &mut App) {
+    app.register_type::<HeroGrowth>();
+    app.register_type::<HeroStatProgress>();
     app.add_systems(Startup, load_hero_databases);
     app.add_systems(OnEnter(Screen::Gameplay), spawn_starter_heroes);
 }
@@ -45,6 +47,33 @@ pub struct HeroStats {
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct HeroTraits(pub Vec<HeroTrait>);
+
+/// Per-stat growth rate (stat points gained per level, as a float).
+/// Rolled once at hire time; fixed for the hero's lifetime.
+#[derive(Component, Debug, Clone, Reflect)]
+#[reflect(Component)]
+pub struct HeroGrowth {
+    pub strength: f32,
+    pub dexterity: f32,
+    pub constitution: f32,
+    pub intelligence: f32,
+    pub wisdom: f32,
+    pub charisma: f32,
+}
+
+/// Fractional accumulator per stat. On level-up, `growth_rate` is added to
+/// the matching field; the integer part is applied to `HeroStats` and the
+/// fractional remainder is kept here for the next level.
+#[derive(Component, Debug, Clone, Default, Reflect)]
+#[reflect(Component)]
+pub struct HeroStatProgress {
+    pub strength: f32,
+    pub dexterity: f32,
+    pub constitution: f32,
+    pub intelligence: f32,
+    pub wisdom: f32,
+    pub charisma: f32,
+}
 
 /// Load all hero databases from RON files at startup.
 fn load_hero_databases(mut commands: Commands) {
