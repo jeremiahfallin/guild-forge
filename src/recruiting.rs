@@ -20,6 +20,11 @@ const MIN_AVAILABILITY: f32 = 14400.0;
 /// Maximum availability window per applicant (seconds).
 const MAX_AVAILABILITY: f32 = 28800.0;
 
+/// Denominator for the quality base roll. Rep tier max (5) + RO max (3) - 1 = 6 + offset.
+const MAX_QUALITY_INPUT: f32 = 6.0;
+/// Random spread applied to the quality base before clamping.
+const QUALITY_JITTER: f32 = 0.2;
+
 /// A candidate hero waiting to be hired.
 #[derive(Debug, Clone)]
 pub struct Applicant {
@@ -27,6 +32,7 @@ pub struct Applicant {
     pub class: HeroClass,
     pub traits: Vec<HeroTrait>,
     pub stats: HeroStats,
+    pub growth: crate::hero::HeroGrowth,
     pub hire_cost: u32,
     pub time_remaining: f32,
 }
@@ -50,6 +56,7 @@ impl Default for ApplicantBoard {
 /// Generate a random applicant, using reputation tier as a stat floor boost.
 fn generate_applicant(
     reputation: &Reputation,
+    buildings: &GuildBuildings,
     class_db: &ClassDatabase,
     trait_db: &TraitDatabase,
     name_db: &NameDatabase,
@@ -106,11 +113,21 @@ fn generate_applicant(
 
     let time_remaining = rng.random_range(MIN_AVAILABILITY..=MAX_AVAILABILITY);
 
+    // ── Quality roll (transient; not stored on the hero) ──────────────
+    let office_level = buildings.level(crate::buildings::BuildingType::RecruitmentOffice) as f32;
+    let rep_tier = reputation.tier() as f32;
+    let quality_base = ((rep_tier - 1.0) + office_level) / MAX_QUALITY_INPUT;
+    let quality = (quality_base + rng.random_range(-QUALITY_JITTER..=QUALITY_JITTER))
+        .clamp(0.0, 1.0);
+
+    let growth = crate::hero::roll_growth(class_def, quality, rng);
+
     Applicant {
         name,
         class: class_def.id,
         traits: hero_traits,
         stats,
+        growth,
         hire_cost,
         time_remaining,
     }
@@ -143,7 +160,7 @@ fn tick_applicant_board(
         if board.applicants.len() < max {
             let mut rng = rand::rng();
             let applicant =
-                generate_applicant(&reputation, &class_db, &trait_db, &name_db, &mut rng);
+                generate_applicant(&reputation, &buildings, &class_db, &trait_db, &name_db, &mut rng);
             info!("New applicant arrived: {} ({})", applicant.name, applicant.class);
             board.applicants.push(applicant);
         }
@@ -154,6 +171,7 @@ fn tick_applicant_board(
 fn seed_applicant_board(
     mut board: ResMut<ApplicantBoard>,
     reputation: Res<Reputation>,
+    buildings: Res<GuildBuildings>,
     class_db: Res<ClassDatabase>,
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
@@ -165,7 +183,7 @@ fn seed_applicant_board(
     let mut rng = rand::rng();
     for _ in 0..2 {
         let applicant =
-            generate_applicant(&reputation, &class_db, &trait_db, &name_db, &mut rng);
+            generate_applicant(&reputation, &buildings, &class_db, &trait_db, &name_db, &mut rng);
         info!("Seeded applicant: {} ({})", applicant.name, applicant.class);
         board.applicants.push(applicant);
     }
@@ -231,6 +249,8 @@ fn handle_hire_applicant(
         applicant.stats,
         HeroTraits(applicant.traits),
         HeroEquipment::default(),
+        applicant.growth,
+        crate::hero::HeroStatProgress::default(),
     ));
 
     commands.trigger(crate::ui::toast::ToastEvent {

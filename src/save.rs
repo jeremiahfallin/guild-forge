@@ -122,6 +122,10 @@ fn load_save(
                 wisdom: a.stats.wisdom,
                 charisma: a.stats.charisma,
             },
+            growth: crate::hero::HeroGrowth {
+                strength: 0.6, dexterity: 0.2, constitution: 0.6,
+                intelligence: 0.0, wisdom: 0.2, charisma: 0.2,
+            }, // TEMP: replaced in Task 7
             hire_cost: a.hire_cost,
             time_remaining: a.time_remaining,
         })
