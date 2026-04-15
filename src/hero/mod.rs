@@ -212,6 +212,48 @@ pub fn roll_growth(class_def: &data::ClassDef, quality: f32, rng: &mut impl Rng)
     }
 }
 
+/// Apply one level's worth of growth: accumulator += rate, integer part flows
+/// into `HeroStats`, fractional part stays in the accumulator.
+pub fn apply_growth_tick(
+    stats: &mut HeroStats,
+    growth: &HeroGrowth,
+    progress: &mut HeroStatProgress,
+) {
+    fn tick(stat: &mut i32, rate: f32, acc: &mut f32) {
+        *acc += rate;
+        let gained = acc.floor() as i32;
+        *stat += gained;
+        *acc -= gained as f32;
+    }
+    tick(&mut stats.strength, growth.strength, &mut progress.strength);
+    tick(&mut stats.dexterity, growth.dexterity, &mut progress.dexterity);
+    tick(&mut stats.constitution, growth.constitution, &mut progress.constitution);
+    tick(&mut stats.intelligence, growth.intelligence, &mut progress.intelligence);
+    tick(&mut stats.wisdom, growth.wisdom, &mut progress.wisdom);
+    tick(&mut stats.charisma, growth.charisma, &mut progress.charisma);
+}
+
+/// Award XP to a hero and apply any resulting level-ups (including stat growth).
+/// Returns the number of level-ups that occurred.
+pub fn award_xp(
+    info: &mut HeroInfo,
+    stats: &mut HeroStats,
+    growth: &HeroGrowth,
+    progress: &mut HeroStatProgress,
+    xp: u32,
+) -> u32 {
+    info.xp += xp;
+    let mut level_ups = 0;
+    while info.xp >= info.xp_to_next {
+        info.xp -= info.xp_to_next;
+        info.level += 1;
+        info.xp_to_next = (info.xp_to_next as f32 * 1.5) as u32;
+        apply_growth_tick(stats, growth, progress);
+        level_ups += 1;
+    }
+    level_ups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,5 +309,108 @@ mod tests {
             assert!(g.strength <= 0.6 + 0.5 + 1e-5);
             assert!(g.intelligence <= 0.0 + 0.5 + 1e-5);
         }
+    }
+
+    fn zero_stats() -> HeroStats {
+        HeroStats {
+            strength: 0, dexterity: 0, constitution: 0,
+            intelligence: 0, wisdom: 0, charisma: 0,
+        }
+    }
+
+    fn zero_progress() -> HeroStatProgress {
+        HeroStatProgress::default()
+    }
+
+    fn info_at(level: u32, xp: u32, xp_to_next: u32) -> HeroInfo {
+        HeroInfo {
+            name: "T".into(),
+            class: HeroClass::Warrior,
+            level,
+            xp,
+            xp_to_next,
+        }
+    }
+
+    #[test]
+    fn apply_growth_tick_rate_zero_never_grows() {
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 0.0, dexterity: 0.0, constitution: 0.0,
+            intelligence: 0.0, wisdom: 0.0, charisma: 0.0,
+        };
+        for _ in 0..50 {
+            apply_growth_tick(&mut stats, &growth, &mut prog);
+        }
+        assert_eq!(stats.strength, 0);
+        assert_eq!(stats.intelligence, 0);
+    }
+
+    #[test]
+    fn apply_growth_tick_rate_half_gains_one_every_two_levels() {
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 0.5, dexterity: 0.0, constitution: 0.0,
+            intelligence: 0.0, wisdom: 0.0, charisma: 0.0,
+        };
+        apply_growth_tick(&mut stats, &growth, &mut prog);
+        assert_eq!(stats.strength, 0);
+        apply_growth_tick(&mut stats, &growth, &mut prog);
+        assert_eq!(stats.strength, 1);
+        apply_growth_tick(&mut stats, &growth, &mut prog);
+        assert_eq!(stats.strength, 1);
+        apply_growth_tick(&mut stats, &growth, &mut prog);
+        assert_eq!(stats.strength, 2);
+    }
+
+    #[test]
+    fn apply_growth_tick_rate_0_3_gains_three_over_ten_levels() {
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 0.3, dexterity: 0.0, constitution: 0.0,
+            intelligence: 0.0, wisdom: 0.0, charisma: 0.0,
+        };
+        for _ in 0..10 {
+            apply_growth_tick(&mut stats, &growth, &mut prog);
+        }
+        assert_eq!(stats.strength, 3);
+    }
+
+    #[test]
+    fn award_xp_multi_level_applies_growth_per_level() {
+        let mut info = info_at(1, 0, 100);
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 1.0, dexterity: 0.0, constitution: 0.0,
+            intelligence: 0.0, wisdom: 0.0, charisma: 0.0,
+        };
+        let ups = award_xp(&mut info, &mut stats, &growth, &mut prog, 500);
+        assert_eq!(ups, 3);
+        assert_eq!(info.level, 4);
+        assert_eq!(stats.strength, 3);
+        assert_eq!(info.xp, 25);
+    }
+
+    #[test]
+    fn award_xp_partial_accumulator_carries_forward() {
+        let mut info = info_at(1, 0, 100);
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 0.6, dexterity: 0.0, constitution: 0.0,
+            intelligence: 0.0, wisdom: 0.0, charisma: 0.0,
+        };
+        award_xp(&mut info, &mut stats, &growth, &mut prog, 100);
+        assert_eq!(info.level, 2);
+        assert_eq!(stats.strength, 0);
+        assert!((prog.strength - 0.6).abs() < 1e-5);
+        award_xp(&mut info, &mut stats, &growth, &mut prog, 150);
+        assert_eq!(info.level, 3);
+        assert_eq!(stats.strength, 1);
+        assert!((prog.strength - 0.2).abs() < 1e-5);
     }
 }
