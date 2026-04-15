@@ -183,3 +183,89 @@ fn spawn_random_hero(
         crate::equipment::HeroEquipment::default(),
     ));
 }
+
+/// Per-stat growth floor contributed by each point of class weight.
+const FLOOR_PER_WEIGHT: f32 = 0.2;
+/// Maximum random portion added on top of the class floor (pre-quality scaling).
+const MAX_RANDOM_GROWTH: f32 = 1.0;
+
+/// Roll a `HeroGrowth` for a newly-generated hero.
+///
+/// `quality` is a 0.0..=1.0 scalar (computed from reputation tier +
+/// RecruitmentOffice level). It gates the ceiling of the random portion
+/// but never reduces the class floor.
+pub fn roll_growth(class_def: &data::ClassDef, quality: f32, rng: &mut impl Rng) -> HeroGrowth {
+    let q = quality.clamp(0.0, 1.0);
+    let w = &class_def.stat_weights;
+    let mut roll = |weight: i32| -> f32 {
+        let floor = weight.max(0) as f32 * FLOOR_PER_WEIGHT;
+        let random_portion = rng.random::<f32>() * MAX_RANDOM_GROWTH * q;
+        floor + random_portion
+    };
+    HeroGrowth {
+        strength: roll(w.str),
+        dexterity: roll(w.dex),
+        constitution: roll(w.con),
+        intelligence: roll(w.int),
+        wisdom: roll(w.wis),
+        charisma: roll(w.cha),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hero::data::{ClassDef, HeroClass, StatWeights};
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    fn test_class(weights: StatWeights) -> ClassDef {
+        ClassDef {
+            id: HeroClass::Warrior,
+            name: "Test".into(),
+            description: "".into(),
+            stat_weights: weights,
+            starting_abilities: vec![],
+        }
+    }
+
+    fn warrior_weights() -> StatWeights {
+        StatWeights { str: 3, dex: 1, con: 3, int: 0, wis: 1, cha: 1 }
+    }
+
+    #[test]
+    fn roll_growth_at_quality_zero_equals_class_floor() {
+        let class = test_class(warrior_weights());
+        let mut rng = StdRng::seed_from_u64(42);
+        let g = roll_growth(&class, 0.0, &mut rng);
+        // FLOOR_PER_WEIGHT = 0.2
+        assert!((g.strength - 0.6).abs() < 1e-5);
+        assert!((g.dexterity - 0.2).abs() < 1e-5);
+        assert!((g.constitution - 0.6).abs() < 1e-5);
+        assert!((g.intelligence - 0.0).abs() < 1e-5);
+        assert!((g.wisdom - 0.2).abs() < 1e-5);
+        assert!((g.charisma - 0.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn roll_growth_at_quality_one_caps_at_floor_plus_max_random() {
+        let class = test_class(warrior_weights());
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let g = roll_growth(&class, 1.0, &mut rng);
+            assert!(g.strength >= 0.6 - 1e-5 && g.strength <= 0.6 + 1.0 + 1e-5);
+            assert!(g.intelligence >= 0.0 - 1e-5 && g.intelligence <= 0.0 + 1.0 + 1e-5);
+        }
+    }
+
+    #[test]
+    fn roll_growth_at_quality_half_caps_at_floor_plus_half_max() {
+        let class = test_class(warrior_weights());
+        for seed in 0..200 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let g = roll_growth(&class, 0.5, &mut rng);
+            assert!(g.strength <= 0.6 + 0.5 + 1e-5);
+            assert!(g.intelligence <= 0.0 + 0.5 + 1e-5);
+        }
+    }
+}
