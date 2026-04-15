@@ -11,7 +11,12 @@
       "Bash(cargo build:*)",
       "Bash(cargo run:*)",
       "Bash(echo \"EXIT CODE: $?\")",
-      "Bash(find \"C:\\\\Users\\\\bullf\\\\dev\\\\games\\\\guild-forge\\\\assets\" -type f -exec ls -lh {})"
+      "Bash(find \"C:\\\\Users\\\\bullf\\\\dev\\\\games\\\\guild-forge\\\\assets\" -type f -exec ls -lh {})",
+      "Bash(git push:*)",
+      "Bash(wc -l /c/Users/bullf/dev/games/guild-forge/src/**/*.rs)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(cargo check:*)"
     ]
   }
 }
