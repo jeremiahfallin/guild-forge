@@ -9,8 +9,8 @@ use std::time::SystemTime;
 use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
 use crate::equipment::HeroEquipment;
-use crate::hero::data::{HeroClass, HeroTrait};
-use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
+use crate::hero::data::{ClassDatabase, HeroClass, HeroTrait};
+use crate::hero::{Hero, HeroGrowth, HeroInfo, HeroStatProgress, HeroStats, HeroTraits, roll_growth};
 use crate::materials::{MaterialType, Materials};
 use crate::mission::dungeon::DungeonMap;
 use crate::mission::entities::{
@@ -76,6 +76,7 @@ fn tick_autosave(time: Res<Time<Real>>, mut timer: ResMut<AutosaveTimer>, mut co
 fn load_save(
     mut commands: Commands,
     existing_heroes: Query<(), With<Hero>>,
+    class_db: Res<ClassDatabase>,
 ) {
     // Already have heroes — skip (re-entry or already loaded).
     if !existing_heroes.is_empty() {
@@ -122,10 +123,7 @@ fn load_save(
                 wisdom: a.stats.wisdom,
                 charisma: a.stats.charisma,
             },
-            growth: crate::hero::HeroGrowth {
-                strength: 0.6, dexterity: 0.2, constitution: 0.6,
-                intelligence: 0.0, wisdom: 0.2, charisma: 0.2,
-            }, // TEMP: replaced in Task 7
+            growth: restore_growth(&a.growth, a.class, &class_db),
             hire_cost: a.hire_cost,
             time_remaining: a.time_remaining,
         })
@@ -162,6 +160,15 @@ fn load_save(
                     weapon_tier: dto.equipment.weapon_tier,
                     armor_tier: dto.equipment.armor_tier,
                     accessory_tier: dto.equipment.accessory_tier,
+                },
+                restore_growth(&dto.growth, dto.class, &class_db),
+                HeroStatProgress {
+                    strength: dto.progress.strength,
+                    dexterity: dto.progress.dexterity,
+                    constitution: dto.progress.constitution,
+                    intelligence: dto.progress.intelligence,
+                    wisdom: dto.progress.wisdom,
+                    charisma: dto.progress.charisma,
                 },
             ))
             .id();
@@ -299,6 +306,8 @@ fn handle_save(
             &HeroStats,
             &HeroTraits,
             &HeroEquipment,
+            &HeroGrowth,
+            &HeroStatProgress,
             Option<&OnMission>,
         ),
         With<Hero>,
@@ -334,7 +343,7 @@ fn handle_save(
     let mut hero_dtos = Vec::new();
     let mut entity_to_index: HashMap<Entity, usize> = HashMap::new();
 
-    for (entity, info, stats, traits, equipment, on_mission) in &heroes {
+    for (entity, info, stats, traits, equipment, growth, progress, on_mission) in &heroes {
         let idx = hero_dtos.len();
         entity_to_index.insert(entity, idx);
 
@@ -359,6 +368,22 @@ fn handle_save(
                 accessory_tier: equipment.accessory_tier,
             },
             on_mission: on_mission.is_some(),
+            growth: HeroGrowthSave {
+                strength: growth.strength,
+                dexterity: growth.dexterity,
+                constitution: growth.constitution,
+                intelligence: growth.intelligence,
+                wisdom: growth.wisdom,
+                charisma: growth.charisma,
+            },
+            progress: HeroStatProgressSave {
+                strength: progress.strength,
+                dexterity: progress.dexterity,
+                constitution: progress.constitution,
+                intelligence: progress.intelligence,
+                wisdom: progress.wisdom,
+                charisma: progress.charisma,
+            },
         });
     }
 
@@ -380,6 +405,14 @@ fn handle_save(
             },
             hire_cost: a.hire_cost,
             time_remaining: a.time_remaining,
+            growth: HeroGrowthSave {
+                strength: a.growth.strength,
+                dexterity: a.growth.dexterity,
+                constitution: a.growth.constitution,
+                intelligence: a.growth.intelligence,
+                wisdom: a.growth.wisdom,
+                charisma: a.growth.charisma,
+            },
         })
         .collect();
 
@@ -551,6 +584,26 @@ pub struct HeroEquipmentSave {
     pub accessory_tier: u32,
 }
 
+#[derive(Serialize, Deserialize, Default)]
+pub struct HeroGrowthSave {
+    pub strength: f32,
+    pub dexterity: f32,
+    pub constitution: f32,
+    pub intelligence: f32,
+    pub wisdom: f32,
+    pub charisma: f32,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct HeroStatProgressSave {
+    pub strength: f32,
+    pub dexterity: f32,
+    pub constitution: f32,
+    pub intelligence: f32,
+    pub wisdom: f32,
+    pub charisma: f32,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct HeroSaveDto {
     pub name: String,
@@ -562,6 +615,10 @@ pub struct HeroSaveDto {
     pub traits: Vec<HeroTrait>,
     pub equipment: HeroEquipmentSave,
     pub on_mission: bool,
+    #[serde(default)]
+    pub growth: HeroGrowthSave,
+    #[serde(default)]
+    pub progress: HeroStatProgressSave,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -572,6 +629,8 @@ pub struct ApplicantSaveDto {
     pub stats: HeroStatsSave,
     pub hire_cost: u32,
     pub time_remaining: f32,
+    #[serde(default)]
+    pub growth: HeroGrowthSave,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -614,4 +673,128 @@ pub struct EnemyTokenDto {
     pub max_hp: i32,
     pub attack: i32,
     pub defense: i32,
+}
+
+// ── Growth backfill ───────────────────────────────────────────────
+
+/// True when every growth component is exactly 0.0 — the signature of a
+/// legacy save that predates the growth-rates feature.
+fn is_zero_growth(g: &HeroGrowthSave) -> bool {
+    g.strength == 0.0
+        && g.dexterity == 0.0
+        && g.constitution == 0.0
+        && g.intelligence == 0.0
+        && g.wisdom == 0.0
+        && g.charisma == 0.0
+}
+
+/// Convert a `HeroGrowthSave` to a `HeroGrowth`. For legacy saves where every
+/// field is zero, roll a fresh neutral-quality (0.5) growth from the hero's
+/// class so existing heroes aren't permanently frozen at their current stats.
+fn restore_growth(
+    saved: &HeroGrowthSave,
+    class: HeroClass,
+    class_db: &ClassDatabase,
+) -> HeroGrowth {
+    if is_zero_growth(saved) {
+        if let Some(class_def) = class_db.0.iter().find(|c| c.id == class) {
+            let mut rng = rand::rng();
+            return roll_growth(class_def, 0.5, &mut rng);
+        }
+        // Class not found — fall through to the zeroed value below as a
+        // harmless last-resort default.
+    }
+    HeroGrowth {
+        strength: saved.strength,
+        dexterity: saved.dexterity,
+        constitution: saved.constitution,
+        intelligence: saved.intelligence,
+        wisdom: saved.wisdom,
+        charisma: saved.charisma,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hero_save_dto_round_trips_with_growth() {
+        let dto = HeroSaveDto {
+            name: "A".into(),
+            class: HeroClass::Warrior,
+            level: 3,
+            xp: 42,
+            xp_to_next: 200,
+            stats: HeroStatsSave {
+                strength: 12,
+                dexterity: 10,
+                constitution: 14,
+                intelligence: 8,
+                wisdom: 9,
+                charisma: 10,
+            },
+            traits: vec![],
+            equipment: HeroEquipmentSave {
+                weapon_tier: 0,
+                armor_tier: 0,
+                accessory_tier: 0,
+            },
+            on_mission: false,
+            growth: HeroGrowthSave {
+                strength: 1.1,
+                dexterity: 0.3,
+                constitution: 0.8,
+                intelligence: 0.0,
+                wisdom: 0.4,
+                charisma: 0.2,
+            },
+            progress: HeroStatProgressSave {
+                strength: 0.5,
+                dexterity: 0.0,
+                constitution: 0.2,
+                intelligence: 0.0,
+                wisdom: 0.1,
+                charisma: 0.0,
+            },
+        };
+        let s = ron::ser::to_string(&dto).unwrap();
+        let back: HeroSaveDto = ron::from_str(&s).unwrap();
+        assert!((back.growth.strength - 1.1).abs() < 1e-5);
+        assert!((back.growth.charisma - 0.2).abs() < 1e-5);
+        assert!((back.progress.strength - 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn legacy_hero_save_dto_without_growth_deserializes_with_defaults() {
+        // A RON string missing `growth` and `progress` fields.
+        let legacy = r#"(
+            name: "L",
+            class: Warrior,
+            level: 2, xp: 0, xp_to_next: 150,
+            stats: (strength: 10, dexterity: 10, constitution: 10,
+                    intelligence: 10, wisdom: 10, charisma: 10),
+            traits: [],
+            equipment: (weapon_tier: 0, armor_tier: 0, accessory_tier: 0),
+            on_mission: false,
+        )"#;
+        let dto: HeroSaveDto = ron::from_str(legacy).unwrap();
+        assert!(is_zero_growth(&dto.growth));
+        assert_eq!(dto.progress.strength, 0.0);
+    }
+
+    #[test]
+    fn is_zero_growth_detects_all_zero_vs_nonzero() {
+        let zero = HeroGrowthSave::default();
+        assert!(is_zero_growth(&zero));
+        let non_zero = HeroGrowthSave {
+            strength: 0.0,
+            dexterity: 0.0,
+            constitution: 0.0,
+            intelligence: 0.0001,
+            wisdom: 0.0,
+            charisma: 0.0,
+        };
+        assert!(!is_zero_growth(&non_zero));
+    }
 }
