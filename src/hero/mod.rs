@@ -220,7 +220,7 @@ pub fn apply_growth_tick(
     progress: &mut HeroStatProgress,
 ) {
     fn tick(stat: &mut i32, rate: f32, acc: &mut f32) {
-        *acc += rate;
+        *acc += rate.max(0.0);
         let gained = acc.floor() as i32;
         *stat += gained;
         *acc -= gained as f32;
@@ -247,7 +247,7 @@ pub fn award_xp(
     while info.xp >= info.xp_to_next {
         info.xp -= info.xp_to_next;
         info.level += 1;
-        info.xp_to_next = (info.xp_to_next as f32 * 1.5) as u32;
+        info.xp_to_next = info.xp_to_next + info.xp_to_next / 2;
         apply_growth_tick(stats, growth, progress);
         level_ups += 1;
     }
@@ -412,5 +412,22 @@ mod tests {
         assert_eq!(info.level, 3);
         assert_eq!(stats.strength, 1);
         assert!((prog.strength - 0.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn apply_growth_tick_advances_all_six_stats() {
+        let mut stats = zero_stats();
+        let mut prog = zero_progress();
+        let growth = HeroGrowth {
+            strength: 1.0, dexterity: 1.0, constitution: 1.0,
+            intelligence: 1.0, wisdom: 1.0, charisma: 1.0,
+        };
+        apply_growth_tick(&mut stats, &growth, &mut prog);
+        assert_eq!(stats.strength, 1);
+        assert_eq!(stats.dexterity, 1);
+        assert_eq!(stats.constitution, 1);
+        assert_eq!(stats.intelligence, 1);
+        assert_eq!(stats.wisdom, 1);
+        assert_eq!(stats.charisma, 1);
     }
 }
