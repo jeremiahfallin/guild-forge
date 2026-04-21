@@ -40,7 +40,9 @@ fn spawn_guild_screen(
     materials: Res<Materials>,
     conversion_db: Res<ConversionDatabase>,
 ) {
-    let Ok(root_entity) = gameplay_root.single() else { return };
+    let Ok(root_entity) = gameplay_root.single() else {
+        return;
+    };
     let root = build_guild_ui(&buildings, &building_db, &gold, &materials, &conversion_db);
     root.spawn_as_child_of(&mut commands, root_entity);
 }
@@ -55,7 +57,9 @@ fn rebuild_guild_screen(
     materials: Res<Materials>,
     conversion_db: Res<ConversionDatabase>,
 ) {
-    let Ok(root_entity) = gameplay_root.single() else { return };
+    let Ok(root_entity) = gameplay_root.single() else {
+        return;
+    };
 
     for entity in &guild_ui {
         commands.entity(entity).despawn();
@@ -72,23 +76,20 @@ fn build_guild_ui(
     materials: &Materials,
     conversion_db: &ConversionDatabase,
 ) -> Div {
-    let mut root = widgets::content_area("Guild Screen")
-        .insert((DespawnOnExit(GameTab::Guild), GuildUi));
-
-    let top_bar = div()
-        .row()
-        .w_full()
-        .items_center()
-        .p(px(16.0))
-        .child(widgets::header("Guild Hall"));
-
-    let mut content = div()
+    let mut root = div()
         .col()
-        .w_full()
         .flex_1()
+        .overflow_y_scroll()
         .gap(px(12.0))
         .p(px(16.0))
-        .overflow_y_hidden();
+        .insert((
+            Name::new("Guild Screen"),
+            DespawnOnExit(GameTab::Guild),
+            GuildUi,
+            ScrollPosition::default(),
+        ));
+
+    root = root.child(widgets::header("Guild Hall"));
 
     // Stockpile panel — show all owned materials
     let owned: Vec<(MaterialType, u32)> = MaterialType::ALL
@@ -107,21 +108,13 @@ fn build_guild_ui(
             .gap(px(8.0))
             .bg(Color::srgba(0.15, 0.18, 0.25, 0.7))
             .rounded(px(6.0))
-            .child(
-                text("Stockpile")
-                    .font_size(24.0)
-                    .color(HEADER_TEXT),
-            );
+            .child(text("Stockpile").font_size(24.0).color(HEADER_TEXT));
 
         // Grid-like layout: wrap rows of material entries
-        let mut row = div()
-            .row()
-            .w_full()
-            .gap(px(8.0))
-            .insert(Node {
-                flex_wrap: FlexWrap::Wrap,
-                ..default()
-            });
+        let mut row = div().row().w_full().gap(px(8.0)).insert(Node {
+            flex_wrap: FlexWrap::Wrap,
+            ..default()
+        });
 
         for (mat, count) in &owned {
             row = row.child(
@@ -136,19 +129,15 @@ fn build_guild_ui(
                             .font_size(16.0)
                             .color(HEADER_TEXT),
                     )
-                    .child(
-                        text(mat.name())
-                            .font_size(16.0)
-                            .color(LABEL_TEXT),
-                    ),
+                    .child(text(mat.name()).font_size(16.0).color(LABEL_TEXT)),
             );
         }
 
         stockpile = stockpile.child(row);
-        content = content.child(stockpile);
+        root = root.child(stockpile);
 
         // Divider
-        content = content.child(
+        root = root.child(
             div()
                 .w_full()
                 .h(px(2.0))
@@ -205,11 +194,7 @@ fn build_guild_ui(
                     cost_str.push_str(&format!(" + {} {}", amt, mat.name()));
                 }
 
-                card = card.child(
-                    text(cost_str)
-                        .font_size(14.0)
-                        .color(LABEL_TEXT),
-                );
+                card = card.child(text(cost_str).font_size(14.0).color(LABEL_TEXT));
 
                 card = card.child(
                     div()
@@ -223,12 +208,8 @@ fn build_guild_ui(
                             Name::new("Upgrade Button"),
                             Button,
                             UpgradeBuildingButton(building_type),
-                            crate::theme::interaction::InteractionPalette {
-                                none: BUTTON_BACKGROUND,
-                                hovered: BUTTON_HOVERED_BACKGROUND,
-                                pressed: BUTTON_PRESSED_BACKGROUND,
-                            },
                         ))
+                        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_upgrade_click)
                         .child(
                             text("Upgrade")
@@ -246,20 +227,20 @@ fn build_guild_ui(
             );
         }
 
-        content = content.child(card);
+        root = root.child(card);
     }
 
     // Workshop conversions section
     let workshop_level = buildings.level(BuildingType::Workshop);
     if workshop_level >= 1 {
-        content = content.child(
+        root = root.child(
             div()
                 .w_full()
                 .h(px(2.0))
                 .bg(Color::srgba(0.4, 0.4, 0.5, 0.6)),
         );
 
-        content = content.child(
+        root = root.child(
             text("Workshop Conversions")
                 .font_size(24.0)
                 .color(HEADER_TEXT),
@@ -287,7 +268,7 @@ fn build_guild_ui(
                 Color::srgba(0.2, 0.2, 0.2, 0.4)
             };
 
-            content = content.child(
+            root = root.child(
                 div()
                     .row()
                     .w_full()
@@ -297,11 +278,7 @@ fn build_guild_ui(
                     .justify_between()
                     .bg(bg)
                     .rounded(px(4.0))
-                    .child(
-                        text(recipe_text)
-                            .font_size(16.0)
-                            .color(LABEL_TEXT),
-                    )
+                    .child(text(recipe_text).font_size(16.0).color(LABEL_TEXT))
                     .child(
                         div()
                             .p(px(6.0))
@@ -313,12 +290,8 @@ fn build_guild_ui(
                                 Name::new("Convert Button"),
                                 Button,
                                 ConvertButton(idx),
-                                crate::theme::interaction::InteractionPalette {
-                                    none: BUTTON_BACKGROUND,
-                                    hovered: BUTTON_HOVERED_BACKGROUND,
-                                    pressed: BUTTON_PRESSED_BACKGROUND,
-                                },
                             ))
+                            .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                             .on_click(on_convert_click)
                             .child(
                                 text("Convert")
@@ -331,7 +304,6 @@ fn build_guild_ui(
         }
     }
 
-    root = root.child(top_bar).child(content);
     root
 }
 

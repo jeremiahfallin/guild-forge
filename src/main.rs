@@ -16,8 +16,10 @@ mod menus;
 mod mission;
 mod recruiting;
 mod reputation;
+mod save;
 mod screens;
 mod theme;
+mod time_bank;
 mod training;
 mod ui;
 
@@ -54,6 +56,7 @@ impl Plugin for AppPlugin {
 
         // Add other plugins.
         app.add_plugins((
+            bevy_declarative::BevyDeclarativePlugin,
             asset_tracking::plugin,
             audio::plugin,
             buildings::plugin,
@@ -69,8 +72,10 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             recruiting::plugin,
             reputation::plugin,
+            save::plugin,
             screens::plugin,
             theme::plugin,
+            time_bank::plugin,
             training::plugin,
             ui::plugin,
         ));

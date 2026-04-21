@@ -1,10 +1,10 @@
 //! Hero data definitions loaded from RON files.
 
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The class of a hero, determining their stat growth and abilities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum HeroClass {
     Warrior,
     Rogue,
@@ -26,7 +26,7 @@ impl std::fmt::Display for HeroClass {
 }
 
 /// A personality trait that affects hero behavior and stat growth.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum HeroTrait {
     Brave,
     Cautious,

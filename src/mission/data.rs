@@ -1,12 +1,12 @@
 //! Mission and enemy data definitions loaded from RON files.
 
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::materials::MaterialType;
 
 /// Enemy type identifiers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum EnemyType {
     Goblin,
     Skeleton,

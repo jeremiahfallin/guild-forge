@@ -9,6 +9,7 @@ pub mod pathfinding;
 pub mod tileset;
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::screens::GameTab;
 
@@ -70,7 +71,7 @@ pub struct MissionInfo {
 }
 
 /// The current state of a mission.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[reflect(Component)]
 pub enum MissionProgress {
     InProgress,

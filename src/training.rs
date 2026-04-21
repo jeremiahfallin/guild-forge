@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::buildings::{BuildingType, GuildBuildings};
-use crate::hero::{Hero, HeroInfo};
+use crate::hero::{Hero, HeroInfo, HeroStats};
 use crate::mission::OnMission;
 
 const TRAINING_TICK_INTERVAL: f32 = 60.0;
@@ -19,7 +19,10 @@ fn tick_training(
     time: Res<Time>,
     mut timer: ResMut<TrainingTimer>,
     buildings: Res<GuildBuildings>,
-    mut heroes: Query<&mut HeroInfo, (With<Hero>, Without<OnMission>)>,
+    mut heroes: Query<
+        (&mut HeroInfo, &mut HeroStats, &crate::hero::HeroGrowth, &mut crate::hero::HeroStatProgress),
+        (With<Hero>, Without<OnMission>),
+    >,
 ) {
     let level = buildings.level(BuildingType::TrainingGrounds);
     if level == 0 {
@@ -34,13 +37,8 @@ fn tick_training(
 
     let xp_per_tick = level * 2;
 
-    for mut info in &mut heroes {
-        info.xp += xp_per_tick;
-        while info.xp >= info.xp_to_next {
-            info.xp -= info.xp_to_next;
-            info.level += 1;
-            info.xp_to_next = (info.xp_to_next as f32 * 1.5) as u32;
-        }
+    for (mut info, mut stats, growth, mut progress) in &mut heroes {
+        crate::hero::award_xp(&mut info, &mut stats, growth, &mut progress, xp_per_tick);
     }
 }
 

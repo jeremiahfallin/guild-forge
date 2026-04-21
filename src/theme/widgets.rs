@@ -10,7 +10,6 @@ use bevy_declarative::element::text::{TextEl, text};
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
-use super::interaction::InteractionPalette;
 use super::palette::*;
 
 /// A root UI node that fills the window and centers its content.
@@ -87,12 +86,8 @@ pub fn game_button_small<B: Bundle, M>(
         .insert((
             Name::new("Button Small"),
             Button,
-            InteractionPalette {
-                none: BUTTON_BACKGROUND,
-                hovered: BUTTON_HOVERED_BACKGROUND,
-                pressed: BUTTON_PRESSED_BACKGROUND,
-            },
         ))
+        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
         .on_click(action)
         .child(
             text(label)
@@ -117,12 +112,8 @@ pub fn game_button<B: Bundle, M>(
         .insert((
             Name::new("Button"),
             Button,
-            InteractionPalette {
-                none: BUTTON_BACKGROUND,
-                hovered: BUTTON_HOVERED_BACKGROUND,
-                pressed: BUTTON_PRESSED_BACKGROUND,
-            },
         ))
+        .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
         .on_click(action)
         .child(
             text(label)
@@ -131,3 +122,11 @@ pub fn game_button<B: Bundle, M>(
                 .insert(Pickable::IGNORE),
         )
 }
+
+/// Marker for the bank time text in the sidebar.
+#[derive(Component)]
+pub struct SidebarBankText;
+
+/// Marker for speed buttons — stores the speed multiplier.
+#[derive(Component)]
+pub struct SpeedButton(pub f32);
