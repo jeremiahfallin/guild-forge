@@ -1,6 +1,7 @@
 //! Persistent sidebar — spawned once on gameplay enter, lives across all GameTab transitions.
 
 use bevy::prelude::*;
+use bevy_declarative::InteractionPalette;
 use bevy_declarative::element::div::div;
 use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
@@ -30,6 +31,7 @@ pub(super) fn plugin(app: &mut App) {
             update_rep_display.run_if(resource_changed::<Reputation>),
             update_bank_display.run_if(resource_changed::<OfflineTimeBank>),
             update_active_tab_highlight.run_if(state_changed::<GameTab>),
+            update_active_speed_highlight.run_if(resource_changed::<GameSpeed>),
             update_mission_list,
         )
             .run_if(in_state(crate::screens::Screen::Gameplay)),
@@ -264,6 +266,22 @@ fn update_bank_display(
 ) {
     for mut t in &mut texts {
         **t = format!("Bank: {}", format_banked_time(bank.banked_seconds));
+    }
+}
+
+fn update_active_speed_highlight(
+    speed: Res<GameSpeed>,
+    mut buttons: Query<(&SpeedButton, &mut BackgroundColor, &mut InteractionPalette)>,
+) {
+    const ACTIVE: Color = Color::srgb(0.3, 0.5, 0.7);
+    for (btn, mut bg, mut palette) in &mut buttons {
+        let resting = if (speed.0 - btn.0).abs() < 0.01 {
+            ACTIVE
+        } else {
+            BUTTON_BACKGROUND
+        };
+        *bg = BackgroundColor(resting);
+        palette.none = resting;
     }
 }
 
