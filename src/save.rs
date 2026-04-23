@@ -830,6 +830,24 @@ mod tests {
     }
 
     #[test]
+    fn legacy_hero_save_dto_without_favorite_flags_defaults_false() {
+        // A RON string missing `favorite` and `personally_managed`.
+        let legacy = r#"(
+            name: "L",
+            class: Warrior,
+            level: 1, xp: 0, xp_to_next: 100,
+            stats: (strength: 10, dexterity: 10, constitution: 10,
+                    intelligence: 10, wisdom: 10, charisma: 10),
+            traits: [],
+            equipment: (weapon_tier: 0, armor_tier: 0, accessory_tier: 0),
+            on_mission: false,
+        )"#;
+        let dto: HeroSaveDto = ron::from_str(legacy).unwrap();
+        assert!(!dto.favorite);
+        assert!(!dto.personally_managed);
+    }
+
+    #[test]
     fn is_zero_growth_detects_all_zero_vs_nonzero() {
         let zero = HeroGrowthSave::default();
         assert!(is_zero_growth(&zero));
