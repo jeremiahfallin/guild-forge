@@ -45,7 +45,7 @@ fn spawn_roster(
     heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
     let mut root = widgets::content_area("Roster Screen")
@@ -221,7 +221,7 @@ fn build_hero_list(
 
 fn build_detail_panel(
     selected: &SelectedHero,
-    hero_query: &Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: &Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     trait_db: &TraitDatabase,
 ) -> Div {
     let panel = div()
@@ -244,7 +244,7 @@ fn build_detail_panel(
         );
     };
 
-    let Ok((info, stats, traits)) = hero_query.get(entity) else {
+    let Ok((info, stats, traits, is_favorite, is_managed)) = hero_query.get(entity) else {
         return panel.child(
             text("Hero not found")
                 .font_size(24.0)
@@ -268,7 +268,22 @@ fn build_detail_panel(
             text(format!("XP: {} / {}", info.xp, info.xp_to_next))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
-        );
+        )
+        .child({
+            let status_parts: Vec<&str> = [
+                is_favorite.then_some("★ Favorite"),
+                is_managed.then_some("📌 Personally Managed"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            let status_text = if status_parts.is_empty() {
+                String::new()
+            } else {
+                status_parts.join("   ")
+            };
+            text(status_text).font_size(14.0).color(Color::srgb(0.9, 0.85, 0.4))
+        });
 
     // Stats section
     let stats_section = build_stats_section(stats);
@@ -417,7 +432,7 @@ fn refresh_roster_on_selection_change(
     heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
 
