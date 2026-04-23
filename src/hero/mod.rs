@@ -1,6 +1,7 @@
 //! Hero system: data, components, and generation.
 
 pub mod data;
+pub mod status;
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -13,6 +14,8 @@ pub(super) fn plugin(app: &mut App) {
     app.register_type::<HeroStatProgress>();
     app.register_type::<Favorite>();
     app.register_type::<PersonallyManaged>();
+    app.register_type::<status::Missing>();
+    app.register_type::<status::Injured>();
     app.add_systems(Startup, load_hero_databases);
     app.add_systems(OnEnter(Screen::Gameplay), spawn_starter_heroes);
 }
