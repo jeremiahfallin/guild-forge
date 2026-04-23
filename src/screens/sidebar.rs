@@ -356,7 +356,7 @@ fn update_mission_list(
         };
 
         let name_text = if has_favorite {
-            format!("★ {}", info.name)
+            format!("* {}", info.name)
         } else {
             info.name.clone()
         };

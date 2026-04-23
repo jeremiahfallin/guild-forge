@@ -142,13 +142,16 @@ fn build_hero_list(
             format!("Lv.{} {}", info.level, info.class)
         };
 
-        let star_glyph = if is_favorite { "★" } else { "☆" };
+        // Bevy 0.18's default embedded font is an ASCII-only FiraMono subset,
+        // so unicode stars / emoji would render as tofu. Use ASCII glyphs and
+        // let color carry the on/off signal.
+        let star_glyph = if is_favorite { "*" } else { "-" };
         let star_color = if is_favorite {
             Color::srgb(1.0, 0.85, 0.2)
         } else {
             Color::srgba(0.5, 0.5, 0.5, 0.7)
         };
-        let pin_glyph = if is_managed { "📌" } else { "·" };
+        let pin_glyph = if is_managed { "P" } else { "-" };
         let pin_color = if is_managed {
             Color::srgb(0.5, 0.8, 1.0)
         } else {
@@ -271,8 +274,8 @@ fn build_detail_panel(
         )
         .child({
             let status_parts: Vec<&str> = [
-                is_favorite.then_some("★ Favorite"),
-                is_managed.then_some("📌 Personally Managed"),
+                is_favorite.then_some("* Favorite"),
+                is_managed.then_some("P Personally Managed"),
             ]
             .into_iter()
             .flatten()
