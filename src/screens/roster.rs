@@ -7,7 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::{pct, px};
 
 use crate::{
-    hero::{Favorite, Hero, HeroInfo, HeroStats, HeroTraits, data::*},
+    hero::{Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*},
     mission::OnMission,
     screens::GameTab,
     theme::{palette::*, widgets},
@@ -42,7 +42,7 @@ struct DetailPanel;
 fn spawn_roster(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
@@ -87,7 +87,7 @@ fn sort_favorites_first(entries: &[(bool, usize)]) -> Vec<usize> {
 }
 
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: &SelectedHero,
 ) -> Div {
     let mut list = div()
@@ -106,19 +106,19 @@ fn build_hero_list(
     );
 
     // Collect hero iteration with favorite flag, then sort favorites to the top.
-    let hero_vec: Vec<(Entity, &HeroInfo, Option<&OnMission>, bool)> = heroes
+    let hero_vec: Vec<(Entity, &HeroInfo, Option<&OnMission>, bool, bool)> = heroes
         .iter()
-        .map(|(e, i, om, is_fav)| (e, i, om, is_fav))
+        .map(|(e, i, om, is_fav, is_managed)| (e, i, om, is_fav, is_managed))
         .collect();
     let indexed: Vec<(bool, usize)> = hero_vec
         .iter()
         .enumerate()
-        .map(|(i, (_, _, _, is_fav))| (*is_fav, i))
+        .map(|(i, (_, _, _, is_fav, _))| (*is_fav, i))
         .collect();
     let order = sort_favorites_first(&indexed);
 
     for i in order {
-        let (entity, info, on_mission, _is_favorite) = hero_vec[i];
+        let (entity, info, on_mission, is_favorite, is_managed) = hero_vec[i];
         let is_selected = selected.0 == Some(entity);
         let is_on_mission = on_mission.is_some();
 
@@ -140,6 +140,19 @@ fn build_hero_list(
             format!("Lv.{} {} (On Mission)", info.level, info.class)
         } else {
             format!("Lv.{} {}", info.level, info.class)
+        };
+
+        let star_glyph = if is_favorite { "★" } else { "☆" };
+        let star_color = if is_favorite {
+            Color::srgb(1.0, 0.85, 0.2)
+        } else {
+            Color::srgba(0.5, 0.5, 0.5, 0.7)
+        };
+        let pin_glyph = if is_managed { "📌" } else { "·" };
+        let pin_color = if is_managed {
+            Color::srgb(0.5, 0.8, 1.0)
+        } else {
+            Color::srgba(0.5, 0.5, 0.5, 0.5)
         };
 
         list = list.child(
@@ -166,6 +179,38 @@ fn build_hero_list(
                             text(class_text)
                                 .font_size(16.0)
                                 .color(LABEL_TEXT),
+                        ),
+                )
+                .child(
+                    div()
+                        .col()
+                        .gap(px(4.0))
+                        .items_center()
+                        .child(
+                            div()
+                                .items_center()
+                                .justify_center()
+                                .insert((Button, ToggleFavoriteButton(entity)))
+                                .on_click(toggle_favorite)
+                                .child(
+                                    text(star_glyph)
+                                        .font_size(20.0)
+                                        .color(star_color)
+                                        .insert(Pickable::IGNORE),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .items_center()
+                                .justify_center()
+                                .insert((Button, ToggleManagedButton(entity)))
+                                .on_click(toggle_managed)
+                                .child(
+                                    text(pin_glyph)
+                                        .font_size(16.0)
+                                        .color(pin_color)
+                                        .insert(Pickable::IGNORE),
+                                ),
                         ),
                 ),
         );
@@ -369,7 +414,7 @@ fn refresh_roster_on_selection_change(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
@@ -430,6 +475,47 @@ fn detect_mission_status_changes(
         // Touch the resource to trigger refresh_roster_on_selection_change
         selected.set_changed();
     }
+}
+
+/// Component on the star icon inside a hero row; toggles `Favorite` on click.
+#[derive(Component)]
+struct ToggleFavoriteButton(Entity);
+
+/// Component on the pin icon inside a hero row; toggles `PersonallyManaged` on click.
+#[derive(Component)]
+struct ToggleManagedButton(Entity);
+
+fn toggle_favorite(
+    click: On<Pointer<Click>>,
+    buttons: Query<&ToggleFavoriteButton>,
+    favorites: Query<(), With<Favorite>>,
+    mut commands: Commands,
+    mut selected: ResMut<SelectedHero>,
+) {
+    let Ok(button) = buttons.get(click.event_target()) else { return };
+    if favorites.get(button.0).is_ok() {
+        commands.entity(button.0).remove::<Favorite>();
+    } else {
+        commands.entity(button.0).insert(Favorite);
+    }
+    // Force a roster rebuild so the sort and icon state update.
+    selected.set_changed();
+}
+
+fn toggle_managed(
+    click: On<Pointer<Click>>,
+    buttons: Query<&ToggleManagedButton>,
+    managed: Query<(), With<PersonallyManaged>>,
+    mut commands: Commands,
+    mut selected: ResMut<SelectedHero>,
+) {
+    let Ok(button) = buttons.get(click.event_target()) else { return };
+    if managed.get(button.0).is_ok() {
+        commands.entity(button.0).remove::<PersonallyManaged>();
+    } else {
+        commands.entity(button.0).insert(PersonallyManaged);
+    }
+    selected.set_changed();
 }
 
 #[cfg(test)]
