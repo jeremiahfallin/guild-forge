@@ -142,16 +142,15 @@ fn build_hero_list(
             format!("Lv.{} {}", info.level, info.class)
         };
 
-        // Bevy 0.18's default embedded font is an ASCII-only FiraMono subset,
-        // so unicode stars / emoji would render as tofu. Use ASCII glyphs and
-        // let color carry the on/off signal.
-        let star_glyph = if is_favorite { "*" } else { "-" };
+        // DejaVu Sans (loaded as default UI font) covers ★ ☆ ⚑ ⚐ and more.
+        // No emoji though — pin uses a flag glyph instead of 📌.
+        let star_glyph = if is_favorite { "★" } else { "☆" };
         let star_color = if is_favorite {
             Color::srgb(1.0, 0.85, 0.2)
         } else {
             Color::srgba(0.5, 0.5, 0.5, 0.7)
         };
-        let pin_glyph = if is_managed { "P" } else { "-" };
+        let pin_glyph = if is_managed { "⚑" } else { "⚐" };
         let pin_color = if is_managed {
             Color::srgb(0.5, 0.8, 1.0)
         } else {
@@ -191,10 +190,17 @@ fn build_hero_list(
                         .items_center()
                         .child(
                             div()
+                                .p(px(4.0))
+                                .rounded(px(4.0))
                                 .items_center()
                                 .justify_center()
                                 .insert((Button, ToggleFavoriteButton(entity)))
                                 .on_click(toggle_favorite)
+                                .interaction_palette(
+                                    Color::NONE,
+                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
+                                )
                                 .child(
                                     text(star_glyph)
                                         .font_size(20.0)
@@ -204,10 +210,17 @@ fn build_hero_list(
                         )
                         .child(
                             div()
+                                .p(px(4.0))
+                                .rounded(px(4.0))
                                 .items_center()
                                 .justify_center()
                                 .insert((Button, ToggleManagedButton(entity)))
                                 .on_click(toggle_managed)
+                                .interaction_palette(
+                                    Color::NONE,
+                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
+                                )
                                 .child(
                                     text(pin_glyph)
                                         .font_size(16.0)
@@ -274,8 +287,8 @@ fn build_detail_panel(
         )
         .child({
             let status_parts: Vec<&str> = [
-                is_favorite.then_some("* Favorite"),
-                is_managed.then_some("P Personally Managed"),
+                is_favorite.then_some("★ Favorite"),
+                is_managed.then_some("⚑ Personally Managed"),
             ]
             .into_iter()
             .flatten()
