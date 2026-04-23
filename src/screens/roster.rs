@@ -7,7 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::{pct, px};
 
 use crate::{
-    hero::{Hero, HeroInfo, HeroStats, HeroTraits, data::*},
+    hero::{Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*},
     mission::OnMission,
     screens::GameTab,
     theme::{palette::*, widgets},
@@ -42,10 +42,10 @@ struct DetailPanel;
 fn spawn_roster(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
     let mut root = widgets::content_area("Roster Screen")
@@ -76,8 +76,18 @@ fn spawn_roster(
     root.spawn_as_child_of(&mut commands, root_entity);
 }
 
+/// Stable-sort helper: return the input indices reordered so favorites come first,
+/// preserving original order within each group. The input is `(is_favorite, original_index)`.
+fn sort_favorites_first(entries: &[(bool, usize)]) -> Vec<usize> {
+    let mut indexed: Vec<(bool, usize)> = entries.to_vec();
+    // Stable sort: `true` (favorite) should come before `false`. Rust bool
+    // sorts false-before-true naturally, so invert with `!`.
+    indexed.sort_by_key(|(is_fav, _)| !*is_fav);
+    indexed.into_iter().map(|(_, idx)| idx).collect()
+}
+
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: &SelectedHero,
 ) -> Div {
     let mut list = div()
@@ -95,7 +105,20 @@ fn build_hero_list(
             .color(HEADER_TEXT),
     );
 
-    for (entity, info, on_mission) in heroes.iter() {
+    // Collect hero iteration with favorite flag, then sort favorites to the top.
+    let hero_vec: Vec<(Entity, &HeroInfo, Option<&OnMission>, bool, bool)> = heroes
+        .iter()
+        .map(|(e, i, om, is_fav, is_managed)| (e, i, om, is_fav, is_managed))
+        .collect();
+    let indexed: Vec<(bool, usize)> = hero_vec
+        .iter()
+        .enumerate()
+        .map(|(i, (_, _, _, is_fav, _))| (*is_fav, i))
+        .collect();
+    let order = sort_favorites_first(&indexed);
+
+    for i in order {
+        let (entity, info, on_mission, is_favorite, is_managed) = hero_vec[i];
         let is_selected = selected.0 == Some(entity);
         let is_on_mission = on_mission.is_some();
 
@@ -117,6 +140,21 @@ fn build_hero_list(
             format!("Lv.{} {} (On Mission)", info.level, info.class)
         } else {
             format!("Lv.{} {}", info.level, info.class)
+        };
+
+        // DejaVu Sans (loaded as default UI font) covers ★ ☆ ⚑ ⚐ and more.
+        // No emoji though — pin uses a flag glyph instead of 📌.
+        let star_glyph = if is_favorite { "★" } else { "☆" };
+        let star_color = if is_favorite {
+            Color::srgb(1.0, 0.85, 0.2)
+        } else {
+            Color::srgba(0.5, 0.5, 0.5, 0.7)
+        };
+        let pin_glyph = if is_managed { "⚑" } else { "⚐" };
+        let pin_color = if is_managed {
+            Color::srgb(0.5, 0.8, 1.0)
+        } else {
+            Color::srgba(0.5, 0.5, 0.5, 0.5)
         };
 
         list = list.child(
@@ -144,6 +182,52 @@ fn build_hero_list(
                                 .font_size(16.0)
                                 .color(LABEL_TEXT),
                         ),
+                )
+                .child(
+                    div()
+                        .col()
+                        .gap(px(4.0))
+                        .items_center()
+                        .child(
+                            div()
+                                .p(px(4.0))
+                                .rounded(px(4.0))
+                                .items_center()
+                                .justify_center()
+                                .insert((Button, ToggleFavoriteButton(entity)))
+                                .on_click(toggle_favorite)
+                                .interaction_palette(
+                                    Color::NONE,
+                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
+                                )
+                                .child(
+                                    text(star_glyph)
+                                        .font_size(20.0)
+                                        .color(star_color)
+                                        .insert(Pickable::IGNORE),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .p(px(4.0))
+                                .rounded(px(4.0))
+                                .items_center()
+                                .justify_center()
+                                .insert((Button, ToggleManagedButton(entity)))
+                                .on_click(toggle_managed)
+                                .interaction_palette(
+                                    Color::NONE,
+                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
+                                )
+                                .child(
+                                    text(pin_glyph)
+                                        .font_size(16.0)
+                                        .color(pin_color)
+                                        .insert(Pickable::IGNORE),
+                                ),
+                        ),
                 ),
         );
     }
@@ -153,7 +237,7 @@ fn build_hero_list(
 
 fn build_detail_panel(
     selected: &SelectedHero,
-    hero_query: &Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: &Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     trait_db: &TraitDatabase,
 ) -> Div {
     let panel = div()
@@ -176,7 +260,7 @@ fn build_detail_panel(
         );
     };
 
-    let Ok((info, stats, traits)) = hero_query.get(entity) else {
+    let Ok((info, stats, traits, is_favorite, is_managed)) = hero_query.get(entity) else {
         return panel.child(
             text("Hero not found")
                 .font_size(24.0)
@@ -200,7 +284,22 @@ fn build_detail_panel(
             text(format!("XP: {} / {}", info.xp, info.xp_to_next))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
-        );
+        )
+        .child({
+            let status_parts: Vec<&str> = [
+                is_favorite.then_some("★ Favorite"),
+                is_managed.then_some("⚑ Personally Managed"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            let status_text = if status_parts.is_empty() {
+                String::new()
+            } else {
+                status_parts.join("   ")
+            };
+            text(status_text).font_size(14.0).color(Color::srgb(0.9, 0.85, 0.4))
+        });
 
     // Stats section
     let stats_section = build_stats_section(stats);
@@ -346,10 +445,10 @@ fn refresh_roster_on_selection_change(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
 
@@ -406,5 +505,88 @@ fn detect_mission_status_changes(
         *last_on_mission = current;
         // Touch the resource to trigger refresh_roster_on_selection_change
         selected.set_changed();
+    }
+}
+
+/// Component on the star icon inside a hero row; toggles `Favorite` on click.
+#[derive(Component)]
+struct ToggleFavoriteButton(Entity);
+
+/// Component on the pin icon inside a hero row; toggles `PersonallyManaged` on click.
+#[derive(Component)]
+struct ToggleManagedButton(Entity);
+
+fn toggle_favorite(
+    click: On<Pointer<Click>>,
+    buttons: Query<&ToggleFavoriteButton>,
+    favorites: Query<(), With<Favorite>>,
+    mut commands: Commands,
+    mut selected: ResMut<SelectedHero>,
+) {
+    let Ok(button) = buttons.get(click.event_target()) else { return };
+    if favorites.get(button.0).is_ok() {
+        commands.entity(button.0).remove::<Favorite>();
+    } else {
+        commands.entity(button.0).insert(Favorite);
+    }
+    // Force a roster rebuild so the sort and icon state update.
+    selected.set_changed();
+}
+
+fn toggle_managed(
+    click: On<Pointer<Click>>,
+    buttons: Query<&ToggleManagedButton>,
+    managed: Query<(), With<PersonallyManaged>>,
+    mut commands: Commands,
+    mut selected: ResMut<SelectedHero>,
+) {
+    let Ok(button) = buttons.get(click.event_target()) else { return };
+    if managed.get(button.0).is_ok() {
+        commands.entity(button.0).remove::<PersonallyManaged>();
+    } else {
+        commands.entity(button.0).insert(PersonallyManaged);
+    }
+    selected.set_changed();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_with_favorites_first_puts_favorite_entries_before_non_favorites() {
+        let input: Vec<(bool, usize)> = vec![
+            (false, 0),
+            (true, 1),
+            (false, 2),
+            (true, 3),
+            (false, 4),
+        ];
+        let sorted = sort_favorites_first(&input);
+        // Favorites (index 1, 3) come first in their original order;
+        // non-favorites (0, 2, 4) follow in their original order.
+        assert_eq!(sorted, vec![1, 3, 0, 2, 4]);
+    }
+
+    #[test]
+    fn sort_with_no_favorites_preserves_input_order() {
+        let input: Vec<(bool, usize)> = vec![
+            (false, 0),
+            (false, 1),
+            (false, 2),
+        ];
+        let sorted = sort_favorites_first(&input);
+        assert_eq!(sorted, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn sort_with_all_favorites_preserves_input_order() {
+        let input: Vec<(bool, usize)> = vec![
+            (true, 0),
+            (true, 1),
+            (true, 2),
+        ];
+        let sorted = sort_favorites_first(&input);
+        assert_eq!(sorted, vec![0, 1, 2]);
     }
 }
