@@ -10,7 +10,10 @@ use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
 use crate::equipment::HeroEquipment;
 use crate::hero::data::{ClassDatabase, HeroClass, HeroTrait};
-use crate::hero::{Hero, HeroGrowth, HeroInfo, HeroStatProgress, HeroStats, HeroTraits, roll_growth};
+use crate::hero::{
+    Favorite, Hero, HeroGrowth, HeroInfo, HeroStatProgress, HeroStats, HeroTraits,
+    PersonallyManaged, roll_growth,
+};
 use crate::materials::{MaterialType, Materials};
 use crate::mission::dungeon::DungeonMap;
 use crate::mission::entities::{
@@ -136,42 +139,47 @@ fn load_save(
     // ── Spawn heroes — track entities for mission cross-references ─
     let mut hero_entities: Vec<Entity> = Vec::with_capacity(save_data.heroes.len());
     for dto in &save_data.heroes {
-        let entity = commands
-            .spawn((
-                Name::new(dto.name.clone()),
-                Hero,
-                HeroInfo {
-                    name: dto.name.clone(),
-                    class: dto.class,
-                    level: dto.level,
-                    xp: dto.xp,
-                    xp_to_next: dto.xp_to_next,
-                },
-                HeroStats {
-                    strength: dto.stats.strength,
-                    dexterity: dto.stats.dexterity,
-                    constitution: dto.stats.constitution,
-                    intelligence: dto.stats.intelligence,
-                    wisdom: dto.stats.wisdom,
-                    charisma: dto.stats.charisma,
-                },
-                HeroTraits(dto.traits.clone()),
-                HeroEquipment {
-                    weapon_tier: dto.equipment.weapon_tier,
-                    armor_tier: dto.equipment.armor_tier,
-                    accessory_tier: dto.equipment.accessory_tier,
-                },
-                restore_growth(&dto.growth, dto.class, &class_db),
-                HeroStatProgress {
-                    strength: dto.progress.strength,
-                    dexterity: dto.progress.dexterity,
-                    constitution: dto.progress.constitution,
-                    intelligence: dto.progress.intelligence,
-                    wisdom: dto.progress.wisdom,
-                    charisma: dto.progress.charisma,
-                },
-            ))
-            .id();
+        let mut entity_commands = commands.spawn((
+            Name::new(dto.name.clone()),
+            Hero,
+            HeroInfo {
+                name: dto.name.clone(),
+                class: dto.class,
+                level: dto.level,
+                xp: dto.xp,
+                xp_to_next: dto.xp_to_next,
+            },
+            HeroStats {
+                strength: dto.stats.strength,
+                dexterity: dto.stats.dexterity,
+                constitution: dto.stats.constitution,
+                intelligence: dto.stats.intelligence,
+                wisdom: dto.stats.wisdom,
+                charisma: dto.stats.charisma,
+            },
+            HeroTraits(dto.traits.clone()),
+            HeroEquipment {
+                weapon_tier: dto.equipment.weapon_tier,
+                armor_tier: dto.equipment.armor_tier,
+                accessory_tier: dto.equipment.accessory_tier,
+            },
+            restore_growth(&dto.growth, dto.class, &class_db),
+            HeroStatProgress {
+                strength: dto.progress.strength,
+                dexterity: dto.progress.dexterity,
+                constitution: dto.progress.constitution,
+                intelligence: dto.progress.intelligence,
+                wisdom: dto.progress.wisdom,
+                charisma: dto.progress.charisma,
+            },
+        ));
+        if dto.favorite {
+            entity_commands.insert(Favorite);
+        }
+        if dto.personally_managed {
+            entity_commands.insert(PersonallyManaged);
+        }
+        let entity = entity_commands.id();
         hero_entities.push(entity);
     }
 
@@ -309,6 +317,8 @@ fn handle_save(
             &HeroGrowth,
             &HeroStatProgress,
             Option<&OnMission>,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
         ),
         With<Hero>,
     >,
@@ -343,7 +353,7 @@ fn handle_save(
     let mut hero_dtos = Vec::new();
     let mut entity_to_index: HashMap<Entity, usize> = HashMap::new();
 
-    for (entity, info, stats, traits, equipment, growth, progress, on_mission) in &heroes {
+    for (entity, info, stats, traits, equipment, growth, progress, on_mission, is_favorite, is_managed) in &heroes {
         let idx = hero_dtos.len();
         entity_to_index.insert(entity, idx);
 
@@ -384,6 +394,8 @@ fn handle_save(
                 wisdom: progress.wisdom,
                 charisma: progress.charisma,
             },
+            favorite: is_favorite,
+            personally_managed: is_managed,
         });
     }
 
@@ -619,6 +631,10 @@ pub struct HeroSaveDto {
     pub growth: HeroGrowthSave,
     #[serde(default)]
     pub progress: HeroStatProgressSave,
+    #[serde(default)]
+    pub favorite: bool,
+    #[serde(default)]
+    pub personally_managed: bool,
 }
 
 #[derive(Serialize, Deserialize)]
