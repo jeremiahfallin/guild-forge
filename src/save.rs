@@ -773,6 +773,8 @@ mod tests {
                 wisdom: 0.1,
                 charisma: 0.0,
             },
+            favorite: false,
+            personally_managed: false,
         };
         let s = ron::ser::to_string(&dto).unwrap();
         let back: HeroSaveDto = ron::from_str(&s).unwrap();
@@ -797,6 +799,34 @@ mod tests {
         let dto: HeroSaveDto = ron::from_str(legacy).unwrap();
         assert!(is_zero_growth(&dto.growth));
         assert_eq!(dto.progress.strength, 0.0);
+    }
+
+    #[test]
+    fn hero_save_dto_round_trips_favorite_flags() {
+        let dto = HeroSaveDto {
+            name: "F".into(),
+            class: HeroClass::Warrior,
+            level: 1,
+            xp: 0,
+            xp_to_next: 100,
+            stats: HeroStatsSave {
+                strength: 10, dexterity: 10, constitution: 10,
+                intelligence: 10, wisdom: 10, charisma: 10,
+            },
+            traits: vec![],
+            equipment: HeroEquipmentSave {
+                weapon_tier: 0, armor_tier: 0, accessory_tier: 0,
+            },
+            on_mission: false,
+            growth: HeroGrowthSave::default(),
+            progress: HeroStatProgressSave::default(),
+            favorite: true,
+            personally_managed: true,
+        };
+        let s = ron::ser::to_string(&dto).unwrap();
+        let back: HeroSaveDto = ron::from_str(&s).unwrap();
+        assert!(back.favorite);
+        assert!(back.personally_managed);
     }
 
     #[test]
