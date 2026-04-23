@@ -7,7 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::{pct, px};
 
 use crate::{
-    hero::{Hero, HeroInfo, HeroStats, HeroTraits, data::*},
+    hero::{Favorite, Hero, HeroInfo, HeroStats, HeroTraits, data::*},
     mission::OnMission,
     screens::GameTab,
     theme::{palette::*, widgets},
@@ -42,7 +42,7 @@ struct DetailPanel;
 fn spawn_roster(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
@@ -87,7 +87,7 @@ fn sort_favorites_first(entries: &[(bool, usize)]) -> Vec<usize> {
 }
 
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
     selected: &SelectedHero,
 ) -> Div {
     let mut list = div()
@@ -105,7 +105,20 @@ fn build_hero_list(
             .color(HEADER_TEXT),
     );
 
-    for (entity, info, on_mission) in heroes.iter() {
+    // Collect hero iteration with favorite flag, then sort favorites to the top.
+    let hero_vec: Vec<(Entity, &HeroInfo, Option<&OnMission>, bool)> = heroes
+        .iter()
+        .map(|(e, i, om, is_fav)| (e, i, om, is_fav))
+        .collect();
+    let indexed: Vec<(bool, usize)> = hero_vec
+        .iter()
+        .enumerate()
+        .map(|(i, (_, _, _, is_fav))| (*is_fav, i))
+        .collect();
+    let order = sort_favorites_first(&indexed);
+
+    for i in order {
+        let (entity, info, on_mission, _is_favorite) = hero_vec[i];
         let is_selected = selected.0 == Some(entity);
         let is_on_mission = on_mission.is_some();
 
@@ -356,7 +369,7 @@ fn refresh_roster_on_selection_change(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>), With<Hero>>,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
