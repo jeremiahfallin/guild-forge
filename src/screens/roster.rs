@@ -76,6 +76,16 @@ fn spawn_roster(
     root.spawn_as_child_of(&mut commands, root_entity);
 }
 
+/// Stable-sort helper: return the input indices reordered so favorites come first,
+/// preserving original order within each group. The input is `(is_favorite, original_index)`.
+fn sort_favorites_first(entries: &[(bool, usize)]) -> Vec<usize> {
+    let mut indexed: Vec<(bool, usize)> = entries.to_vec();
+    // Stable sort: `true` (favorite) should come before `false`. Rust bool
+    // sorts false-before-true naturally, so invert with `!`.
+    indexed.sort_by_key(|(is_fav, _)| !*is_fav);
+    indexed.into_iter().map(|(_, idx)| idx).collect()
+}
+
 fn build_hero_list(
     heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
     selected: &SelectedHero,
@@ -406,5 +416,47 @@ fn detect_mission_status_changes(
         *last_on_mission = current;
         // Touch the resource to trigger refresh_roster_on_selection_change
         selected.set_changed();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_with_favorites_first_puts_favorite_entries_before_non_favorites() {
+        let input: Vec<(bool, usize)> = vec![
+            (false, 0),
+            (true, 1),
+            (false, 2),
+            (true, 3),
+            (false, 4),
+        ];
+        let sorted = sort_favorites_first(&input);
+        // Favorites (index 1, 3) come first in their original order;
+        // non-favorites (0, 2, 4) follow in their original order.
+        assert_eq!(sorted, vec![1, 3, 0, 2, 4]);
+    }
+
+    #[test]
+    fn sort_with_no_favorites_preserves_input_order() {
+        let input: Vec<(bool, usize)> = vec![
+            (false, 0),
+            (false, 1),
+            (false, 2),
+        ];
+        let sorted = sort_favorites_first(&input);
+        assert_eq!(sorted, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn sort_with_all_favorites_preserves_input_order() {
+        let input: Vec<(bool, usize)> = vec![
+            (true, 0),
+            (true, 1),
+            (true, 2),
+        ];
+        let sorted = sort_favorites_first(&input);
+        assert_eq!(sorted, vec![0, 1, 2]);
     }
 }
