@@ -243,7 +243,7 @@ pub fn check_mission_completion(
     time: Res<Time<Virtual>>,
     mut materials: ResMut<crate::materials::Materials>,
     mut reputation: ResMut<crate::reputation::Reputation>,
-    favorite_q: Query<&crate::hero::HeroInfo, With<Favorite>>,
+    favorite_q: Query<(), With<Favorite>>,
 ) {
     let mut rng = rand::rng();
 
@@ -264,11 +264,17 @@ pub fn check_mission_completion(
             *progress = MissionProgress::Failed;
             let expires_at = time.elapsed_secs_f64() + MISSING_DURATION_SECS;
 
-            // Favorite-aware toast title.
-            let favorited_name = party
-                .0
-                .iter()
-                .find_map(|e| favorite_q.get(*e).ok().map(|i| i.name.clone()));
+            // Favorite-aware toast title. `favorite_q` is data-less
+            // (`With<Favorite>` only) to avoid a HeroInfo access conflict with
+            // the mutable `hero_infos` query above; we look up the name
+            // separately via `hero_infos`.
+            let favorited_name = party.0.iter().find_map(|e| {
+                if favorite_q.get(*e).is_ok() {
+                    hero_infos.get(*e).ok().map(|(hi, _, _, _)| hi.name.clone())
+                } else {
+                    None
+                }
+            });
             let title = match favorited_name {
                 Some(name) => format!("{name} is missing!"),
                 None => format!("{} — Failed!", info.name),
