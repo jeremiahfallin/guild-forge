@@ -7,6 +7,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::hero::status::INJURED_STAT_MULTIPLIER;
 use crate::hero::{Hero, HeroInfo, HeroStats};
 
 use super::Mission;
@@ -105,6 +106,7 @@ pub fn spawn_tokens_for_mission(
     templates: &MissionTemplateDatabase,
     enemy_db: &EnemyDatabase,
     template_id: &str,
+    injured_q: &Query<(), With<crate::hero::status::Injured>>,
 ) {
     // Find entrance room for hero placement
     let entrance = map.entrance_room().unwrap_or(&map.rooms[0]);
@@ -122,10 +124,22 @@ pub fn spawn_tokens_for_mission(
         let hx = (entrance_x as i32 + offset_x).clamp(0, map.width as i32 - 1) as u32;
         let hy = (entrance_y as i32 + offset_y).clamp(0, map.height as i32 - 1) as u32;
 
+        let is_injured = injured_q.get(hero_entity).is_ok();
+        let mul = |v: i32| -> i32 {
+            if is_injured {
+                (v as f32 * INJURED_STAT_MULTIPLIER).floor() as i32
+            } else {
+                v
+            }
+        };
+        let str_eff = mul(stats.strength);
+        let dex_eff = mul(stats.dexterity);
+        let con_eff = mul(stats.constitution);
+
         // HP = con×3 + level×5
-        let mut hp = stats.constitution * 3 + info.level as i32 * 5;
-        let mut attack = (stats.strength + stats.dexterity) / 2;
-        let mut defense = (stats.constitution + stats.dexterity) / 2;
+        let mut hp = con_eff * 3 + info.level as i32 * 5;
+        let mut attack = (str_eff + dex_eff) / 2;
+        let mut defense = (con_eff + dex_eff) / 2;
 
         // Apply equipment bonuses
         if let Some(equipment) = maybe_equipment {
