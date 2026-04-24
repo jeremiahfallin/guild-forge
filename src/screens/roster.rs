@@ -7,7 +7,10 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::{pct, px};
 
 use crate::{
-    hero::{Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*},
+    hero::{
+        Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*,
+        status::{Injured, Missing, format_countdown},
+    },
     mission::OnMission,
     screens::GameTab,
     theme::{palette::*, widgets},
@@ -42,10 +45,22 @@ struct DetailPanel;
 fn spawn_roster(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    heroes: Query<
+        (
+            Entity,
+            &HeroInfo,
+            Option<&OnMission>,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
+            Option<&Missing>,
+            Option<&Injured>,
+        ),
+        With<Hero>,
+    >,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    time: Res<Time<Virtual>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
     let mut root = widgets::content_area("Roster Screen")
@@ -59,7 +74,7 @@ fn spawn_roster(
         .child(widgets::header("Roster"));
 
     // Main content: two-panel layout
-    let hero_list = build_hero_list(&heroes, &selected);
+    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64());
     let detail = build_detail_panel(&selected, &hero_query, &trait_db);
 
     let content = div()
@@ -87,8 +102,20 @@ fn sort_favorites_first(entries: &[(bool, usize)]) -> Vec<usize> {
 }
 
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    heroes: &Query<
+        (
+            Entity,
+            &HeroInfo,
+            Option<&OnMission>,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
+            Option<&Missing>,
+            Option<&Injured>,
+        ),
+        With<Hero>,
+    >,
     selected: &SelectedHero,
+    now: f64,
 ) -> Div {
     let mut list = div()
         .col()
@@ -106,23 +133,37 @@ fn build_hero_list(
     );
 
     // Collect hero iteration with favorite flag, then sort favorites to the top.
-    let hero_vec: Vec<(Entity, &HeroInfo, Option<&OnMission>, bool, bool)> = heroes
+    let hero_vec: Vec<(
+        Entity,
+        &HeroInfo,
+        Option<&OnMission>,
+        bool,
+        bool,
+        Option<Missing>,
+        Option<Injured>,
+    )> = heroes
         .iter()
-        .map(|(e, i, om, is_fav, is_managed)| (e, i, om, is_fav, is_managed))
+        .map(|(e, i, om, is_fav, is_managed, missing, injured)| {
+            (e, i, om, is_fav, is_managed, missing.copied(), injured.copied())
+        })
         .collect();
     let indexed: Vec<(bool, usize)> = hero_vec
         .iter()
         .enumerate()
-        .map(|(i, (_, _, _, is_fav, _))| (*is_fav, i))
+        .map(|(i, (_, _, _, is_fav, _, _, _))| (*is_fav, i))
         .collect();
     let order = sort_favorites_first(&indexed);
 
     for i in order {
-        let (entity, info, on_mission, is_favorite, is_managed) = hero_vec[i];
+        let (entity, info, on_mission, is_favorite, is_managed, missing, injured) = hero_vec[i];
         let is_selected = selected.0 == Some(entity);
         let is_on_mission = on_mission.is_some();
 
-        let bg_color = if is_on_mission {
+        let bg_color = if missing.is_some() {
+            Color::srgba(0.35, 0.2, 0.2, 0.5) // dim red-gray
+        } else if injured.is_some() {
+            Color::srgba(0.3, 0.25, 0.15, 0.5) // dim amber
+        } else if is_on_mission {
             Color::srgba(0.3, 0.3, 0.3, 0.4) // Grayed out
         } else if is_selected {
             Color::srgba(0.275, 0.400, 0.750, 0.8)
@@ -136,7 +177,21 @@ fn build_hero_list(
             HEADER_TEXT
         };
 
-        let class_text = if is_on_mission {
+        let class_text = if let Some(m) = missing {
+            format!(
+                "Lv.{} {} — MISSING {}",
+                info.level,
+                info.class,
+                format_countdown(m.expires_at - now)
+            )
+        } else if let Some(inj) = injured {
+            format!(
+                "Lv.{} {} — INJURED {}",
+                info.level,
+                info.class,
+                format_countdown(inj.expires_at - now)
+            )
+        } else if is_on_mission {
             format!("Lv.{} {} (On Mission)", info.level, info.class)
         } else {
             format!("Lv.{} {}", info.level, info.class)
@@ -445,10 +500,22 @@ fn refresh_roster_on_selection_change(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    heroes: Query<
+        (
+            Entity,
+            &HeroInfo,
+            Option<&OnMission>,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
+            Option<&Missing>,
+            Option<&Injured>,
+        ),
+        With<Hero>,
+    >,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
     hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    time: Res<Time<Virtual>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
 
@@ -467,7 +534,7 @@ fn refresh_roster_on_selection_change(
         .p(px(16.0))
         .child(widgets::header("Roster"));
 
-    let hero_list = build_hero_list(&heroes, &selected);
+    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64());
     let detail = build_detail_panel(&selected, &hero_query, &trait_db);
 
     let content = div()
