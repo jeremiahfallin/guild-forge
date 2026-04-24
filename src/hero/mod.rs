@@ -2,6 +2,7 @@
 
 pub mod data;
 pub mod status;
+pub mod status_tick;
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -16,6 +17,7 @@ pub(super) fn plugin(app: &mut App) {
     app.register_type::<PersonallyManaged>();
     app.register_type::<status::Missing>();
     app.register_type::<status::Injured>();
+    app.add_plugins(status_tick::plugin);
     app.add_systems(Startup, load_hero_databases);
     app.add_systems(OnEnter(Screen::Gameplay), spawn_starter_heroes);
 }
