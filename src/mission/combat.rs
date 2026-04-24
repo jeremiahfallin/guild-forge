@@ -8,6 +8,8 @@ use rand::Rng;
 
 use crate::economy::Gold;
 use crate::hero::data::HeroTrait;
+use crate::hero::status::{Missing, MISSING_DURATION_SECS};
+use crate::hero::Favorite;
 use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
 use crate::ui::toast::{ToastEvent, ToastKind};
 
@@ -238,8 +240,10 @@ pub fn check_mission_completion(
     >,
     mut gold: ResMut<Gold>,
     template_db: Res<MissionTemplateDatabase>,
+    time: Res<Time<Virtual>>,
     mut materials: ResMut<crate::materials::Materials>,
     mut reputation: ResMut<crate::reputation::Reputation>,
+    favorite_q: Query<&crate::hero::HeroInfo, With<Favorite>>,
 ) {
     let mut rng = rand::rng();
 
@@ -258,16 +262,31 @@ pub fn check_mission_completion(
         let all_dead = !mission_heroes.is_empty() && mission_heroes.iter().all(|(_, c)| c.hp <= 0);
         if all_dead {
             *progress = MissionProgress::Failed;
+            let expires_at = time.elapsed_secs_f64() + MISSING_DURATION_SECS;
+
+            // Favorite-aware toast title.
+            let favorited_name = party
+                .0
+                .iter()
+                .find_map(|e| favorite_q.get(*e).ok().map(|i| i.name.clone()));
+            let title = match favorited_name {
+                Some(name) => format!("{name} is missing!"),
+                None => format!("{} — Failed!", info.name),
+            };
             commands.trigger(ToastEvent {
-                title: format!("{} — Failed!", info.name),
-                body: "Party wiped — no rewards".to_string(),
+                title,
+                body: "Party wiped — heroes are missing.".to_string(),
                 kind: ToastKind::Failure,
             });
+
             for &hero_entity in &party.0 {
-                commands.entity(hero_entity).remove::<super::OnMission>();
+                commands
+                    .entity(hero_entity)
+                    .remove::<super::OnMission>()
+                    .insert(Missing { expires_at });
             }
             commands.entity(mission_entity).despawn();
-            info!("Mission '{}' failed — all heroes fell!", info.name);
+            info!("Mission '{}' failed — heroes missing for {MISSING_DURATION_SECS}s", info.name);
             continue;
         }
 
