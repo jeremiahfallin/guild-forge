@@ -1,6 +1,8 @@
 //! Hero system: data, components, and generation.
 
 pub mod data;
+pub mod status;
+pub mod status_tick;
 
 use bevy::prelude::*;
 use rand::Rng;
@@ -11,6 +13,11 @@ use data::*;
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<HeroGrowth>();
     app.register_type::<HeroStatProgress>();
+    app.register_type::<Favorite>();
+    app.register_type::<PersonallyManaged>();
+    app.register_type::<status::Missing>();
+    app.register_type::<status::Injured>();
+    app.add_plugins(status_tick::plugin);
     app.add_systems(Startup, load_hero_databases);
     app.add_systems(OnEnter(Screen::Gameplay), spawn_starter_heroes);
 }
@@ -19,6 +26,22 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
 pub struct Hero;
+
+/// UI-prominence flag. Favorited heroes are pinned at the top of lists,
+/// highlighted in mission feeds, and surfaced as priority events in the
+/// eventual Field Report dashboard. Purely cosmetic — does not affect
+/// game rules.
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct Favorite;
+
+/// Opt-in flag indicating the player wants to manage this hero by hand
+/// rather than let the (future) Dispatcher auto-assign them. When the
+/// Dispatcher lands, it will skip heroes with this component. Has no
+/// behavioral effect yet — displayed only.
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
+pub struct PersonallyManaged;
 
 /// Core identity information for a hero.
 #[derive(Component, Debug, Reflect)]

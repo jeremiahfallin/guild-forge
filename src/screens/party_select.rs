@@ -61,7 +61,7 @@ fn spawn_party_select(
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
-    heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>)>,
+    heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
     commands.init_resource::<SelectedParty>();
@@ -149,7 +149,7 @@ fn spawn_party_select(
 }
 
 fn build_available_panel(
-    heroes: &Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>)>,
+    heroes: &Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
     selected_entities: &[Entity],
 ) -> bevy_declarative::element::div::Div {
     let mut panel = div()
@@ -233,7 +233,7 @@ fn refresh_party_select(
     selected_party: Res<SelectedParty>,
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
-    heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>)>,
+    heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
     hero_info: Query<&HeroInfo, With<Hero>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
@@ -410,6 +410,7 @@ fn dispatch_mission(
     enemy_db: Option<Res<EnemyDatabase>>,
     hero_q: Query<(&HeroInfo, &HeroStats, Option<&crate::equipment::HeroEquipment>), With<Hero>>,
     equipment_db: Option<Res<crate::equipment::EquipmentDatabase>>,
+    injured_q: Query<(), With<crate::hero::status::Injured>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     let Some(mission_idx) = selected_mission.as_ref().and_then(|sm| sm.0) else {
@@ -462,6 +463,7 @@ fn dispatch_mission(
         &templates,
         &enemy_db,
         &template.id,
+        &injured_q,
     );
 
     // Mark heroes as on-mission

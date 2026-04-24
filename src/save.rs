@@ -10,7 +10,11 @@ use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
 use crate::equipment::HeroEquipment;
 use crate::hero::data::{ClassDatabase, HeroClass, HeroTrait};
-use crate::hero::{Hero, HeroGrowth, HeroInfo, HeroStatProgress, HeroStats, HeroTraits, roll_growth};
+use crate::hero::status::{Injured, Missing};
+use crate::hero::{
+    Favorite, Hero, HeroGrowth, HeroInfo, HeroStatProgress, HeroStats, HeroTraits,
+    PersonallyManaged, roll_growth,
+};
 use crate::materials::{MaterialType, Materials};
 use crate::mission::dungeon::DungeonMap;
 use crate::mission::entities::{
@@ -77,6 +81,7 @@ fn load_save(
     mut commands: Commands,
     existing_heroes: Query<(), With<Hero>>,
     class_db: Res<ClassDatabase>,
+    time: Res<Time<Virtual>>,
 ) {
     // Already have heroes — skip (re-entry or already loaded).
     if !existing_heroes.is_empty() {
@@ -136,42 +141,54 @@ fn load_save(
     // ── Spawn heroes — track entities for mission cross-references ─
     let mut hero_entities: Vec<Entity> = Vec::with_capacity(save_data.heroes.len());
     for dto in &save_data.heroes {
-        let entity = commands
-            .spawn((
-                Name::new(dto.name.clone()),
-                Hero,
-                HeroInfo {
-                    name: dto.name.clone(),
-                    class: dto.class,
-                    level: dto.level,
-                    xp: dto.xp,
-                    xp_to_next: dto.xp_to_next,
-                },
-                HeroStats {
-                    strength: dto.stats.strength,
-                    dexterity: dto.stats.dexterity,
-                    constitution: dto.stats.constitution,
-                    intelligence: dto.stats.intelligence,
-                    wisdom: dto.stats.wisdom,
-                    charisma: dto.stats.charisma,
-                },
-                HeroTraits(dto.traits.clone()),
-                HeroEquipment {
-                    weapon_tier: dto.equipment.weapon_tier,
-                    armor_tier: dto.equipment.armor_tier,
-                    accessory_tier: dto.equipment.accessory_tier,
-                },
-                restore_growth(&dto.growth, dto.class, &class_db),
-                HeroStatProgress {
-                    strength: dto.progress.strength,
-                    dexterity: dto.progress.dexterity,
-                    constitution: dto.progress.constitution,
-                    intelligence: dto.progress.intelligence,
-                    wisdom: dto.progress.wisdom,
-                    charisma: dto.progress.charisma,
-                },
-            ))
-            .id();
+        let mut entity_commands = commands.spawn((
+            Name::new(dto.name.clone()),
+            Hero,
+            HeroInfo {
+                name: dto.name.clone(),
+                class: dto.class,
+                level: dto.level,
+                xp: dto.xp,
+                xp_to_next: dto.xp_to_next,
+            },
+            HeroStats {
+                strength: dto.stats.strength,
+                dexterity: dto.stats.dexterity,
+                constitution: dto.stats.constitution,
+                intelligence: dto.stats.intelligence,
+                wisdom: dto.stats.wisdom,
+                charisma: dto.stats.charisma,
+            },
+            HeroTraits(dto.traits.clone()),
+            HeroEquipment {
+                weapon_tier: dto.equipment.weapon_tier,
+                armor_tier: dto.equipment.armor_tier,
+                accessory_tier: dto.equipment.accessory_tier,
+            },
+            restore_growth(&dto.growth, dto.class, &class_db),
+            HeroStatProgress {
+                strength: dto.progress.strength,
+                dexterity: dto.progress.dexterity,
+                constitution: dto.progress.constitution,
+                intelligence: dto.progress.intelligence,
+                wisdom: dto.progress.wisdom,
+                charisma: dto.progress.charisma,
+            },
+        ));
+        if dto.favorite {
+            entity_commands.insert(Favorite);
+        }
+        if dto.personally_managed {
+            entity_commands.insert(PersonallyManaged);
+        }
+        let now = time.elapsed_secs_f64();
+        if let Some(rem) = dto.missing_remaining {
+            entity_commands.insert(Missing { expires_at: now + rem });
+        }
+        if let Some(rem) = dto.injured_remaining {
+            entity_commands.insert(Injured { expires_at: now + rem });
+        }
+        let entity = entity_commands.id();
         hero_entities.push(entity);
     }
 
@@ -299,6 +316,7 @@ fn handle_save(
     training_timer: Res<TrainingTimer>,
     applicant_board: Res<ApplicantBoard>,
     offline_bank: Res<OfflineTimeBank>,
+    time: Res<Time<Virtual>>,
     heroes: Query<
         (
             Entity,
@@ -309,6 +327,10 @@ fn handle_save(
             &HeroGrowth,
             &HeroStatProgress,
             Option<&OnMission>,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
+            Option<&Missing>,
+            Option<&Injured>,
         ),
         With<Hero>,
     >,
@@ -343,7 +365,7 @@ fn handle_save(
     let mut hero_dtos = Vec::new();
     let mut entity_to_index: HashMap<Entity, usize> = HashMap::new();
 
-    for (entity, info, stats, traits, equipment, growth, progress, on_mission) in &heroes {
+    for (entity, info, stats, traits, equipment, growth, progress, on_mission, is_favorite, is_managed, missing, injured) in &heroes {
         let idx = hero_dtos.len();
         entity_to_index.insert(entity, idx);
 
@@ -384,6 +406,10 @@ fn handle_save(
                 wisdom: progress.wisdom,
                 charisma: progress.charisma,
             },
+            favorite: is_favorite,
+            personally_managed: is_managed,
+            missing_remaining: missing.map(|m| (m.expires_at - time.elapsed_secs_f64()).max(0.0)),
+            injured_remaining: injured.map(|i| (i.expires_at - time.elapsed_secs_f64()).max(0.0)),
         });
     }
 
@@ -619,6 +645,14 @@ pub struct HeroSaveDto {
     pub growth: HeroGrowthSave,
     #[serde(default)]
     pub progress: HeroStatProgressSave,
+    #[serde(default)]
+    pub favorite: bool,
+    #[serde(default)]
+    pub personally_managed: bool,
+    #[serde(default)]
+    pub missing_remaining: Option<f64>,
+    #[serde(default)]
+    pub injured_remaining: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -757,6 +791,10 @@ mod tests {
                 wisdom: 0.1,
                 charisma: 0.0,
             },
+            favorite: false,
+            personally_managed: false,
+            missing_remaining: None,
+            injured_remaining: None,
         };
         let s = ron::ser::to_string(&dto).unwrap();
         let back: HeroSaveDto = ron::from_str(&s).unwrap();
@@ -781,6 +819,91 @@ mod tests {
         let dto: HeroSaveDto = ron::from_str(legacy).unwrap();
         assert!(is_zero_growth(&dto.growth));
         assert_eq!(dto.progress.strength, 0.0);
+    }
+
+    #[test]
+    fn hero_save_dto_round_trips_favorite_flags() {
+        let dto = HeroSaveDto {
+            name: "F".into(),
+            class: HeroClass::Warrior,
+            level: 1,
+            xp: 0,
+            xp_to_next: 100,
+            stats: HeroStatsSave {
+                strength: 10, dexterity: 10, constitution: 10,
+                intelligence: 10, wisdom: 10, charisma: 10,
+            },
+            traits: vec![],
+            equipment: HeroEquipmentSave {
+                weapon_tier: 0, armor_tier: 0, accessory_tier: 0,
+            },
+            on_mission: false,
+            growth: HeroGrowthSave::default(),
+            progress: HeroStatProgressSave::default(),
+            favorite: true,
+            personally_managed: true,
+            missing_remaining: None,
+            injured_remaining: None,
+        };
+        let s = ron::ser::to_string(&dto).unwrap();
+        let back: HeroSaveDto = ron::from_str(&s).unwrap();
+        assert!(back.favorite);
+        assert!(back.personally_managed);
+    }
+
+    #[test]
+    fn hero_save_dto_round_trips_with_missing_and_injured() {
+        let dto = HeroSaveDto {
+            name: "A".into(),
+            class: HeroClass::Warrior,
+            level: 1,
+            xp: 0,
+            xp_to_next: 100,
+            stats: HeroStatsSave { strength: 10, dexterity: 10, constitution: 10,
+                intelligence: 10, wisdom: 10, charisma: 10 },
+            traits: vec![],
+            equipment: HeroEquipmentSave { weapon_tier: 0, armor_tier: 0, accessory_tier: 0 },
+            on_mission: false,
+            growth: HeroGrowthSave::default(),
+            progress: HeroStatProgressSave::default(),
+            favorite: false,
+            personally_managed: false,
+            missing_remaining: Some(42.0),
+            injured_remaining: Some(200.0),
+        };
+        let s = ron::to_string(&dto).unwrap();
+        let back: HeroSaveDto = ron::from_str(&s).unwrap();
+        assert_eq!(back.missing_remaining, Some(42.0));
+        assert_eq!(back.injured_remaining, Some(200.0));
+    }
+
+    #[test]
+    fn hero_save_dto_defaults_missing_and_injured_to_none() {
+        // Old-format save (no fields) should deserialize with None.
+        let old = r#"(name:"A",class:Warrior,level:1,xp:0,xp_to_next:100,
+            stats:(strength:10,dexterity:10,constitution:10,intelligence:10,wisdom:10,charisma:10),
+            traits:[],equipment:(weapon_tier:0,armor_tier:0,accessory_tier:0),on_mission:false)"#;
+        let back: HeroSaveDto = ron::from_str(old).unwrap();
+        assert_eq!(back.missing_remaining, None);
+        assert_eq!(back.injured_remaining, None);
+    }
+
+    #[test]
+    fn legacy_hero_save_dto_without_favorite_flags_defaults_false() {
+        // A RON string missing `favorite` and `personally_managed`.
+        let legacy = r#"(
+            name: "L",
+            class: Warrior,
+            level: 1, xp: 0, xp_to_next: 100,
+            stats: (strength: 10, dexterity: 10, constitution: 10,
+                    intelligence: 10, wisdom: 10, charisma: 10),
+            traits: [],
+            equipment: (weapon_tier: 0, armor_tier: 0, accessory_tier: 0),
+            on_mission: false,
+        )"#;
+        let dto: HeroSaveDto = ron::from_str(legacy).unwrap();
+        assert!(!dto.favorite);
+        assert!(!dto.personally_managed);
     }
 
     #[test]

@@ -1,6 +1,7 @@
 //! Persistent sidebar — spawned once on gameplay enter, lives across all GameTab transitions.
 
 use bevy::prelude::*;
+use bevy_declarative::InteractionPalette;
 use bevy_declarative::element::div::div;
 use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
@@ -8,7 +9,8 @@ use bevy_declarative::style::values::px;
 
 use crate::{
     economy::Gold,
-    mission::{Mission, MissionInfo, MissionProgress, ViewedMission},
+    hero::{Favorite, Hero},
+    mission::{Mission, MissionInfo, MissionParty, MissionProgress, ViewedMission},
     reputation::Reputation,
     screens::GameTab,
     theme::{
@@ -30,6 +32,7 @@ pub(super) fn plugin(app: &mut App) {
             update_rep_display.run_if(resource_changed::<Reputation>),
             update_bank_display.run_if(resource_changed::<OfflineTimeBank>),
             update_active_tab_highlight.run_if(state_changed::<GameTab>),
+            update_active_speed_highlight.run_if(resource_changed::<GameSpeed>),
             update_mission_list,
         )
             .run_if(in_state(crate::screens::Screen::Gameplay)),
@@ -267,6 +270,22 @@ fn update_bank_display(
     }
 }
 
+fn update_active_speed_highlight(
+    speed: Res<GameSpeed>,
+    mut buttons: Query<(&SpeedButton, &mut BackgroundColor, &mut InteractionPalette)>,
+) {
+    const ACTIVE: Color = Color::srgb(0.3, 0.5, 0.7);
+    for (btn, mut bg, mut palette) in &mut buttons {
+        let resting = if (speed.0 - btn.0).abs() < 0.01 {
+            ACTIVE
+        } else {
+            BUTTON_BACKGROUND
+        };
+        *bg = BackgroundColor(resting);
+        palette.none = resting;
+    }
+}
+
 fn update_active_tab_highlight(
     tab: Res<State<GameTab>>,
     mut buttons: Query<(&SidebarNavButton, &mut BackgroundColor)>,
@@ -283,20 +302,24 @@ fn update_active_tab_highlight(
 fn update_mission_list(
     mut commands: Commands,
     list_q: Query<Entity, With<SidebarMissionList>>,
-    missions: Query<(Entity, &MissionInfo, &MissionProgress), With<Mission>>,
+    missions: Query<(Entity, &MissionInfo, &MissionProgress, &MissionParty), With<Mission>>,
+    favorite_heroes: Query<(), (With<Hero>, With<Favorite>)>,
     children_q: Query<&Children>,
-    mut last_snapshot: Local<Vec<(Entity, MissionProgress)>>,
+    mut last_snapshot: Local<Vec<(Entity, MissionProgress, bool)>>,
 ) {
     let Ok(list_entity) = list_q.single() else {
         return;
     };
 
     // Build a snapshot of current mission state to detect changes
-    let mut snapshot: Vec<(Entity, MissionProgress)> = missions
+    let mut snapshot: Vec<(Entity, MissionProgress, bool)> = missions
         .iter()
-        .map(|(e, _, p)| (e, *p))
+        .map(|(e, _, p, party)| {
+            let has_favorite = party.0.iter().any(|h| favorite_heroes.get(*h).is_ok());
+            (e, *p, has_favorite)
+        })
         .collect();
-    snapshot.sort_by_key(|(e, _)| *e);
+    snapshot.sort_by_key(|(e, _, _)| *e);
 
     if *last_snapshot == snapshot {
         return; // Nothing changed — keep existing UI with its click observers
@@ -311,17 +334,31 @@ fn update_mission_list(
     }
 
     // Rebuild mission entries
-    for (mission_entity, info, progress) in &missions {
+    for (mission_entity, info, progress, party) in &missions {
+        let has_favorite = party.0.iter().any(|h| favorite_heroes.get(*h).is_ok());
+
         let status_text = match progress {
             MissionProgress::InProgress => "In Progress",
             MissionProgress::Complete => "Complete",
             MissionProgress::Failed => "Failed",
         };
 
-        let bg_color = match progress {
+        let base_bg = match progress {
             MissionProgress::InProgress => Color::srgba(0.2, 0.25, 0.35, 0.8),
             MissionProgress::Complete => Color::srgba(0.15, 0.35, 0.15, 0.8),
             MissionProgress::Failed => Color::srgba(0.35, 0.15, 0.15, 0.8),
+        };
+        let bg_color = if has_favorite {
+            let c = base_bg.to_srgba();
+            Color::srgba(c.red + 0.15, c.green + 0.10, c.blue, 0.9)
+        } else {
+            base_bg
+        };
+
+        let name_text = if has_favorite {
+            format!("★ {}", info.name)
+        } else {
+            info.name.clone()
         };
 
         let entry = div()
@@ -334,7 +371,7 @@ fn update_mission_list(
             .insert(WatchMissionButton(mission_entity))
             .on_click(watch_mission)
             .child(
-                text(&info.name)
+                text(name_text)
                     .font_size(14.0)
                     .color(HEADER_TEXT),
             )
