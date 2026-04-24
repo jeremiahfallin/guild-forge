@@ -9,10 +9,16 @@ use bevy::prelude::*;
 
 use super::status::{Injured, Missing, INJURED_DURATION_SECS};
 use super::{Favorite, HeroInfo};
+use crate::screens::Screen;
 use crate::ui::toast::{ToastEvent, ToastKind};
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, (tick_missing, tick_injured).chain());
+    app.add_systems(
+        Update,
+        (tick_missing, tick_injured)
+            .chain()
+            .run_if(in_state(Screen::Gameplay)),
+    );
 }
 
 fn tick_missing(
