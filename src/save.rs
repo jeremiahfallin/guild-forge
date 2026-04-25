@@ -47,6 +47,12 @@ pub(super) fn plugin(app: &mut App) {
 
 // ── Resources & Events ─────────────────────────────────────────────
 
+/// If a saved Missing timer has less than this many game-seconds remaining
+/// when the save is loaded, restore the hero straight to Injured rather
+/// than letting Missing tick out almost immediately and trigger a return
+/// toast moments after the player loaded.
+const NEAR_EXPIRED_MISSING_THRESHOLD_SECS: f64 = 1.0;
+
 /// Timer that fires an autosave every 300 seconds.
 #[derive(Resource, Debug)]
 pub struct AutosaveTimer(pub f32);
@@ -183,7 +189,18 @@ fn load_save(
         }
         let now = time.elapsed_secs_f64();
         if let Some(rem) = dto.missing_remaining {
-            entity_commands.insert(Missing { expires_at: now + rem });
+            if rem < NEAR_EXPIRED_MISSING_THRESHOLD_SECS {
+                // Save was taken in the final second of Missing — restoring
+                // the tail would just fire the "X has returned" toast moments
+                // after load, which feels like a spurious notification. Skip
+                // the tail and apply Injured directly with a fresh duration.
+                use crate::hero::status::INJURED_DURATION_SECS;
+                entity_commands.insert(Injured {
+                    expires_at: now + INJURED_DURATION_SECS,
+                });
+            } else {
+                entity_commands.insert(Missing { expires_at: now + rem });
+            }
         }
         if let Some(rem) = dto.injured_remaining {
             entity_commands.insert(Injured { expires_at: now + rem });
