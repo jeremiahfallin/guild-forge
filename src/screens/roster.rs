@@ -25,6 +25,7 @@ pub(super) fn plugin(app: &mut App) {
         (
             refresh_roster_on_selection_change.run_if(resource_changed::<SelectedHero>),
             detect_mission_status_changes,
+            tick_status_countdown_refresh,
         )
             // Run after the Missing/Injured tick so the roster sees the
             // post-transition state on the same frame status flips.
@@ -557,6 +558,29 @@ fn refresh_roster_on_selection_change(
 
 fn clear_selection(mut selected: ResMut<SelectedHero>) {
     selected.0 = None;
+}
+
+/// Force a roster rebuild ~once per game-second while any hero has a
+/// Missing or Injured timer running, so countdown labels visibly tick down
+/// instead of sitting stale until the next selection or status change.
+///
+/// Uses `Time<Virtual>` so paused/sped-up game time is respected, and
+/// touches `SelectedHero` to reuse the existing rebuild path.
+fn tick_status_countdown_refresh(
+    mut timer: Local<f32>,
+    time: Res<Time<Virtual>>,
+    has_status: Query<(), Or<(With<Missing>, With<Injured>)>>,
+    mut selected: ResMut<SelectedHero>,
+) {
+    if has_status.is_empty() {
+        *timer = 0.0;
+        return;
+    }
+    *timer += time.delta_secs();
+    if *timer >= 1.0 {
+        *timer = 0.0;
+        selected.set_changed();
+    }
 }
 
 /// Detect when heroes gain or lose `OnMission` and force a roster rebuild
