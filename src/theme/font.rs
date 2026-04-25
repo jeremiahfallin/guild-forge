@@ -8,7 +8,11 @@ use bevy::text::TextFont;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, load_default_font);
-    app.add_systems(Update, apply_default_font);
+    // Run in PostUpdate so text spawned during Update is patched before
+    // layout/glyph computation later in PostUpdate — otherwise the default
+    // FiraMono handle renders for one frame and the UI visibly flickers
+    // whenever a screen rebuilds its text (e.g. Recruiting's 1s refresh).
+    app.add_systems(PostUpdate, apply_default_font);
 }
 
 #[derive(Resource)]
