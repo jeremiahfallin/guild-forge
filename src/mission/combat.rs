@@ -266,18 +266,25 @@ pub fn check_mission_completion(
 
             // Favorite-aware toast title. `favorite_q` is data-less
             // (`With<Favorite>` only) to avoid a HeroInfo access conflict with
-            // the mutable `hero_infos` query above; we look up the name
-            // separately via `hero_infos`.
-            let favorited_name = party.0.iter().find_map(|e| {
-                if favorite_q.get(*e).is_ok() {
-                    hero_infos.get(*e).ok().map(|(hi, _, _, _)| hi.name.clone())
-                } else {
-                    None
+            // the mutable `hero_infos` query above; we look up names
+            // separately via `hero_infos`. All favorited casualties are named
+            // so the player isn't blindsided by a second favorite they didn't
+            // see called out.
+            let favorited_names: Vec<String> = party
+                .0
+                .iter()
+                .filter(|e| favorite_q.get(**e).is_ok())
+                .filter_map(|e| hero_infos.get(*e).ok().map(|(hi, _, _, _)| hi.name.clone()))
+                .collect();
+            let title = match favorited_names.len() {
+                0 => format!("{} — Failed!", info.name),
+                1 => format!("{} is missing!", favorited_names[0]),
+                2 => format!("{} & {} are missing!", favorited_names[0], favorited_names[1]),
+                _ => {
+                    // n>=3: Oxford-style "A, B & C"
+                    let (last, rest) = favorited_names.split_last().unwrap();
+                    format!("{} & {} are missing!", rest.join(", "), last)
                 }
-            });
-            let title = match favorited_name {
-                Some(name) => format!("{name} is missing!"),
-                None => format!("{} — Failed!", info.name),
             };
             commands.trigger(ToastEvent {
                 title,
