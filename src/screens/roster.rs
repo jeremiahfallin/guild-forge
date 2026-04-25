@@ -10,6 +10,7 @@ use crate::{
     hero::{
         Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*,
         status::{Injured, Missing, format_countdown},
+        status_tick::StatusTickSet,
     },
     mission::OnMission,
     screens::GameTab,
@@ -25,6 +26,9 @@ pub(super) fn plugin(app: &mut App) {
             refresh_roster_on_selection_change.run_if(resource_changed::<SelectedHero>),
             detect_mission_status_changes,
         )
+            // Run after the Missing/Injured tick so the roster sees the
+            // post-transition state on the same frame status flips.
+            .after(StatusTickSet)
             .run_if(in_state(GameTab::Roster)),
     );
     app.add_systems(OnExit(GameTab::Roster), clear_selection);
