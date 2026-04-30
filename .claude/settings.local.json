@@ -16,7 +16,10 @@
       "Bash(wc -l /c/Users/bullf/dev/games/guild-forge/src/**/*.rs)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(bevy --version)",
+      "Bash(bevy build *)",
+      "Bash(powershell.exe -Command \"Compress-Archive -Path 'guild-forge-demo' -DestinationPath 'guild-forge-demo.zip' -Force\")"
     ]
   }
 }
