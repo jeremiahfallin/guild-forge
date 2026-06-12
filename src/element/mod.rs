@@ -8,5 +8,5 @@ pub trait Element {
     fn spawn_with_parent(self: Box<Self>, parent: &mut ChildSpawnerCommands);
 }
 
-pub use div::{div, Div};
-pub use text::{text, TextEl};
+pub use div::{Div, div};
+pub use text::{TextEl, text};

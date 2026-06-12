@@ -475,76 +475,192 @@ pub trait Styled: Sized {
 
     // ── Tailwind gap presets (4px base) ──────────────────────────────
 
-    fn gap_0(self) -> Self { self.gap(px(0.0)) }
-    fn gap_0p5(self) -> Self { self.gap(px(2.0)) }
-    fn gap_1(self) -> Self { self.gap(px(4.0)) }
-    fn gap_1p5(self) -> Self { self.gap(px(6.0)) }
-    fn gap_2(self) -> Self { self.gap(px(8.0)) }
-    fn gap_2p5(self) -> Self { self.gap(px(10.0)) }
-    fn gap_3(self) -> Self { self.gap(px(12.0)) }
-    fn gap_3p5(self) -> Self { self.gap(px(14.0)) }
-    fn gap_4(self) -> Self { self.gap(px(16.0)) }
-    fn gap_5(self) -> Self { self.gap(px(20.0)) }
-    fn gap_6(self) -> Self { self.gap(px(24.0)) }
-    fn gap_8(self) -> Self { self.gap(px(32.0)) }
-    fn gap_10(self) -> Self { self.gap(px(40.0)) }
-    fn gap_12(self) -> Self { self.gap(px(48.0)) }
-    fn gap_16(self) -> Self { self.gap(px(64.0)) }
+    fn gap_0(self) -> Self {
+        self.gap(px(0.0))
+    }
+    fn gap_0p5(self) -> Self {
+        self.gap(px(2.0))
+    }
+    fn gap_1(self) -> Self {
+        self.gap(px(4.0))
+    }
+    fn gap_1p5(self) -> Self {
+        self.gap(px(6.0))
+    }
+    fn gap_2(self) -> Self {
+        self.gap(px(8.0))
+    }
+    fn gap_2p5(self) -> Self {
+        self.gap(px(10.0))
+    }
+    fn gap_3(self) -> Self {
+        self.gap(px(12.0))
+    }
+    fn gap_3p5(self) -> Self {
+        self.gap(px(14.0))
+    }
+    fn gap_4(self) -> Self {
+        self.gap(px(16.0))
+    }
+    fn gap_5(self) -> Self {
+        self.gap(px(20.0))
+    }
+    fn gap_6(self) -> Self {
+        self.gap(px(24.0))
+    }
+    fn gap_8(self) -> Self {
+        self.gap(px(32.0))
+    }
+    fn gap_10(self) -> Self {
+        self.gap(px(40.0))
+    }
+    fn gap_12(self) -> Self {
+        self.gap(px(48.0))
+    }
+    fn gap_16(self) -> Self {
+        self.gap(px(64.0))
+    }
 
     // ── Tailwind padding presets (4px base) ──────────────────────────
 
-    fn p_0(self) -> Self { self.p(px(0.0)) }
-    fn p_0p5(self) -> Self { self.p(px(2.0)) }
-    fn p_1(self) -> Self { self.p(px(4.0)) }
-    fn p_1p5(self) -> Self { self.p(px(6.0)) }
-    fn p_2(self) -> Self { self.p(px(8.0)) }
-    fn p_2p5(self) -> Self { self.p(px(10.0)) }
-    fn p_3(self) -> Self { self.p(px(12.0)) }
-    fn p_3p5(self) -> Self { self.p(px(14.0)) }
-    fn p_4(self) -> Self { self.p(px(16.0)) }
-    fn p_5(self) -> Self { self.p(px(20.0)) }
-    fn p_6(self) -> Self { self.p(px(24.0)) }
-    fn p_8(self) -> Self { self.p(px(32.0)) }
-    fn p_10(self) -> Self { self.p(px(40.0)) }
-    fn p_12(self) -> Self { self.p(px(48.0)) }
-    fn p_16(self) -> Self { self.p(px(64.0)) }
+    fn p_0(self) -> Self {
+        self.p(px(0.0))
+    }
+    fn p_0p5(self) -> Self {
+        self.p(px(2.0))
+    }
+    fn p_1(self) -> Self {
+        self.p(px(4.0))
+    }
+    fn p_1p5(self) -> Self {
+        self.p(px(6.0))
+    }
+    fn p_2(self) -> Self {
+        self.p(px(8.0))
+    }
+    fn p_2p5(self) -> Self {
+        self.p(px(10.0))
+    }
+    fn p_3(self) -> Self {
+        self.p(px(12.0))
+    }
+    fn p_3p5(self) -> Self {
+        self.p(px(14.0))
+    }
+    fn p_4(self) -> Self {
+        self.p(px(16.0))
+    }
+    fn p_5(self) -> Self {
+        self.p(px(20.0))
+    }
+    fn p_6(self) -> Self {
+        self.p(px(24.0))
+    }
+    fn p_8(self) -> Self {
+        self.p(px(32.0))
+    }
+    fn p_10(self) -> Self {
+        self.p(px(40.0))
+    }
+    fn p_12(self) -> Self {
+        self.p(px(48.0))
+    }
+    fn p_16(self) -> Self {
+        self.p(px(64.0))
+    }
 
     // ── Tailwind margin presets (4px base) ───────────────────────────
 
-    fn m_0(self) -> Self { self.m(px(0.0)) }
-    fn m_0p5(self) -> Self { self.m(px(2.0)) }
-    fn m_1(self) -> Self { self.m(px(4.0)) }
-    fn m_1p5(self) -> Self { self.m(px(6.0)) }
-    fn m_2(self) -> Self { self.m(px(8.0)) }
-    fn m_2p5(self) -> Self { self.m(px(10.0)) }
-    fn m_3(self) -> Self { self.m(px(12.0)) }
-    fn m_3p5(self) -> Self { self.m(px(14.0)) }
-    fn m_4(self) -> Self { self.m(px(16.0)) }
-    fn m_5(self) -> Self { self.m(px(20.0)) }
-    fn m_6(self) -> Self { self.m(px(24.0)) }
-    fn m_8(self) -> Self { self.m(px(32.0)) }
+    fn m_0(self) -> Self {
+        self.m(px(0.0))
+    }
+    fn m_0p5(self) -> Self {
+        self.m(px(2.0))
+    }
+    fn m_1(self) -> Self {
+        self.m(px(4.0))
+    }
+    fn m_1p5(self) -> Self {
+        self.m(px(6.0))
+    }
+    fn m_2(self) -> Self {
+        self.m(px(8.0))
+    }
+    fn m_2p5(self) -> Self {
+        self.m(px(10.0))
+    }
+    fn m_3(self) -> Self {
+        self.m(px(12.0))
+    }
+    fn m_3p5(self) -> Self {
+        self.m(px(14.0))
+    }
+    fn m_4(self) -> Self {
+        self.m(px(16.0))
+    }
+    fn m_5(self) -> Self {
+        self.m(px(20.0))
+    }
+    fn m_6(self) -> Self {
+        self.m(px(24.0))
+    }
+    fn m_8(self) -> Self {
+        self.m(px(32.0))
+    }
 
     // ── Tailwind width presets (4px base) ────────────────────────────
 
-    fn w_0(self) -> Self { self.w(px(0.0)) }
-    fn w_1(self) -> Self { self.w(px(4.0)) }
-    fn w_2(self) -> Self { self.w(px(8.0)) }
-    fn w_4(self) -> Self { self.w(px(16.0)) }
-    fn w_8(self) -> Self { self.w(px(32.0)) }
-    fn w_16(self) -> Self { self.w(px(64.0)) }
-    fn w_32(self) -> Self { self.w(px(128.0)) }
-    fn w_64(self) -> Self { self.w(px(256.0)) }
+    fn w_0(self) -> Self {
+        self.w(px(0.0))
+    }
+    fn w_1(self) -> Self {
+        self.w(px(4.0))
+    }
+    fn w_2(self) -> Self {
+        self.w(px(8.0))
+    }
+    fn w_4(self) -> Self {
+        self.w(px(16.0))
+    }
+    fn w_8(self) -> Self {
+        self.w(px(32.0))
+    }
+    fn w_16(self) -> Self {
+        self.w(px(64.0))
+    }
+    fn w_32(self) -> Self {
+        self.w(px(128.0))
+    }
+    fn w_64(self) -> Self {
+        self.w(px(256.0))
+    }
 
     // ── Tailwind height presets (4px base) ───────────────────────────
 
-    fn h_0(self) -> Self { self.h(px(0.0)) }
-    fn h_1(self) -> Self { self.h(px(4.0)) }
-    fn h_2(self) -> Self { self.h(px(8.0)) }
-    fn h_4(self) -> Self { self.h(px(16.0)) }
-    fn h_8(self) -> Self { self.h(px(32.0)) }
-    fn h_16(self) -> Self { self.h(px(64.0)) }
-    fn h_32(self) -> Self { self.h(px(128.0)) }
-    fn h_64(self) -> Self { self.h(px(256.0)) }
+    fn h_0(self) -> Self {
+        self.h(px(0.0))
+    }
+    fn h_1(self) -> Self {
+        self.h(px(4.0))
+    }
+    fn h_2(self) -> Self {
+        self.h(px(8.0))
+    }
+    fn h_4(self) -> Self {
+        self.h(px(16.0))
+    }
+    fn h_8(self) -> Self {
+        self.h(px(32.0))
+    }
+    fn h_16(self) -> Self {
+        self.h(px(64.0))
+    }
+    fn h_32(self) -> Self {
+        self.h(px(128.0))
+    }
+    fn h_64(self) -> Self {
+        self.h(px(256.0))
+    }
 }
 
 #[cfg(test)]

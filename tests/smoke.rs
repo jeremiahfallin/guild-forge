@@ -13,11 +13,7 @@ fn full_api_smoke_test() {
         .p_4()
         .bg(slate_900())
         .rounded(px(8.0))
-        .child(
-            text("Hello World")
-                .text_2xl()
-                .color(white()),
-        )
+        .child(text("Hello World").text_2xl().color(white()))
         .child(
             div()
                 .flex()
@@ -51,11 +47,7 @@ fn styled_methods_on_div() {
 /// Verifies Styled trait methods work on TextEl.
 #[test]
 fn styled_methods_on_text() {
-    let t = text("Hello")
-        .text_xl()
-        .color(blue_500())
-        .p_2()
-        .m_1();
+    let t = text("Hello").text_xl().color(blue_500()).p_2().m_1();
 
     let _ = t;
 }

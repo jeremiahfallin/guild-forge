@@ -20,10 +20,7 @@ pub(crate) fn plugin(app: &mut App) {
     app.add_observer(on_out);
 }
 
-fn on_click(
-    click: On<Pointer<Click>>,
-    mut q: Query<(&InteractionPalette, &mut BackgroundColor)>,
-) {
+fn on_click(click: On<Pointer<Click>>, mut q: Query<(&InteractionPalette, &mut BackgroundColor)>) {
     if let Ok((palette, mut bg)) = q.get_mut(click.event_target()) {
         *bg = palette.pressed.into();
     }
@@ -38,19 +35,13 @@ fn on_release(
     }
 }
 
-fn on_over(
-    over: On<Pointer<Over>>,
-    mut q: Query<(&InteractionPalette, &mut BackgroundColor)>,
-) {
+fn on_over(over: On<Pointer<Over>>, mut q: Query<(&InteractionPalette, &mut BackgroundColor)>) {
     if let Ok((palette, mut bg)) = q.get_mut(over.event_target()) {
         *bg = palette.hovered.into();
     }
 }
 
-fn on_out(
-    out: On<Pointer<Out>>,
-    mut q: Query<(&InteractionPalette, &mut BackgroundColor)>,
-) {
+fn on_out(out: On<Pointer<Out>>, mut q: Query<(&InteractionPalette, &mut BackgroundColor)>) {
     if let Ok((palette, mut bg)) = q.get_mut(out.event_target()) {
         *bg = palette.none.into();
     }

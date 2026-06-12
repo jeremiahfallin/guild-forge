@@ -30,9 +30,10 @@ impl TextEl {
 
     /// Insert an arbitrary bundle of components onto this element's entity.
     pub fn insert(mut self, bundle: impl Bundle + Send + Sync + 'static) -> Self {
-        self.insertions.push(Box::new(move |ec: &mut EntityCommands| {
-            ec.insert(bundle);
-        }));
+        self.insertions
+            .push(Box::new(move |ec: &mut EntityCommands| {
+                ec.insert(bundle);
+            }));
         self
     }
 
@@ -47,16 +48,36 @@ impl TextEl {
     }
 
     // Tailwind text size presets
-    pub fn text_xs(self) -> Self { self.font_size(12.0) }
-    pub fn text_sm(self) -> Self { self.font_size(14.0) }
-    pub fn text_base(self) -> Self { self.font_size(16.0) }
-    pub fn text_lg(self) -> Self { self.font_size(18.0) }
-    pub fn text_xl(self) -> Self { self.font_size(20.0) }
-    pub fn text_2xl(self) -> Self { self.font_size(24.0) }
-    pub fn text_3xl(self) -> Self { self.font_size(30.0) }
-    pub fn text_4xl(self) -> Self { self.font_size(36.0) }
-    pub fn text_5xl(self) -> Self { self.font_size(48.0) }
-    pub fn text_6xl(self) -> Self { self.font_size(60.0) }
+    pub fn text_xs(self) -> Self {
+        self.font_size(12.0)
+    }
+    pub fn text_sm(self) -> Self {
+        self.font_size(14.0)
+    }
+    pub fn text_base(self) -> Self {
+        self.font_size(16.0)
+    }
+    pub fn text_lg(self) -> Self {
+        self.font_size(18.0)
+    }
+    pub fn text_xl(self) -> Self {
+        self.font_size(20.0)
+    }
+    pub fn text_2xl(self) -> Self {
+        self.font_size(24.0)
+    }
+    pub fn text_3xl(self) -> Self {
+        self.font_size(30.0)
+    }
+    pub fn text_4xl(self) -> Self {
+        self.font_size(36.0)
+    }
+    pub fn text_5xl(self) -> Self {
+        self.font_size(48.0)
+    }
+    pub fn text_6xl(self) -> Self {
+        self.font_size(60.0)
+    }
 
     pub fn spawn<'a>(self, commands: &'a mut Commands) -> EntityCommands<'a> {
         let text = Text::new(self.content);
