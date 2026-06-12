@@ -4,10 +4,14 @@ authors = ["Jeremiah <jeremiah.fallin@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = ["crates/bevy_declarative"]
+resolver = "3"
+
 [dependencies]
 # Use only features needed for a 2D game to improve compile time and size
 bevy = { version = "0.18", default-features = false, features = ["2d"] }
-bevy_declarative = { path = "../bevy_declarative" }
+bevy_declarative = { path = "crates/bevy_declarative" }
 dirs = "6"
 rand = "0.9"
 ron = "0.9"
