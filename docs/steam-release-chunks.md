@@ -1,6 +1,7 @@
 # Guild Forge — LLM-Tackleable Chunks: Current State → Early Access Launch
 
 > **Created:** 2026-06-11 · grounded in the working tree as verified that day
+> **Verified:** 2026-06-16 · all 26 ticked chunks confirmed present in code (most test-backed); RS-3 found ~75% built (see its note); stale `Touches` pointers on CT-2/CT-4 corrected
 > **Companions:** `finished-product-vision.md` (what & why) · `steam-release-roadmap.md` (when & how to ship) · this doc (what to hand Claude Code next session)
 > **End point:** EA launch (roadmap Phase 4). EA→1.0 content is sketched, not chunked — it will be reshaped by player feedback.
 
@@ -20,48 +21,48 @@
 
 *The critical path. From `combat-feel`. A first slice exists in `src/mission/sequential.rs` (turn queue, dev-only F1 toggle); these chunks take it from slice to shipped default.*
 
-- [ ] **CB-1 · Design-parity turn rules** — bring `sequential.rs` to the written design: move **one tile** or act (not multi-tile `MoveRange` steps), initiative = d20 + DEX **rerolled every round** (replace the deterministic speed sort; keep seeded tie-breaking and the existing unit tests' spirit).
+- [x] **CB-1 · Design-parity turn rules** *(✓ 2026-06-12)* — bring `sequential.rs` to the written design: move **one tile** or act (not multi-tile `MoveRange` steps), initiative = d20 + DEX **rerolled every round** (replace the deterministic speed sort; keep seeded tie-breaking and the existing unit tests' spirit).
   Touches: `src/mission/sequential.rs`, `src/mission/entities.rs` (MoveRange semantics) · Design: combat-feel §6, §8 · Needs: —
   Done when: tests cover per-round reroll and one-tile movement; an F1-toggled mission visibly obeys both.
   Decision inside: confirm d20+DEX over speed-sort (the design argues reroll; the slice disagrees).
 
-- [ ] **CB-2 · Encounter enrollment + tempo split** — encounters begin when action ranges overlap; exploration ticks 4–8 turns/sec, combat 1–2 turns/sec. Replaces the flat 2 Hz `FixedUpdate` tick with a variable turn cadence (keep `Time<Virtual>` speed scaling working).
+- [x] **CB-2 · Encounter enrollment + tempo split** *(✓ 2026-06-12)* — encounters begin when action ranges overlap; exploration ticks 4–8 turns/sec, combat 1–2 turns/sec. Replaces the flat 2 Hz `FixedUpdate` tick with a variable turn cadence (keep `Time<Virtual>` speed scaling working).
   Touches: `src/mission/mod.rs` (tick architecture), `sequential.rs` · Design: combat-feel §4, §5.1 · Needs: CB-1
   Done when: watching a mission, walking is brisk and fights are deliberate, with no camera/mode change — the tempo shift alone signals combat.
 
-- [ ] **CB-3 · Ability data layer** — RON-defined abilities (range, cooldown, effect, AI priority rule) loaded like the existing databases; wire up the currently-unused `starting_abilities` in `classes.ron` (Slash, Fireball, Heal…). Data + validation only, no sim behavior yet.
+- [x] **CB-3 · Ability data layer** *(✓ 2026-06-12)* — RON-defined abilities (range, cooldown, effect, AI priority rule) loaded like the existing databases; wire up the currently-unused `starting_abilities` in `classes.ron` (Slash, Fireball, Heal…). Data + validation only, no sim behavior yet.
   Touches: new `assets/data/abilities.ron`, `src/mission/data.rs`, `src/hero/data.rs` · Design: combat-feel §7 · Needs: —
   Done when: abilities load at startup, every class resolves its kit, malformed data fails loudly in tests.
 
-- [ ] **CB-4 · Cooldown abilities in the sim** — heroes fire their 2–3 short-cooldown abilities on turn-counted cooldowns via per-ability AI priority rules (Cleave at 2+ adjacent, Heal at ally <50%).
+- [x] **CB-4 · Cooldown abilities in the sim** *(✓ 2026-06-12)* — heroes fire their 2–3 short-cooldown abilities on turn-counted cooldowns via per-ability AI priority rules (Cleave at 2+ adjacent, Heal at ally <50%).
   Touches: `sequential.rs`, `src/mission/ai.rs` · Design: combat-feel §7.2 · Needs: CB-1, CB-3
   Done when: in a watched fight each class fires its abilities 1–3 times, cooldowns respected (unit-tested).
 
-- [ ] **CB-5 · Signature moves** — one per class per encounter (Rallying Cry, Mass Heal, Meteor, Shadowstep, Volley), threshold-based timing rules so the AI visibly *saves* it; refreshes between encounters, not turns.
+- [x] **CB-5 · Signature moves** *(✓ 2026-06-12)* — one per class per encounter (Rallying Cry, Mass Heal, Meteor, Shadowstep/Assassinate, Volley), threshold-based timing rules so the AI visibly *saves* it; refreshes between encounters, not turns.
   Touches: `sequential.rs`, `ai.rs`, `abilities.ron` · Design: combat-feel §7.3 · Needs: CB-4
   Done when: a signature fires at most once per encounter at a sensible moment, and a wasted one is impossible.
 
-- [ ] **CB-6 · Traits as visible personality** — connect the existing `ai.rs` score multipliers (6 of 7 traits already steer decisions) to the new turn loop, then add the designed behaviors: Brave rushes the signature, Cautious retreats below 30% HP, Greedy spends a turn on chests, Loner positions away from allies. Give Leader its first mechanical effect.
+- [x] **CB-6 · Traits as visible personality** *(✓ 2026-06-13)* — connect the existing `ai.rs` score multipliers (6 of 7 traits already steer decisions) to the new turn loop, then add the designed behaviors: Brave rushes the signature, Cautious retreats below 30% HP, Greedy spends a turn on chests, Loner positions away from allies. Give Leader its first mechanical effect.
   Touches: `ai.rs`, `sequential.rs` · Design: combat-feel §10, vision §3 · Needs: CB-4, CB-5
   Done when: two same-class heroes with opposite traits are tellable apart in one watched fight.
   Decision inside: what Leader does (party-buff aura is the natural fit).
 
-- [ ] **CB-7 · Enemy kits + real bosses** — `enemies.ron` gains abilities; every difficulty-3+ template ends in a boss with 1–2 telegraphed mechanics (AoE slam heroes scatter from, summoned adds, enrage timer). Retires the "BossRat is just 40 HP" era.
+- [x] **CB-7 · Enemy kits + real bosses** *(✓ 2026-06-13)* — `enemies.ron` gains abilities; every difficulty-3+ template ends in a boss with 1–2 telegraphed mechanics (AoE slam heroes scatter from, summoned adds, enrage timer). Retires the "BossRat is just 40 HP" era.
   Touches: `assets/data/enemies.ron`, `sequential.rs`, `ai.rs`, `dungeon.rs` (boss room) · Design: vision §5.3 · Needs: CB-3, CB-4
   Done when: a boss fight is visually and mechanically distinct from a room of trash mobs.
 
-- [ ] **CB-8 · Retire the simultaneous mode** — make Sequential the only player-facing sim. Keep the shared systems (`handle_death_system`, `update_room_status`, `check_mission_completion`), delete or dev-gate the walk-up combat systems and the F1 toggle, and migrate the serialized `SimulationMode` out of saves.
+- [x] **CB-8 · Retire the simultaneous mode** *(✓ 2026-06-13)* — make Sequential the only player-facing sim. Keep the shared systems (`handle_death_system`, `update_room_status`, `check_mission_completion`), delete or dev-gate the walk-up combat systems and the F1 toggle, and migrate the serialized `SimulationMode` out of saves.
   Touches: `src/mission/mod.rs`, `combat.rs`, `dev_tools.rs`, `save.rs` · Needs: CB-1–CB-5 stable, TI-2 (save migration)
   Done when: a release build runs turn-based by default and an old save loads cleanly.
   Decision inside: hard-delete the old mode vs. keep it dev-only for A/B comparison.
 
 ## UX — Watchability
 
-- [ ] **UX-1 · Combat log / mission feed** — **do this first.** A scrolling, DM-voiced feed in the mission view ("Sera shadowsteps behind the orc — 17 damage!"), driven by sim events with string templates in RON. Emit from the *current* sim today; it gets richer as CB lands, and later becomes the Field Report's data source.
+- [x] **UX-1 · Combat log / mission feed** *(✓ 2026-06-12)* — **do this first.** A scrolling, DM-voiced feed in the mission view ("Sera shadowsteps behind the orc — 17 damage!"), driven by sim events with string templates in RON. Emit from the *current* sim today; it gets richer as CB lands, and later becomes the Field Report's data source.
   Touches: new feed module under `src/ui/`, `src/screens/mission_view.rs`, event emission in `combat.rs`/`sequential.rs` · Design: vision §5.4 · Needs: —
   Done when: a full mission reads as a story — attacks, crits, deaths, loot, room entries all narrated.
 
-- [ ] **UX-2 · Hit feedback** — floating damage numbers, hit-flash, death poof, knockback nudge on the mission-view proxies; screen shake reserved for signature moves (that part lands with CB-5).
+- [x] **UX-2 · Hit feedback** *(✓ 2026-06-12)* — floating damage numbers, hit-flash, death poof, knockback nudge on the mission-view proxies; screen shake reserved for signature moves (that part lands with CB-5).
   Touches: `mission_view.rs`, `entities.rs` (proxy sync), `tileset.rs` · Design: vision §10.2 · Needs: — (shake part: CB-5)
   Done when: every hit is visible without reading the log.
 
@@ -75,26 +76,27 @@
 
 ## CT — Content & Variance
 
-- [ ] **CT-1 · Mission modifiers** — data-driven modifiers from the GDD (Foggy, Infested, Cursed Ground, Bountiful + Trapped): template field, generation roll, sim effect, badge on the mission board.
+- [x] **CT-1 · Mission modifiers** *(✓ 2026-06-13)* — data-driven modifiers from the GDD (Foggy, Infested, Cursed Ground, Bountiful + Trapped): template field, generation roll, sim effect, badge on the mission board.
   Touches: `assets/data/mission_templates.ron`, `src/mission/data.rs`, `dungeon.rs`, `src/screens/missions.rs` · Design: GDD §4.3, vision §5.1 · Needs: —
   Done when: generated missions roll 0–2 modifiers and each one demonstrably changes a run.
 
-- [ ] **CT-2 · Mid-mission events engine** — events fire 0–2× per mission, resolve via trait-and-stat checks, and *which hero* triggers them follows personality (Greedy touches the shrine). RON-defined, narrated through the feed.
-  Touches: new `src/mission/events.rs`, `assets/data/events.ron`, `ai.rs` hooks · Design: vision §5.2 · Needs: UX-1; richer after CB-1
+- [x] **CT-2 · Mid-mission events engine** *(✓ 2026-06-14)* — events fire 0–2× per mission, resolve via trait-and-stat checks, and *which hero* triggers them follows personality (Greedy touches the shrine). RON-defined, narrated through the feed.
+  Touches: `assets/data/events.ron` + defs/DB in `src/mission/data.rs`, firing in `sequential.rs`, chronicle in `hero/mod.rs` (the planned `src/mission/events.rs` was never created — logic landed in those files instead) · Design: vision §5.2 · Needs: UX-1; richer after CB-1
   Done when: shrine/ambush/hidden-chamber events fire, resolve by check, and read clearly in the feed.
 
-- [ ] **CT-3 · Event content pack** — ~12–15 events across themes: wandering merchant, collapsed floor splits the party, rival-guild party cameo, cursed fountain. Pure data + flavor writing on the CT-2 engine. A good low-energy session.
+- [x] **CT-3 · Event content pack** *(✓ 2026-06-14)* — ~12–15 events across themes: wandering merchant, collapsed floor splits the party, rival-guild party cameo, cursed fountain. Pure data + flavor writing on the CT-2 engine. A good low-energy session.
   Touches: `events.ron` · Needs: CT-2
 
-- [ ] **CT-4 · Second biome** — crypt or forest tileset wired through the existing autotile bitmask system, an enemy-family mapping, and template binding. Code/data are LLM work against placeholder art until the commissioned set lands.
-  Touches: `src/mission/tileset.rs`, `dungeon.rs`, RON files · Design: vision §5.1 · Needs: — (final art: appendix)
+- [x] **CT-4 · Second biome** *(✓ 2026-06-14)* — crypt or forest tileset wired through the existing autotile bitmask system, an enemy-family mapping, and template binding. Code/data are LLM work against placeholder art until the commissioned set lands.
+  Touches: enemy-family mapping + template binding in `src/mission/data.rs`, biome tile-tint in `mission_view.rs`, RON files · Design: vision §5.1 · Needs: — (final art: appendix)
   Done when: two visually and ecologically distinct biomes generate from templates.
+  Note (2026-06-16): visual differentiation is currently a per-biome tile *tint* in `mission_view.rs` (Crypt → purple), not a distinct autotile set in `tileset.rs` as the chunk text implies — revisit when commissioned art lands.
 
-- [ ] **CT-5 · Enemy roster to 8–10 with behaviors** — new enemy entries plus per-enemy AI knobs (skirmisher kites, swarmers flood, shaman heals). Pairs with CB-7 kits.
+- [x] **CT-5 · Enemy roster to 8–10 with behaviors** *(✓ 2026-06-14)* — new enemy entries plus per-enemy AI knobs (skirmisher kites, swarmers flood, shaman heals). Pairs with CB-7 kits.
   Touches: `enemies.ron`, `ai.rs` · Design: roadmap Phase 1 minimums · Needs: CB-4 (for kit-based behaviors)
   Done when: the demo's enemies are tellable apart by behavior in the feed and on screen.
 
-- [ ] **CT-6 · Gear rarity + behavioral affixes (first pass)** — rarity tiers Common→Legendary (GDD), one behavioral affix slot on Rare+ items (lifesteal, +initiative, cleave-on-hit) hooked into the ability system; legendary drops announced as events. This is the roadmap's "loot decisions feel interesting" bar.
+- [x] **CT-6 · Gear rarity + behavioral affixes (first pass)** *(✓ 2026-06-14)* — rarity tiers Common→Legendary (GDD), one behavioral affix slot on Rare+ items (lifesteal, +initiative, cleave-on-hit) hooked into the ability system; legendary drops announced as events. This is the roadmap's "loot decisions feel interesting" bar.
   Touches: `src/equipment.rs`, `assets/data/equipment.ron`, loot resolution, feed · Design: GDD §4.1, vision §8 · Needs: CB-3, CB-4, UX-1
   Done when: a watched legendary drop changes what the hero visibly does next fight.
 
@@ -103,36 +105,37 @@
 
 ## HR — Heroes & Attachment
 
-- [ ] **HR-1 · Chronicle data layer** — per-hero history (missions, kills, near-deaths, rescues given/received, lifetime gold, signature moments) captured from the UX-1 event stream and persisted in saves.
+- [x] **HR-1 · Chronicle data layer** *(✓ 2026-06-14)* — per-hero history (missions, kills, near-deaths, rescues given/received, lifetime gold, signature moments) captured from the UX-1 event stream and persisted in saves.
   Touches: `src/hero/mod.rs`, `src/save.rs` · Design: vision §4.2 · Needs: UX-1, TI-2 (schema change)
   Done when: history accumulates across missions and survives save/load.
 
-- [ ] **HR-2 · Career timeline UI** — scrollable timeline on the hero sheet ("Day 12: sole survivor of the Skeleton Crypt wipe").
+- [x] **HR-2 · Career timeline UI** *(✓ 2026-06-14)* — scrollable timeline on the hero sheet ("Day 12: sole survivor of the Skeleton Crypt wipe").
   Touches: `src/screens/roster.rs` (or new hero-sheet screen) · Needs: HR-1
 
-- [ ] **HR-3 · Epithets** — milestone rules grant titles (*Slimebane*, *the Twice-Lost*) auto-displayed everywhere the name renders: roster, feed, toasts.
+- [x] **HR-3 · Epithets** *(✓ 2026-06-14)* — milestone rules grant titles (*Slimebane*, *the Twice-Lost*) auto-displayed everywhere the name renders: roster, feed, toasts.
   Touches: `hero/mod.rs`, name-rendering call sites · Design: vision §4.2 · Needs: HR-1
   Done when: a kill-count epithet triggers mid-session and shows up in the next feed line.
 
-- [ ] **HR-4 · Portraits** — layered pixel-portrait compositor (base/hair/gear slots) rendering on roster, hero sheet, and feed. Compositor + integration are LLM work; the layer art is human-led (appendix).
+- [x] **HR-4 · Portraits** *(✓ 2026-06-14)* — layered pixel-portrait compositor (base/hair/gear slots) rendering on roster, hero sheet, and feed. Compositor + integration are LLM work; the layer art is human-led (appendix).
   Touches: new portrait module, `roster.rs`, feed · Design: vision §4.1 · Needs: — (final art: appendix)
 
-- [ ] **HR-5 · Veteran perks** — small history-earned passives ("survived 3 rescues: +10% HP"), capped, shown on the hero sheet.
+- [x] **HR-5 · Veteran perks** *(✓ 2026-06-14)* — small history-earned passives ("survived 3 rescues: +10% HP"), capped, shown on the hero sheet.
   Touches: `hero/mod.rs`, stat resolution · Design: vision §4.3 · Needs: HR-1
 
 ## RS — Rescue Missions *(demo scope, decided 2026-06-11)*
 
-- [ ] **RS-1 · Rescue generation + Missing semantics** — a wipe auto-generates a rescue mission into the same dungeon (same seed/layout) that must succeed before the Missing timer expires.
+- [x] **RS-1 · Rescue generation + Missing semantics** *(✓ 2026-06-15)* — a wipe auto-generates a rescue mission into the same dungeon (same seed/layout) that must succeed before the Missing timer expires.
   Touches: mission generation, `src/hero/status.rs`, `status_tick.rs`, `save.rs` · Design: scale §8, vision §7 · Needs: —
   Done when: wiping a party immediately offers a runnable rescue with a live countdown.
   Decision inside: what expiry without rescue means — today Missing softens to Injured; the scale doc implies lost-forever. (Middle path: un-rescued heroes still soften to Injured for the demo; lost-forever + memorial arrives in EA.)
 
-- [ ] **RS-2 · Rescue beats** — the lost party's trail, campsite, and dropped gear appear as events in the rescue run; recovering gear closes the loss loop.
+- [x] **RS-2 · Rescue beats** *(✓ 2026-06-15)* — the lost party's trail, campsite, and dropped gear appear as events in the rescue run; recovering gear closes the loss loop.
   Touches: `events.ron`, rescue generation · Design: vision §7 · Needs: RS-1, CT-2
 
 - [ ] **RS-3 · Rescue UX** — the wipe toast becomes actionable ("Mount rescue"), a priority card pins to the mission board, party select shows the countdown, and resolution writes chronicle entries for rescuers and rescued.
   Touches: `ui/toast.rs`, `missions.rs`, `party_select.rs` · Needs: RS-1; chronicle entries need HR-1
   Done when: the whole loop — wipe, alarm, rescue, reunion — plays without touching a menu you didn't expect.
+  Progress (2026-06-16): UX scaffolding done — actionable "Mount Rescue" toast (`ToastAction::MountRescue`, `ui/toast.rs`), rescue offers pinned atop the mission board with countdown + rescuee names (`missions.rs`), party-select countdown (`party_select.rs`). Remaining: rescue *resolution* writes no chronicle entries — `rescues_given`/`rescues_received` are never incremented on a successful rescue (only set in tests). Finish that bookkeeping (+ rescuer/rescued timeline lines) to close the chunk.
 
 ## FT — First-Time Experience
 
@@ -144,15 +147,15 @@
 
 ## TI — Tech Foundations
 
-- [ ] **TI-1 · Fix the `bevy_declarative` dependency** — vendor into a workspace, pin a git rev, or publish; a clean clone must build in CI. **Blocks anyone else ever building the game — do early.**
+- [x] **TI-1 · Fix the `bevy_declarative` dependency** *(✓ 2026-06-12 — vendored via git subtree into `crates/bevy_declarative`; standalone repo archived)* — vendor into a workspace, pin a git rev, or publish; a clean clone must build in CI. **Blocks anyone else ever building the game — do early.**
   Touches: `Cargo.toml`, CI · Design: roadmap Phase 0 · Needs: —
 
-- [ ] **TI-2 · Save versioning + migration + backup** — version field, migration registry, write-then-rename with `.bak`, corrupt-load fallback. Every schema-touching chunk (CB-8, HR-1, RS-1) leans on this; breaking saves is the #1 EA review killer.
+- [x] **TI-2 · Save versioning + migration + backup** *(✓ 2026-06-12 — version field, migration registry, write-then-rename with .bak, corrupt-load fallback)* — Every schema-touching chunk (CB-8, HR-1, RS-1) leans on this; breaking saves is the #1 EA review killer.
   Touches: `src/save.rs` · Design: roadmap §9 · Needs: — · **Do before HR-1/CB-8 merge.**
   Done when: a deliberately old-versioned save migrates; a corrupted file falls back without a crash.
 
-- [ ] **TI-3 · Crash reporting** — panic hook writing a log (version + recent log ring) plus a dialog pointing to Discord/issues.
-  Touches: `main.rs`, new module · Design: roadmap §9 · Needs: —
+- [x] **TI-3 · Crash reporting** *(✓ 2026-06-12 — panic hook writing a log, version + recent log ring, RFD popup dialog)* — panic hook writing a log (version + recent log ring) plus a dialog pointing to Discord/issues.
+  Touches: `main.rs`, `src/crash_reporting.rs` · Design: roadmap §9 · Needs: —
 
 - [ ] **TI-4 · Settings completeness** — resolution/fullscreen, separate music/SFX volume buses, key rebinding if feasible.
   Touches: `src/menus/settings.rs`, `audio.rs` · Design: roadmap Phase 1 · Needs: —
