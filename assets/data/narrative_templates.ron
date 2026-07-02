@@ -1,0 +1,45 @@
+(
+    attack_hit: [
+        "{attacker} strikes {defender} for {damage} damage!",
+        "{attacker} swings their weapon at {defender}, dealing {damage} damage.",
+        "A swift blow from {attacker} hits {defender} for {damage} damage.",
+    ],
+    attack_crit: [
+        "{attacker} lands a devastating critical hit on {defender} for {damage} damage!",
+        "A critical strike! {attacker} plunges their blade into {defender} for {damage} damage!",
+        "{attacker} finds a weak spot in {defender}'s guard — {damage} critical damage!",
+    ],
+    attack_miss: [
+        "{attacker} swings at {defender} but misses!",
+        "{attacker}'s attack on {defender} is deflected!",
+        "{attacker} strikes at {defender} but finds only air.",
+    ],
+    heal: [
+        "{healer} channels healing energy to {target}, restoring {amount} HP!",
+        "{healer} mends {target}'s wounds for {amount} HP.",
+        "A soothing light surrounds {target} as {healer} heals them for {amount} HP.",
+    ],
+    death_hero: [
+        "{name} collapses in battle! The party is in peril!",
+        "{name} has fallen!",
+        "{name} succumbs to their wounds.",
+    ],
+    death_enemy: [
+        "{name} has been defeated!",
+        "{name} falls to the floor, vanquished.",
+        "The {name} collapses, lifeless.",
+    ],
+    room_entry: [
+        "{hero} leads the party into the {room}.",
+        "The party follows {hero} into the {room}.",
+        "{hero} opens the door to the {room}.",
+    ],
+    mission_complete: [
+        "Mission accomplished! The party returns victorious, securing {gold} gold and {xp} XP!",
+        "Victory! The dungeon has been conquered. The heroes earn {gold} gold and {xp} XP.",
+    ],
+    mission_failed: [
+        "Defeat! The party has been wiped out. The heroes are lost.",
+        "All heroes have fallen. The mission ends in failure.",
+    ],
+)

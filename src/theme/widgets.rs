@@ -56,7 +56,7 @@ pub fn content_area(name: impl Into<Cow<'static, str>>) -> Div {
         .col()
         .flex_1()
         .h_full()
-        .items_center()
+        .items_stretch()
         .gap(px(20.0))
         .overflow_y_hidden()
         .insert((Name::new(name), Pickable::IGNORE))
@@ -64,7 +64,7 @@ pub fn content_area(name: impl Into<Cow<'static, str>>) -> Div {
 
 /// A simple header label. Bigger than [`label`].
 pub fn header(content: impl Into<String>) -> TextEl {
-    text(content).font_size(40.0).color(HEADER_TEXT)
+    text(content).font_size(32.0).color(HEADER_TEXT)
 }
 
 /// A simple text label.

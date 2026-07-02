@@ -12,6 +12,9 @@ mod roster;
 mod sidebar;
 mod splash;
 mod title;
+mod title_embers;
+
+pub use title_embers::{EmberSettings, EmberGlowTexture};
 
 use bevy::prelude::*;
 
@@ -32,6 +35,7 @@ pub(super) fn plugin(app: &mut App) {
         sidebar::plugin,
         splash::plugin,
         title::plugin,
+        title_embers::plugin,
     ));
 }
 

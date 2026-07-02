@@ -136,37 +136,34 @@ fn build_recruiting_ui(
 
         let time_str = format_time(applicant.time_remaining);
 
-        let mut card = div()
+        let mut details_col = div()
             .col()
-            .w_full()
-            .p(px(12.0))
-            .gap(px(6.0))
-            .bg(Color::srgba(0.2, 0.2, 0.3, 0.6))
-            .rounded(px(6.0));
+            .flex_1()
+            .gap(px(6.0));
 
         // Name and class
-        card = card.child(
+        details_col = details_col.child(
             text(format!("{} - {}", applicant.name, applicant.class))
                 .font_size(22.0)
                 .color(HEADER_TEXT),
         );
 
         // Traits
-        card = card.child(
+        details_col = details_col.child(
             text(format!("Traits: {}", traits_str))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
         );
 
         // Stats
-        card = card.child(
+        details_col = details_col.child(
             text(stats_str)
                 .font_size(14.0)
                 .color(LABEL_TEXT),
         );
 
         // Cost and timer row + hire button
-        card = card.child(
+        details_col = details_col.child(
             div()
                 .row()
                 .w_full()
@@ -200,6 +197,31 @@ fn build_recruiting_ui(
                 ),
         );
 
+        let mut card = div()
+            .row()
+            .w_full()
+            .p(px(12.0))
+            .gap(px(12.0))
+            .items_center()
+            .bg(CARD_BACKGROUND)
+            .rounded(px(8.0))
+            .insert(BorderColor::all(BORDER_IRON));
+        card.style_mut().border = UiRect::all(Val::Px(1.5));
+
+        if let Some(ref portrait_handle) = applicant.portrait_handle {
+            card = card.child(
+                div()
+                    .size(px(64.0))
+                    .bg(Color::srgb(0.08, 0.08, 0.1))
+                    .rounded(px(4.0))
+                    .insert(ImageNode {
+                        image: portrait_handle.clone(),
+                        ..default()
+                    })
+            );
+        }
+
+        card = card.child(details_col);
         content = content.child(card);
     }
 

@@ -1,7 +1,7 @@
 //! Equipment system: gear definitions, crafting, and combat bonuses.
 
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
@@ -16,6 +16,37 @@ pub enum GearSlot {
     Weapon,
     Armor,
     Accessory,
+}
+
+/// Tiers of gear rarity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, Reflect, Default)]
+pub enum GearRarity {
+    #[default]
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+    Legendary,
+}
+
+impl GearRarity {
+    pub fn stat_multiplier(&self) -> f32 {
+        match self {
+            Self::Common => 1.0,
+            Self::Uncommon => 1.2,
+            Self::Rare => 1.5,
+            Self::Epic => 2.0,
+            Self::Legendary => 2.5,
+        }
+    }
+}
+
+/// Behavioral affixes that modify simulation actions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Reflect)]
+pub enum BehavioralAffix {
+    Lifesteal,
+    Initiative,
+    CleaveOnHit,
 }
 
 impl GearSlot {
@@ -88,8 +119,16 @@ impl EquipmentDatabase {
 #[reflect(Component)]
 pub struct HeroEquipment {
     pub weapon_tier: u32,
+    pub weapon_rarity: GearRarity,
+    pub weapon_affix: Option<BehavioralAffix>,
+
     pub armor_tier: u32,
+    pub armor_rarity: GearRarity,
+    pub armor_affix: Option<BehavioralAffix>,
+
     pub accessory_tier: u32,
+    pub accessory_rarity: GearRarity,
+    pub accessory_affix: Option<BehavioralAffix>,
 }
 
 impl HeroEquipment {
@@ -111,7 +150,14 @@ impl HeroEquipment {
         }
     }
 
-    /// Sum up all stat bonuses from equipped gear tiers.
+    /// Check if the hero has the specified affix on any gear slot.
+    pub fn has_affix(&self, affix: BehavioralAffix) -> bool {
+        self.weapon_affix == Some(affix)
+            || self.armor_affix == Some(affix)
+            || self.accessory_affix == Some(affix)
+    }
+
+    /// Sum up all stat bonuses from equipped gear tiers, applying rarity multipliers.
     pub fn total_stats(&self, db: &EquipmentDatabase, class: HeroClass) -> GearStats {
         let mut total = GearStats::default();
         for &slot in GearSlot::ALL {
@@ -122,9 +168,15 @@ impl HeroEquipment {
             if let Some(path) = db.get_path(class, slot) {
                 // Tiers are 1-indexed in the data; vec is 0-indexed
                 if let Some(gear_tier) = path.tiers.get((tier - 1) as usize) {
-                    total.attack += gear_tier.stats.attack;
-                    total.defense += gear_tier.stats.defense;
-                    total.hp += gear_tier.stats.hp;
+                    let rarity = match slot {
+                        GearSlot::Weapon => self.weapon_rarity,
+                        GearSlot::Armor => self.armor_rarity,
+                        GearSlot::Accessory => self.accessory_rarity,
+                    };
+                    let mult = rarity.stat_multiplier();
+                    total.attack += (gear_tier.stats.attack as f32 * mult).round() as i32;
+                    total.defense += (gear_tier.stats.defense as f32 * mult).round() as i32;
+                    total.hp += (gear_tier.stats.hp as f32 * mult).round() as i32;
                 }
             }
         }
@@ -210,6 +262,7 @@ fn handle_craft_gear(
         title: format!("Crafted {}!", tier_def.name),
         body: format!("Equipped to {}", info.name),
         kind: crate::ui::toast::ToastKind::Success,
+        action: None,
     });
 
     info!(
@@ -229,6 +282,9 @@ fn load_equipment_database(mut commands: Commands) {
 }
 
 pub(super) fn plugin(app: &mut App) {
+    app.register_type::<HeroEquipment>();
+    app.register_type::<GearRarity>();
+    app.register_type::<BehavioralAffix>();
     app.add_systems(Startup, load_equipment_database);
     app.add_observer(handle_craft_gear);
 }

@@ -8,9 +8,11 @@ use bevy_declarative::style::values::{pct, px};
 
 use crate::{
     hero::{
-        Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, data::*,
+        Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, Fatigue, data::*,
         status::{Injured, Missing, format_countdown},
         status_tick::StatusTickSet,
+        HeroHistory,
+        Epithet, format_hero_name, portrait::HeroPortraitImage,
     },
     mission::OnMission,
     screens::GameTab,
@@ -47,6 +49,12 @@ struct RosterUi;
 #[derive(Component)]
 struct DetailPanel;
 
+#[derive(Component)]
+struct RosterListScroll;
+
+#[derive(Component)]
+struct DetailPanelScroll;
+
 fn spawn_roster(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
@@ -54,17 +62,21 @@ fn spawn_roster(
         (
             Entity,
             &HeroInfo,
+            &HeroStats,
             Option<&OnMission>,
             Has<Favorite>,
             Has<PersonallyManaged>,
             Option<&Missing>,
             Option<&Injured>,
+            &Fatigue,
+            Option<&Epithet>,
+            Option<&HeroPortraitImage>,
         ),
         With<Hero>,
     >,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>, &Fatigue, Option<&HeroHistory>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     time: Res<Time<Virtual>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
@@ -79,8 +91,8 @@ fn spawn_roster(
         .child(widgets::header("Roster"));
 
     // Main content: two-panel layout
-    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64());
-    let detail = build_detail_panel(&selected, &hero_query, &trait_db);
+    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64(), 0.0);
+    let detail = build_detail_panel(&selected, &hero_query, &trait_db, 0.0);
 
     let content = div()
         .row()
@@ -111,25 +123,30 @@ fn build_hero_list(
         (
             Entity,
             &HeroInfo,
+            &HeroStats,
             Option<&OnMission>,
             Has<Favorite>,
             Has<PersonallyManaged>,
             Option<&Missing>,
             Option<&Injured>,
+            &Fatigue,
+            Option<&Epithet>,
+            Option<&HeroPortraitImage>,
         ),
         With<Hero>,
     >,
     selected: &SelectedHero,
     now: f64,
+    saved_scroll_y: f32,
 ) -> Div {
     let mut list = div()
         .col()
-        .w(pct(30.0))
+        .w(px(380.0))
         .h_full()
         .min_h(px(0.0))
         .gap(px(8.0))
         .overflow_y_scroll()
-        .insert((Name::new("Hero List"), ScrollPosition::default()));
+        .insert((Name::new("Hero List"), RosterListScroll, ScrollPosition(Vec2::new(0.0, saved_scroll_y))));
 
     list = list.child(
         text("Heroes")
@@ -141,39 +158,47 @@ fn build_hero_list(
     let hero_vec: Vec<(
         Entity,
         &HeroInfo,
+        &HeroStats,
         Option<&OnMission>,
         bool,
         bool,
         Option<Missing>,
         Option<Injured>,
+        &Fatigue,
+        Option<&Epithet>,
+        Option<&HeroPortraitImage>,
     )> = heroes
         .iter()
-        .map(|(e, i, om, is_fav, is_managed, missing, injured)| {
-            (e, i, om, is_fav, is_managed, missing.copied(), injured.copied())
+        .map(|(e, i, s, om, is_fav, is_managed, missing, injured, f, ep, port)| {
+            (e, i, s, om, is_fav, is_managed, missing.cloned(), injured.copied(), f, ep, port)
         })
         .collect();
     let indexed: Vec<(bool, usize)> = hero_vec
         .iter()
         .enumerate()
-        .map(|(i, (_, _, _, is_fav, _, _, _))| (*is_fav, i))
+        .map(|(i, (_, _, _, _, is_fav, ..))| (*is_fav, i))
         .collect();
     let order = sort_favorites_first(&indexed);
 
     for i in order {
-        let (entity, info, on_mission, is_favorite, is_managed, missing, injured) = hero_vec[i];
+        let (entity, info, stats, on_mission, is_favorite, is_managed, missing, injured, fatigue, epithet, portrait_img) = hero_vec[i].clone();
         let is_selected = selected.0 == Some(entity);
         let is_on_mission = on_mission.is_some();
 
         let bg_color = if missing.is_some() {
-            Color::srgba(0.35, 0.2, 0.2, 0.5) // dim red-gray
+            Color::srgba(0.35, 0.15, 0.15, 0.6) // dim red-gray
         } else if injured.is_some() {
-            Color::srgba(0.3, 0.25, 0.15, 0.5) // dim amber
+            Color::srgba(0.32, 0.22, 0.12, 0.6) // dim amber
         } else if is_on_mission {
-            Color::srgba(0.3, 0.3, 0.3, 0.4) // Grayed out
-        } else if is_selected {
-            Color::srgba(0.275, 0.400, 0.750, 0.8)
+            Color::srgba(0.18, 0.18, 0.22, 0.45) // Grayed out
         } else {
-            Color::srgba(0.2, 0.2, 0.3, 0.6)
+            CARD_BACKGROUND
+        };
+
+        let border_color = if is_selected {
+            BORDER_GOLD
+        } else {
+            BORDER_IRON
         };
 
         let name_color = if is_on_mission {
@@ -217,79 +242,132 @@ fn build_hero_list(
             Color::srgba(0.5, 0.5, 0.5, 0.5)
         };
 
-        list = list.child(
-            div()
-                .row()
-                .w_full()
-                .p(px(12.0))
-                .gap(px(12.0))
-                .items_center()
-                .bg(bg_color)
-                .rounded(px(6.0))
-                .insert(SelectHeroButton(entity))
-                .on_click(select_hero)
-                .child(
-                    div()
-                        .col()
-                        .flex_1()
-                        .child(
-                            text(&info.name)
-                                .font_size(22.0)
-                                .color(name_color),
-                        )
-                        .child(
-                            text(class_text)
-                                .font_size(16.0)
-                                .color(LABEL_TEXT),
-                        ),
-                )
-                .child(
-                    div()
-                        .col()
-                        .gap(px(4.0))
-                        .items_center()
-                        .child(
-                            div()
-                                .p(px(4.0))
-                                .rounded(px(4.0))
-                                .items_center()
-                                .justify_center()
-                                .insert((Button, ToggleFavoriteButton(entity)))
-                                .on_click(toggle_favorite)
-                                .interaction_palette(
-                                    Color::NONE,
-                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
-                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
-                                )
-                                .child(
-                                    text(star_glyph)
-                                        .font_size(20.0)
-                                        .color(star_color)
-                                        .insert(Pickable::IGNORE),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .p(px(4.0))
-                                .rounded(px(4.0))
-                                .items_center()
-                                .justify_center()
-                                .insert((Button, ToggleManagedButton(entity)))
-                                .on_click(toggle_managed)
-                                .interaction_palette(
-                                    Color::NONE,
-                                    Color::srgba(1.0, 1.0, 1.0, 0.10),
-                                    Color::srgba(1.0, 1.0, 1.0, 0.18),
-                                )
-                                .child(
-                                    text(pin_glyph)
-                                        .font_size(16.0)
-                                        .color(pin_color)
-                                        .insert(Pickable::IGNORE),
-                                ),
-                        ),
-                ),
-        );
+        let max_stamina = fatigue.max(info.level, stats.constitution);
+        let stamina_pct = (fatigue.current / max_stamina * 100.0).clamp(0.0, 100.0);
+        let is_exhausted = fatigue.current <= 0.0;
+        let stamina_bar_color = if is_exhausted {
+            Color::srgb(0.9, 0.2, 0.2)
+        } else if fatigue.current < 25.0 {
+            Color::srgb(0.9, 0.6, 0.2)
+        } else {
+            Color::srgb(0.2, 0.8, 0.4)
+        };
+
+        let mut card = div()
+            .row()
+            .w_full()
+            .p(px(12.0))
+            .gap(px(12.0))
+            .items_center()
+            .bg(bg_color)
+            .rounded(px(8.0))
+            .insert((SelectHeroButton(entity), BorderColor::all(border_color)))
+            .on_click(select_hero);
+        card.style_mut().border = UiRect::all(Val::Px(1.5));
+
+        if let Some(portrait_image) = portrait_img {
+            card = card.child(
+                div()
+                    .size(px(44.0))
+                    .bg(Color::srgb(0.08, 0.08, 0.1))
+                    .rounded(px(4.0))
+                    .insert(ImageNode {
+                        image: portrait_image.0.clone(),
+                        ..default()
+                    })
+            );
+        }
+
+        card = card
+            .child(
+                div()
+                    .col()
+                    .flex_1()
+                    .child(
+                        text(format_hero_name(&info.name, epithet))
+                            .font_size(22.0)
+                            .color(name_color),
+                    )
+                    .child(
+                        text(class_text)
+                            .font_size(16.0)
+                            .color(LABEL_TEXT),
+                    )
+                    .child(
+                        div()
+                            .row()
+                            .items_center()
+                            .gap(px(6.0))
+                            .child(
+                                text(format!("Stamina: {:.0}%", stamina_pct))
+                                    .font_size(12.0)
+                                    .color(LABEL_TEXT)
+                                    .w(px(85.0)),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .h(px(6.0))
+                                    .bg(Color::srgba(0.1, 0.1, 0.15, 0.8))
+                                    .rounded(px(2.0))
+                                    .child(
+                                        div()
+                                            .w(pct(stamina_pct))
+                                            .h_full()
+                                            .bg(stamina_bar_color)
+                                            .rounded(px(2.0)),
+                                    ),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .col()
+                    .gap(px(4.0))
+                    .items_center()
+                    .child(
+                        div()
+                            .p(px(4.0))
+                            .rounded(px(4.0))
+                            .items_center()
+                            .justify_center()
+                            .insert((Button, ToggleFavoriteButton(entity)))
+                            .on_click(toggle_favorite)
+                            .interaction_palette(
+                                Color::NONE,
+                                Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                Color::srgba(1.0, 1.0, 1.0, 0.18),
+                            )
+                            .child(
+                                text(star_glyph)
+                                    .font_size(20.0)
+                                    .color(star_color)
+                                    .insert(Pickable::IGNORE),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .p(px(4.0))
+                            .rounded(px(4.0))
+                            .items_center()
+                            .justify_center()
+                            .insert((Button, ToggleManagedButton(entity)))
+                            .on_click(toggle_managed)
+                            .interaction_palette(
+                                Color::NONE,
+                                Color::srgba(1.0, 1.0, 1.0, 0.10),
+                                Color::srgba(1.0, 1.0, 1.0, 0.18),
+                            )
+                            .child(
+                                text(pin_glyph)
+                                    .font_size(16.0)
+                                    .color(pin_color)
+                                    .insert(Pickable::IGNORE),
+                            ),
+                    ),
+            );
+
+        list = list.child(card);
     }
 
     list
@@ -297,20 +375,35 @@ fn build_hero_list(
 
 fn build_detail_panel(
     selected: &SelectedHero,
-    hero_query: &Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    hero_query: &Query<
+        (
+            &HeroInfo,
+            &HeroStats,
+            &HeroTraits,
+            Has<Favorite>,
+            Has<PersonallyManaged>,
+            &Fatigue,
+            Option<&HeroHistory>,
+            Option<&Epithet>,
+            Option<&HeroPortraitImage>,
+        ),
+        With<Hero>,
+    >,
     trait_db: &TraitDatabase,
+    saved_scroll_y: f32,
 ) -> Div {
-    let panel = div()
+    let mut panel = div()
         .col()
         .flex_1()
         .h_full()
         .min_h(px(0.0))
         .p(px(20.0))
         .gap(px(16.0))
-        .bg(Color::srgba(0.15, 0.15, 0.25, 0.6))
+        .bg(Color::srgba(0.12, 0.13, 0.18, 0.95))
         .rounded(px(8.0))
         .overflow_y_scroll()
-        .insert((Name::new("Detail Panel"), DetailPanel, ScrollPosition::default()));
+        .insert((Name::new("Detail Panel"), DetailPanel, DetailPanelScroll, ScrollPosition(Vec2::new(0.0, saved_scroll_y)), BorderColor::all(BORDER_BRONZE)));
+    panel.style_mut().border = UiRect::all(Val::Px(1.5));
 
     let Some(entity) = selected.0 else {
         return panel.child(
@@ -320,7 +413,7 @@ fn build_detail_panel(
         );
     };
 
-    let Ok((info, stats, traits, is_favorite, is_managed)) = hero_query.get(entity) else {
+    let Ok((info, stats, traits, is_favorite, is_managed, fatigue, history, epithet, portrait_img)) = hero_query.get(entity) else {
         return panel.child(
             text("Hero not found")
                 .font_size(24.0)
@@ -329,11 +422,29 @@ fn build_detail_panel(
     };
 
     // Hero header
-    let header = div()
+    let mut header_row = div()
+        .row()
+        .gap(px(16.0))
+        .items_center();
+
+    if let Some(portrait_image) = portrait_img {
+        header_row = header_row.child(
+            div()
+                .size(px(80.0))
+                .bg(Color::srgb(0.08, 0.08, 0.1))
+                .rounded(px(6.0))
+                .insert(ImageNode {
+                    image: portrait_image.0.clone(),
+                    ..default()
+                })
+        );
+    }
+
+    let header_details = div()
         .col()
         .gap(px(4.0))
         .child(
-            text(&info.name).font_size(36.0).color(HEADER_TEXT),
+            text(format_hero_name(&info.name, epithet)).font_size(36.0).color(HEADER_TEXT),
         )
         .child(
             text(format!("Level {} {}", info.level, info.class))
@@ -361,16 +472,168 @@ fn build_detail_panel(
             text(status_text).font_size(14.0).color(Color::srgb(0.9, 0.85, 0.4))
         });
 
+    header_row = header_row.child(header_details);
+
+    // Stamina section
+    let max_stamina = fatigue.max(info.level, stats.constitution);
+    let stamina_pct = (fatigue.current / max_stamina * 100.0).clamp(0.0, 100.0);
+    let is_exhausted = fatigue.current <= 0.0;
+    
+    let stamina_bar_color = if is_exhausted {
+        Color::srgb(0.9, 0.2, 0.2)
+    } else if fatigue.current < 25.0 {
+        Color::srgb(0.9, 0.6, 0.2)
+    } else {
+        Color::srgb(0.2, 0.8, 0.4)
+    };
+
+    let stamina_section = div()
+        .col()
+        .gap(px(6.0))
+        .child(
+            text("Stamina").font_size(24.0).color(HEADER_TEXT),
+        )
+        .child(
+            div()
+                .row()
+                .items_center()
+                .gap(px(8.0))
+                .child(
+                    text(format!("{:.0} / {:.0}", fatigue.current, max_stamina))
+                        .font_size(16.0)
+                        .color(LABEL_TEXT)
+                        .w(px(100.0)),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .h(px(12.0))
+                        .bg(Color::srgba(0.1, 0.1, 0.15, 0.8))
+                        .rounded(px(4.0))
+                        .child(
+                            div()
+                                .w(pct(stamina_pct))
+                                .h_full()
+                                .bg(stamina_bar_color)
+                                .rounded(px(4.0)),
+                        ),
+                )
+                .child(
+                    if is_exhausted {
+                        text("EXHAUSTED!").font_size(14.0).color(Color::srgb(0.9, 0.2, 0.2))
+                    } else {
+                        text("").font_size(14.0)
+                    }
+                )
+        );
+
     // Stats section
     let stats_section = build_stats_section(stats);
 
     // Traits section
     let traits_section = build_traits_section(&traits.0, trait_db);
 
+    // Veteran Perks section
+    let perks_section = build_perks_section(history);
+
+    // History section
+    let history_section = build_history_section(history);
+
     panel
-        .child(header)
+        .child(header_row)
+        .child(stamina_section)
         .child(stats_section)
         .child(traits_section)
+        .child(perks_section)
+        .child(history_section)
+}
+
+fn build_history_section(history: Option<&HeroHistory>) -> Div {
+    let default_history = HeroHistory::default();
+    let history = history.unwrap_or(&default_history);
+
+    let mut section = div()
+        .col()
+        .gap(px(12.0))
+        .child(
+            text("Career History").font_size(24.0).color(HEADER_TEXT),
+        );
+
+    // Grid of stats
+    let stats_list = vec![
+        ("Missions Run", history.missions_run.to_string()),
+        ("Kills", history.kills.to_string()),
+        ("Near-Deaths", history.near_deaths.to_string()),
+        ("Lifetime Gold", history.lifetime_gold.to_string()),
+        ("Rescues Given", history.rescues_given.to_string()),
+        ("Rescues Recv", history.rescues_received.to_string()),
+    ];
+
+    let mut stats_grid = div().col().gap(px(6.0));
+    for chunk in stats_list.chunks(2) {
+        let mut row = div().row().w_full().gap(px(6.0));
+        for (label, val) in chunk {
+            let mut cell = div()
+                .row()
+                .flex_1()
+                .justify_between()
+                .items_center()
+                .p(px(8.0))
+                .bg(Color::srgba(0.2, 0.2, 0.35, 0.3))
+                .rounded(px(4.0))
+                .insert(BorderColor::all(BORDER_IRON));
+            cell.style_mut().border = UiRect::all(Val::Px(1.0));
+            
+            cell = cell
+                .child(text(*label).font_size(15.0).color(LABEL_TEXT))
+                .child(text(val.clone()).font_size(15.0).color(BUTTON_TEXT));
+            row = row.child(cell);
+        }
+        if chunk.len() == 1 {
+            row = row.child(div().flex_1());
+        }
+        stats_grid = stats_grid.child(row);
+    }
+    section = section.child(stats_grid);
+
+    // Timeline section
+    let mut timeline_col = div().col().gap(px(6.0));
+    
+    timeline_col = timeline_col.child(
+        text("Timeline").font_size(18.0).color(HEADER_TEXT)
+    );
+
+    let mut list_col = div().col().gap(px(6.0));
+    if history.timeline.is_empty() {
+        list_col = list_col.child(
+            text("No recorded history.")
+                .font_size(14.0)
+                .color(Color::srgba(0.5, 0.5, 0.5, 0.8))
+        );
+    } else {
+        for entry in &history.timeline {
+            list_col = list_col.child(
+                div()
+                    .row()
+                    .items_start()
+                    .gap(px(8.0))
+                    .child(
+                        text("•")
+                            .font_size(16.0)
+                            .color(BORDER_GOLD)
+                    )
+                    .child(
+                        text(entry)
+                            .font_size(15.0)
+                            .color(BUTTON_TEXT)
+                    )
+            );
+        }
+    }
+    timeline_col = timeline_col.child(list_col);
+    section = section.child(timeline_col);
+
+    section
 }
 
 fn build_stats_section(stats: &HeroStats) -> Div {
@@ -476,6 +739,54 @@ fn build_traits_section(hero_traits: &[HeroTrait], trait_db: &TraitDatabase) -> 
     section
 }
 
+fn build_perks_section(history: Option<&HeroHistory>) -> Div {
+    let mut section = div()
+        .col()
+        .gap(px(6.0))
+        .child(
+            text("Veteran Perks").font_size(24.0).color(HEADER_TEXT),
+        );
+
+    let earned = history
+        .map(|h| crate::hero::perk::get_earned_perks(h))
+        .unwrap_or_default();
+
+    if earned.is_empty() {
+        return section.child(
+            text("None (Earned via career milestones)")
+                .font_size(16.0)
+                .color(Color::srgba(0.5, 0.5, 0.5, 0.8)),
+        );
+    }
+
+    for perk in earned {
+        section = section.child(
+            div()
+                .row()
+                .gap(px(8.0))
+                .p(px(8.0))
+                .bg(Color::srgba(0.35, 0.28, 0.15, 0.35)) // Warm bronze gold backdrop
+                .rounded(px(4.0))
+                .child(
+                    div()
+                        .col()
+                        .child(
+                            text(perk.name())
+                                .font_size(18.0)
+                                .color(BORDER_GOLD), // Gold-tinted title
+                        )
+                        .child(
+                            text(perk.description())
+                                .font_size(14.0)
+                                .color(LABEL_TEXT),
+                        ),
+                ),
+        );
+    }
+
+    section
+}
+
 /// Returns a color for the stat bar based on the stat value.
 fn stat_bar_color(value: i32) -> Color {
     if value >= 14 {
@@ -505,24 +816,34 @@ fn refresh_roster_on_selection_change(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     roster_ui: Query<Entity, With<RosterUi>>,
+    scroll_list_q: Query<&ScrollPosition, With<RosterListScroll>>,
+    scroll_detail_q: Query<&ScrollPosition, With<DetailPanelScroll>>,
     heroes: Query<
         (
             Entity,
             &HeroInfo,
+            &HeroStats,
             Option<&OnMission>,
             Has<Favorite>,
             Has<PersonallyManaged>,
             Option<&Missing>,
             Option<&Injured>,
+            &Fatigue,
+            Option<&Epithet>,
+            Option<&HeroPortraitImage>,
         ),
         With<Hero>,
     >,
     selected: Res<SelectedHero>,
     trait_db: Res<TraitDatabase>,
-    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>), With<Hero>>,
+    hero_query: Query<(&HeroInfo, &HeroStats, &HeroTraits, Has<Favorite>, Has<PersonallyManaged>, &Fatigue, Option<&HeroHistory>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     time: Res<Time<Virtual>>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
+
+    // Read old scroll positions before despawning
+    let saved_list_y = scroll_list_q.iter().next().map(|s| s.0.y).unwrap_or(0.0);
+    let saved_detail_y = scroll_detail_q.iter().next().map(|s| s.0.y).unwrap_or(0.0);
 
     // Despawn old roster UI and rebuild
     for entity in &roster_ui {
@@ -539,8 +860,8 @@ fn refresh_roster_on_selection_change(
         .p(px(16.0))
         .child(widgets::header("Roster"));
 
-    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64());
-    let detail = build_detail_panel(&selected, &hero_query, &trait_db);
+    let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64(), saved_list_y);
+    let detail = build_detail_panel(&selected, &hero_query, &trait_db, saved_detail_y);
 
     let content = div()
         .row()

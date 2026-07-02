@@ -50,6 +50,10 @@ impl CharacterSprites {
             EnemyType::Slime => &self.slime,
             EnemyType::BossRat => &self.boss_rat,
             EnemyType::Goblin => &self.goblin,
+            EnemyType::GiantRat => &self.boss_rat,
+            EnemyType::GoblinArcher => &self.goblin,
+            EnemyType::GoblinShaman => &self.goblin,
+            EnemyType::SpiderSwarmer => &self.slime,
         }
     }
 }

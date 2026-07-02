@@ -13,6 +13,7 @@ pub enum BuildingType {
     Barracks,
     RecruitmentOffice,
     Workshop,
+    Tavern,
 }
 
 impl BuildingType {
@@ -22,6 +23,7 @@ impl BuildingType {
         BuildingType::Barracks,
         BuildingType::RecruitmentOffice,
         BuildingType::Workshop,
+        BuildingType::Tavern,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -31,6 +33,7 @@ impl BuildingType {
             Self::Barracks => "Barracks",
             Self::RecruitmentOffice => "Recruitment Office",
             Self::Workshop => "Workshop",
+            Self::Tavern => "Tavern",
         }
     }
 
@@ -41,6 +44,7 @@ impl BuildingType {
             Self::Barracks => "Increases your guild's roster capacity.",
             Self::RecruitmentOffice => "More applicants with better quality.",
             Self::Workshop => "Convert raw materials into refined ones.",
+            Self::Tavern => "Accelerates hero stamina recovery when resting.",
         }
     }
 }
@@ -136,6 +140,7 @@ fn handle_upgrade_building(
         title: format!("{} upgraded!", building_type.name()),
         body: format!("Now at level {new_level}"),
         kind: ToastKind::Success,
+        action: None,
     });
 }
 

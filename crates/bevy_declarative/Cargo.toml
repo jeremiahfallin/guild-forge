@@ -1,0 +1,9 @@
+[package]
+name = "bevy_declarative"
+version = "0.1.0"
+edition = "2024"
+# Developed inside the guild-forge workspace; extract + publish when the API stabilizes.
+publish = false
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_ui", "bevy_picking"] }

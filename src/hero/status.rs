@@ -12,10 +12,11 @@ pub const INJURED_STAT_MULTIPLIER: f32 = 0.75;
 
 /// Marks a hero as absent after a mission wipe. `expires_at` is in the
 /// `Time<Virtual>` elapsed-seconds frame.
-#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component)]
 pub struct Missing {
     pub expires_at: f64,
+    pub dropped_equipment: Option<crate::equipment::HeroEquipment>,
 }
 
 /// Temporary stat-penalty state applied when a Missing hero returns.

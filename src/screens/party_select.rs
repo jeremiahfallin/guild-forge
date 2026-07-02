@@ -26,12 +26,10 @@ use crate::{
 const MAX_PARTY_SIZE: usize = 4;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(OnEnter(GameTab::PartySelect), spawn_party_select);
+    app.add_systems(OnEnter(GameTab::PartySelect), init_party_select);
     app.add_systems(
         Update,
-        refresh_party_select.run_if(
-            in_state(GameTab::PartySelect).and(resource_changed::<SelectedParty>),
-        ),
+        refresh_party_select.run_if(in_state(GameTab::PartySelect)),
     );
     app.add_systems(OnExit(GameTab::PartySelect), (cleanup_party_select, crate::screens::missions::clear_selection));
 }
@@ -56,96 +54,8 @@ struct RemoveHeroButton(Entity);
 #[derive(Component)]
 struct DispatchButton;
 
-fn spawn_party_select(
-    mut commands: Commands,
-    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    selected_mission: Option<Res<SelectedMission>>,
-    templates: Option<Res<MissionTemplateDatabase>>,
-    heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
-) {
-    let Ok(root_entity) = gameplay_root.single() else { return };
+fn init_party_select(mut commands: Commands) {
     commands.init_resource::<SelectedParty>();
-
-    let mission_name = selected_mission
-        .as_ref()
-        .and_then(|sm| sm.0)
-        .and_then(|idx| templates.as_ref().map(|t| t.0.get(idx)))
-        .flatten()
-        .map(|t| t.name.as_str())
-        .unwrap_or("Unknown Mission");
-
-    let mut root = widgets::content_area("Party Select")
-        .insert((DespawnOnExit(GameTab::PartySelect), PartySelectUi));
-
-    // Top bar
-    let top_bar = div()
-        .row()
-        .w_full()
-        .justify_between()
-        .items_center()
-        .p(px(16.0))
-        .child(widgets::header(format!("Select Party — {mission_name}")))
-        .child(widgets::game_button("Cancel", go_back_to_missions));
-
-    // Two-panel layout: available heroes (left) + selected party (right)
-    let available_panel = build_available_panel(&heroes, &[]);
-
-    let party_panel = div()
-        .col()
-        .w(pct(50.0))
-        .h_full()
-        .min_h(px(0.0))
-        .gap(px(8.0))
-        .p(px(16.0))
-        .bg(Color::srgba(0.15, 0.2, 0.15, 0.6))
-        .rounded(px(8.0))
-        .overflow_y_scroll()
-        .insert(ScrollPosition::default())
-        .child(
-            text("Selected Party (0/4)")
-                .font_size(24.0)
-                .color(HEADER_TEXT),
-        )
-        .child(
-            text("Click heroes on the left to add them")
-                .font_size(16.0)
-                .color(LABEL_TEXT),
-        );
-
-    let content = div()
-        .row()
-        .w_full()
-        .flex_1()
-        .min_h(px(0.0))
-        .gap(px(16.0))
-        .p(px(16.0))
-        .child(available_panel)
-        .child(party_panel);
-
-    // Bottom: dispatch button (disabled until party has at least 1 hero)
-    let bottom = div()
-        .row()
-        .w_full()
-        .justify_center()
-        .p(px(16.0))
-        .child(
-            div()
-                .w(px(380.0))
-                .h(px(80.0))
-                .items_center()
-                .justify_center()
-                .bg(Color::srgba(0.3, 0.3, 0.3, 0.5))
-                .border_radius(BorderRadius::MAX)
-                .insert(Name::new("Dispatch Disabled"))
-                .child(
-                    text("Select at least 1 hero")
-                        .font_size(28.0)
-                        .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
-                ),
-        );
-
-    root = root.child(top_bar).child(content).child(bottom);
-    root.spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn build_available_panel(
@@ -228,6 +138,8 @@ fn build_available_panel(
 
 fn refresh_party_select(
     mut commands: Commands,
+    mut timer: Local<f32>,
+    time: Res<Time<Virtual>>,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     ui_q: Query<Entity, With<PartySelectUi>>,
     selected_party: Res<SelectedParty>,
@@ -235,7 +147,30 @@ fn refresh_party_select(
     templates: Option<Res<MissionTemplateDatabase>>,
     heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
     hero_info: Query<&HeroInfo, With<Hero>>,
+    board: Option<Res<crate::screens::missions::MissionBoard>>,
 ) {
+    let has_ui = !ui_q.is_empty();
+    let is_rescue = selected_mission
+        .as_ref()
+        .map(|sm| sm.is_rescue)
+        .unwrap_or(false);
+
+    let mut should_rebuild = !has_ui || selected_party.is_changed();
+
+    if has_ui && is_rescue {
+        *timer += time.delta_secs();
+        if *timer >= 1.0 {
+            *timer = 0.0;
+            should_rebuild = true;
+        }
+    } else {
+        *timer = 0.0;
+    }
+
+    if !should_rebuild {
+        return;
+    }
+
     let Ok(root_entity) = gameplay_root.single() else { return };
 
     // Despawn old UI
@@ -245,9 +180,19 @@ fn refresh_party_select(
 
     let mission_name = selected_mission
         .as_ref()
-        .and_then(|sm| sm.0)
-        .and_then(|idx| templates.as_ref().map(|t| t.0.get(idx)))
-        .flatten()
+        .and_then(|sm| sm.index)
+        .and_then(|idx| {
+            if let Some(selected_sm) = selected_mission.as_ref() {
+                if selected_sm.is_rescue {
+                    board.as_ref().and_then(|b| b.rescue_offers.get(idx)).map(|o| o.template_idx)
+                } else {
+                    board.as_ref().and_then(|b| b.offers.get(idx)).map(|o| o.template_idx)
+                }
+            } else {
+                None
+            }
+        })
+        .and_then(|template_idx| templates.as_ref().and_then(|t| t.0.get(template_idx)))
         .map(|t| t.name.as_str())
         .unwrap_or("Unknown Mission");
 
@@ -255,13 +200,40 @@ fn refresh_party_select(
         .insert((DespawnOnExit(GameTab::PartySelect), PartySelectUi));
 
     // Top bar
+    let mut title_row = div().row().items_center().gap(px(12.0))
+        .child(widgets::header(format!("Select Party — {mission_name}")));
+
+    if let Some(selected_sm) = selected_mission.as_ref() {
+        if selected_sm.is_rescue {
+            if let Some(mission_idx) = selected_sm.index {
+                if let Some(board) = board.as_ref() {
+                    if let Some(offer) = board.rescue_offers.get(mission_idx) {
+                        let remaining_secs = (offer.expires_at - time.elapsed_secs_f64()).max(0.0);
+                        let countdown_str = crate::hero::status::format_countdown(remaining_secs);
+                        title_row = title_row.child(
+                            text(format!("({} remaining)", countdown_str))
+                                .font_size(24.0)
+                                .color(Color::srgb(1.0, 0.4, 0.4))
+                        );
+                    } else {
+                        title_row = title_row.child(
+                            text("(Expired)")
+                                .font_size(24.0)
+                                .color(Color::srgb(1.0, 0.4, 0.4))
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     let top_bar = div()
         .row()
         .w_full()
         .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header(format!("Select Party — {mission_name}")))
+        .child(title_row)
         .child(widgets::game_button("Cancel", go_back_to_missions));
 
     // Available heroes panel
@@ -408,26 +380,53 @@ fn dispatch_mission(
     selected_mission: Option<Res<SelectedMission>>,
     templates: Option<Res<MissionTemplateDatabase>>,
     enemy_db: Option<Res<EnemyDatabase>>,
-    hero_q: Query<(&HeroInfo, &HeroStats, Option<&crate::equipment::HeroEquipment>), With<Hero>>,
+    hero_q: Query<(
+        &HeroInfo,
+        &HeroStats,
+        Option<&crate::equipment::HeroEquipment>,
+        &crate::hero::Fatigue,
+        Option<&crate::mission::entities::MoveRange>,
+        Option<&crate::hero::Epithet>,
+        Option<&crate::hero::history::HeroHistory>,
+    ), With<Hero>>,
     equipment_db: Option<Res<crate::equipment::EquipmentDatabase>>,
     injured_q: Query<(), With<crate::hero::status::Injured>>,
     mut next_tab: ResMut<NextState<GameTab>>,
+    board: Option<Res<crate::screens::missions::MissionBoard>>,
+    class_db: Option<Res<crate::hero::data::ClassDatabase>>,
 ) {
-    let Some(mission_idx) = selected_mission.as_ref().and_then(|sm| sm.0) else {
+    let Some(selected_sm) = selected_mission.as_ref() else {
         warn!("No mission selected for dispatch");
         return;
     };
-    let Some(templates) = templates else { return };
-    let Some(template) = templates.0.get(mission_idx) else {
-        warn!("Invalid mission template index: {mission_idx}");
+    let Some(mission_idx) = selected_sm.index else {
+        warn!("No mission index selected for dispatch");
         return;
     };
+    let Some(templates) = templates else { return };
+    let Some(board) = board else { return };
     let Some(enemy_db) = enemy_db else { return };
     let Some(equipment_db) = equipment_db else { return };
     if party.0.is_empty() {
         warn!("Cannot dispatch with empty party");
         return;
     }
+
+    let (template, modifiers) = if selected_sm.is_rescue {
+        let Some(offer) = board.rescue_offers.get(mission_idx) else {
+            warn!("Invalid rescue offer index: {mission_idx}");
+            return;
+        };
+        let Some(temp) = templates.0.get(offer.template_idx) else { return };
+        (temp, &offer.modifiers)
+    } else {
+        let Some(offer) = board.offers.get(mission_idx) else {
+            warn!("Invalid standard offer index: {mission_idx}");
+            return;
+        };
+        let Some(temp) = templates.0.get(offer.template_idx) else { return };
+        (temp, &offer.modifiers)
+    };
 
     // Generate dungeon for this mission
     let mut rng = rand::rng();
@@ -443,6 +442,8 @@ fn dispatch_mission(
                 template_id: template.id.clone(),
                 name: template.name.clone(),
                 difficulty: template.difficulty,
+                modifiers: modifiers.clone(),
+                biome: template.biome,
             },
             MissionProgress::InProgress,
             MissionParty(party.0.clone()),
@@ -464,6 +465,8 @@ fn dispatch_mission(
         &enemy_db,
         &template.id,
         &injured_q,
+        class_db.as_ref().map(|db| db.as_ref()),
+        modifiers,
     );
 
     // Mark heroes as on-mission

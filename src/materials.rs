@@ -148,6 +148,7 @@ fn handle_convert_materials(
             recipe.output_type.name()
         ),
         kind: crate::ui::toast::ToastKind::Info,
+        action: None,
     });
 }
 

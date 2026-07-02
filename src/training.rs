@@ -20,7 +20,13 @@ fn tick_training(
     mut timer: ResMut<TrainingTimer>,
     buildings: Res<GuildBuildings>,
     mut heroes: Query<
-        (&mut HeroInfo, &mut HeroStats, &crate::hero::HeroGrowth, &mut crate::hero::HeroStatProgress),
+        (
+            &mut HeroInfo,
+            &mut HeroStats,
+            &crate::hero::HeroGrowth,
+            &mut crate::hero::HeroStatProgress,
+            Option<&mut crate::hero::Fatigue>,
+        ),
         (With<Hero>, Without<OnMission>),
     >,
 ) {
@@ -37,8 +43,15 @@ fn tick_training(
 
     let xp_per_tick = level * 2;
 
-    for (mut info, mut stats, growth, mut progress) in &mut heroes {
-        crate::hero::award_xp(&mut info, &mut stats, growth, &mut progress, xp_per_tick);
+    for (mut info, mut stats, growth, mut progress, mut fatigue) in &mut heroes {
+        crate::hero::award_xp(
+            &mut info,
+            &mut stats,
+            growth,
+            &mut progress,
+            fatigue.as_deref_mut(),
+            xp_per_tick,
+        );
     }
 }
 

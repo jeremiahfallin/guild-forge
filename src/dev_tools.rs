@@ -10,7 +10,7 @@ pub(super) fn plugin(app: &mut App) {
     // Log `Screen` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);
 
-    // Toggle the debug overlay for UI.
+    // Toggle the debug overlay for UI and handle developer keybinds.
     app.add_systems(
         Update,
         toggle_debug_ui.run_if(input_just_pressed(TOGGLE_KEY)),

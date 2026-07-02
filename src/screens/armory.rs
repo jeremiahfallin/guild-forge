@@ -4,13 +4,13 @@ use bevy::prelude::*;
 use bevy_declarative::element::div::{Div, div};
 use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
-use bevy_declarative::style::values::{pct, px};
+use bevy_declarative::style::values::px;
 
 use crate::{
     buildings::{BuildingType, GuildBuildings},
     economy::Gold,
     equipment::{CraftGear, EquipmentDatabase, GearSlot, HeroEquipment},
-    hero::{Hero, HeroInfo},
+    hero::{Hero, HeroInfo, Epithet, format_hero_name, portrait::HeroPortraitImage},
     materials::Materials,
     mission::OnMission,
     screens::GameTab,
@@ -43,10 +43,10 @@ struct ArmoryUi;
 fn spawn_armory_screen(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     selected: Res<SelectedArmoryHero>,
     equipment_db: Res<EquipmentDatabase>,
-    hero_equip_query: Query<(&HeroInfo, &HeroEquipment), With<Hero>>,
+    hero_equip_query: Query<(&HeroInfo, &HeroEquipment, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     buildings: Res<GuildBuildings>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
@@ -58,10 +58,10 @@ fn rebuild_armory_screen(
     mut commands: Commands,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     armory_ui: Query<Entity, With<ArmoryUi>>,
-    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: Query<(Entity, &HeroInfo, Option<&OnMission>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     selected: Res<SelectedArmoryHero>,
     equipment_db: Res<EquipmentDatabase>,
-    hero_equip_query: Query<(&HeroInfo, &HeroEquipment), With<Hero>>,
+    hero_equip_query: Query<(&HeroInfo, &HeroEquipment, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     buildings: Res<GuildBuildings>,
 ) {
     let Ok(root_entity) = gameplay_root.single() else { return };
@@ -75,10 +75,10 @@ fn rebuild_armory_screen(
 }
 
 fn build_armory_ui(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     selected: &SelectedArmoryHero,
     equipment_db: &EquipmentDatabase,
-    hero_equip_query: &Query<(&HeroInfo, &HeroEquipment), With<Hero>>,
+    hero_equip_query: &Query<(&HeroInfo, &HeroEquipment, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     buildings: &GuildBuildings,
 ) -> Div {
     let mut root = widgets::content_area("Armory Screen")
@@ -109,12 +109,12 @@ fn build_armory_ui(
 }
 
 fn build_hero_list(
-    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>), With<Hero>>,
+    heroes: &Query<(Entity, &HeroInfo, Option<&OnMission>, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     selected: &SelectedArmoryHero,
 ) -> Div {
     let mut list = div()
         .col()
-        .w(pct(30.0))
+        .w(px(360.0))
         .h_full()
         .min_h(px(0.0))
         .gap(px(8.0))
@@ -127,45 +127,60 @@ fn build_hero_list(
             .color(HEADER_TEXT),
     );
 
-    for (entity, info, on_mission) in heroes.iter() {
+    for (entity, info, on_mission, epithet, portrait_img) in heroes.iter() {
         if on_mission.is_some() {
             continue; // Filter out deployed heroes
         }
 
         let is_selected = selected.0 == Some(entity);
-        let bg_color = if is_selected {
-            Color::srgba(0.275, 0.400, 0.750, 0.8)
+        let border_color = if is_selected {
+            BORDER_GOLD
         } else {
-            Color::srgba(0.2, 0.2, 0.3, 0.6)
+            BORDER_IRON
         };
 
-        list = list.child(
+        let mut card = div()
+            .row()
+            .w_full()
+            .p(px(12.0))
+            .gap(px(12.0))
+            .items_center()
+            .bg(CARD_BACKGROUND)
+            .rounded(px(8.0))
+            .insert((SelectArmoryHeroButton(entity), BorderColor::all(border_color)))
+            .on_click(select_armory_hero);
+        card.style_mut().border = UiRect::all(Val::Px(1.5));
+
+        if let Some(portrait_image) = portrait_img {
+            card = card.child(
+                div()
+                    .size(px(40.0))
+                    .bg(Color::srgb(0.08, 0.08, 0.1))
+                    .rounded(px(4.0))
+                    .insert(ImageNode {
+                        image: portrait_image.0.clone(),
+                        ..default()
+                    })
+            );
+        }
+
+        card = card.child(
             div()
-                .row()
-                .w_full()
-                .p(px(12.0))
-                .gap(px(12.0))
-                .items_center()
-                .bg(bg_color)
-                .rounded(px(6.0))
-                .insert(SelectArmoryHeroButton(entity))
-                .on_click(select_armory_hero)
+                .col()
+                .flex_1()
                 .child(
-                    div()
-                        .col()
-                        .flex_1()
-                        .child(
-                            text(&info.name)
-                                .font_size(22.0)
-                                .color(HEADER_TEXT),
-                        )
-                        .child(
-                            text(format!("Lv.{} {}", info.level, info.class))
-                                .font_size(16.0)
-                                .color(LABEL_TEXT),
-                        ),
+                    text(format_hero_name(&info.name, epithet))
+                        .font_size(22.0)
+                        .color(HEADER_TEXT),
+                )
+                .child(
+                    text(format!("Lv.{} {}", info.level, info.class))
+                        .font_size(16.0)
+                        .color(LABEL_TEXT),
                 ),
         );
+
+        list = list.child(card);
     }
 
     list
@@ -174,20 +189,21 @@ fn build_hero_list(
 fn build_gear_panel(
     selected: &SelectedArmoryHero,
     equipment_db: &EquipmentDatabase,
-    hero_equip_query: &Query<(&HeroInfo, &HeroEquipment), With<Hero>>,
+    hero_equip_query: &Query<(&HeroInfo, &HeroEquipment, Option<&Epithet>, Option<&HeroPortraitImage>), With<Hero>>,
     buildings: &GuildBuildings,
 ) -> Div {
-    let panel = div()
+    let mut panel = div()
         .col()
         .flex_1()
         .h_full()
         .min_h(px(0.0))
         .p(px(20.0))
         .gap(px(16.0))
-        .bg(Color::srgba(0.15, 0.15, 0.25, 0.6))
+        .bg(Color::srgba(0.12, 0.13, 0.18, 0.95))
         .rounded(px(8.0))
         .overflow_y_scroll()
-        .insert((Name::new("Gear Panel"), ScrollPosition::default()));
+        .insert((Name::new("Gear Panel"), ScrollPosition::default(), BorderColor::all(BORDER_BRONZE)));
+    panel.style_mut().border = UiRect::all(Val::Px(1.5));
 
     let Some(entity) = selected.0 else {
         return panel.child(
@@ -197,7 +213,7 @@ fn build_gear_panel(
         );
     };
 
-    let Ok((info, equipment)) = hero_equip_query.get(entity) else {
+    let Ok((info, equipment, epithet, portrait_img)) = hero_equip_query.get(entity) else {
         return panel.child(
             text("Hero not found")
                 .font_size(24.0)
@@ -207,11 +223,26 @@ fn build_gear_panel(
 
     let armory_level = buildings.level(BuildingType::Armory);
 
-    let mut result = panel.child(
-        text(format!("{} - Equipment", info.name))
+    let mut header_row = div().row().items_center().gap(px(12.0));
+    if let Some(portrait_image) = portrait_img {
+        header_row = header_row.child(
+            div()
+                .size(px(40.0))
+                .bg(Color::srgb(0.08, 0.08, 0.1))
+                .rounded(px(4.0))
+                .insert(ImageNode {
+                    image: portrait_image.0.clone(),
+                    ..default()
+                })
+        );
+    }
+    header_row = header_row.child(
+        text(format!("{} - Equipment", format_hero_name(&info.name, epithet)))
             .font_size(28.0)
             .color(HEADER_TEXT),
     );
+
+    let mut result = panel.child(header_row);
 
     for &slot in GearSlot::ALL {
         let current_tier = equipment.tier(slot);

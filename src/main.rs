@@ -6,6 +6,7 @@
 mod asset_tracking;
 mod audio;
 mod buildings;
+mod crash_reporting;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod economy;
@@ -26,6 +27,7 @@ mod ui;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 
 fn main() -> AppExit {
+    crash_reporting::init_crash_reporting();
     App::new().add_plugins(AppPlugin).run()
 }
 
@@ -50,6 +52,10 @@ impl Plugin for AppPlugin {
                         ..default()
                     }
                     .into(),
+                    ..default()
+                })
+                .set(bevy::log::LogPlugin {
+                    custom_layer: |_app| Some(crash_reporting::create_log_layer()),
                     ..default()
                 }),
         );
