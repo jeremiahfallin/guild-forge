@@ -19,7 +19,8 @@
       "Bash(cargo check:*)",
       "Bash(bevy --version)",
       "Bash(bevy build *)",
-      "Bash(powershell.exe -Command \"Compress-Archive -Path 'guild-forge-demo' -DestinationPath 'guild-forge-demo.zip' -Force\")"
+      "Bash(powershell.exe -Command \"Compress-Archive -Path 'guild-forge-demo' -DestinationPath 'guild-forge-demo.zip' -Force\")",
+      "Bash(git log *)"
     ]
   }
 }
