@@ -48,6 +48,7 @@ fn spawn_gameplay_root(
     rep: Option<Res<Reputation>>,
     bank: Option<Res<OfflineTimeBank>>,
     speed: Option<Res<GameSpeed>>,
+    glow_texture: Res<crate::screens::EmberGlowTexture>,
 ) {
     let gold_amount = gold.map_or(0, |g| g.0);
     let rep_amount = rep.map_or(0, |r| r.0);
@@ -68,13 +69,13 @@ fn spawn_gameplay_root(
         ));
 
     // Build sidebar
-    let sidebar = build_sidebar(gold_amount, rep_amount, banked, current_speed);
+    let sidebar = build_sidebar(gold_amount, rep_amount, banked, current_speed, glow_texture.0.clone());
     root = root.child(sidebar);
 
     root.spawn(&mut commands);
 }
 
-fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32) -> bevy_declarative::element::div::Div {
+fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32, glow_texture: Handle<Image>) -> bevy_declarative::element::div::Div {
     let mut sidebar = div()
         .col()
         .w(px(SIDEBAR_WIDTH))
@@ -88,11 +89,27 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32) -> 
         .w_full()
         .gap(px(8.0))
         .p(px(12.0))
-        // Title
+        // Title & Logo Row
         .child(
-            text("Guild Forge")
-                .font_size(24.0)
-                .color(HEADER_TEXT),
+            div()
+                .row()
+                .items_center()
+                .gap(px(8.0))
+                .child(
+                    div()
+                        .w(px(24.0))
+                        .h(px(24.0))
+                        .insert(ImageNode {
+                            image: glow_texture,
+                            color: Color::srgba(0.95, 0.45, 0.05, 0.85),
+                            ..default()
+                        })
+                )
+                .child(
+                    text("Guild Forge")
+                        .font_size(24.0)
+                        .color(HEADER_TEXT),
+                )
         )
         // Gold
         .child(
@@ -195,18 +212,17 @@ fn nav_click(
     current_tab: Res<State<GameTab>>,
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
-    if let Ok(nav) = buttons.get(click.event_target()) {
-        if nav.0 != **current_tab {
+    if let Ok(nav) = buttons.get(click.event_target())
+        && nav.0 != **current_tab {
             next_tab.set(nav.0);
         }
-    }
 }
 
 fn speed_btn(multiplier: f32, current_speed: f32) -> bevy_declarative::element::div::Div {
     let label = format!("{}x", multiplier as u32);
     let is_active = (current_speed - multiplier).abs() < 0.01;
     let bg = if is_active {
-        Color::srgb(0.3, 0.5, 0.7)
+        Color::srgb(0.95, 0.65, 0.15)
     } else {
         BUTTON_BACKGROUND
     };
@@ -274,7 +290,7 @@ fn update_active_speed_highlight(
     speed: Res<GameSpeed>,
     mut buttons: Query<(&SpeedButton, &mut BackgroundColor, &mut InteractionPalette)>,
 ) {
-    const ACTIVE: Color = Color::srgb(0.3, 0.5, 0.7);
+    const ACTIVE: Color = Color::srgb(0.95, 0.65, 0.15);
     for (btn, mut bg, mut palette) in &mut buttons {
         let resting = if (speed.0 - btn.0).abs() < 0.01 {
             ACTIVE
