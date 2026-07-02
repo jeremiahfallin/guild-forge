@@ -76,20 +76,32 @@ fn build_guild_ui(
     materials: &Materials,
     conversion_db: &ConversionDatabase,
 ) -> Div {
-    let mut root = div()
-        .col()
-        .flex_1()
-        .overflow_y_scroll()
-        .gap(px(12.0))
-        .p(px(16.0))
+    let mut root = widgets::content_area("Guild Screen")
         .insert((
-            Name::new("Guild Screen"),
             DespawnOnExit(GameTab::Guild),
             GuildUi,
-            ScrollPosition::default(),
         ));
 
-    root = root.child(widgets::header("Guild Hall"));
+    // Top Bar
+    let top_bar = div()
+        .row()
+        .w_full()
+        .items_center()
+        .p(px(16.0))
+        .child(widgets::header("Guild Hall"));
+
+    root = root.child(top_bar);
+
+    // Scrollable content body
+    let mut content = div()
+        .col()
+        .w_full()
+        .flex_1()
+        .min_h(px(0.0))
+        .gap(px(16.0))
+        .p(px(16.0))
+        .overflow_y_scroll()
+        .insert(ScrollPosition::default());
 
     // Stockpile panel — show all owned materials
     let owned: Vec<(MaterialType, u32)> = MaterialType::ALL
@@ -104,11 +116,13 @@ fn build_guild_ui(
         let mut stockpile = div()
             .col()
             .w_full()
-            .p(px(12.0))
+            .p(px(16.0))
             .gap(px(8.0))
-            .bg(Color::srgba(0.15, 0.18, 0.25, 0.7))
-            .rounded(px(6.0))
-            .child(text("Stockpile").font_size(24.0).color(HEADER_TEXT));
+            .bg(Color::srgba(0.12, 0.13, 0.18, 0.95))
+            .rounded(px(8.0))
+            .insert(BorderColor::all(BORDER_BRONZE));
+        stockpile.style_mut().border = UiRect::all(Val::Px(1.5));
+        stockpile = stockpile.child(text("Stockpile").font_size(22.0).color(HEADER_TEXT));
 
         // Grid-like layout: wrap rows of material entries
         let mut row = div().row().w_full().gap(px(8.0)).insert(Node {
@@ -117,13 +131,17 @@ fn build_guild_ui(
         });
 
         for (mat, count) in &owned {
+            let mut entry = div()
+                .row()
+                .gap(px(4.0))
+                .p(px(6.0))
+                .bg(CARD_BACKGROUND)
+                .rounded(px(4.0))
+                .insert(BorderColor::all(BORDER_IRON));
+            entry.style_mut().border = UiRect::all(Val::Px(1.0));
+
             row = row.child(
-                div()
-                    .row()
-                    .gap(px(4.0))
-                    .p(px(6.0))
-                    .bg(Color::srgba(0.2, 0.2, 0.3, 0.6))
-                    .rounded(px(4.0))
+                entry
                     .child(
                         text(format!("{}", count))
                             .font_size(16.0)
@@ -134,10 +152,10 @@ fn build_guild_ui(
         }
 
         stockpile = stockpile.child(row);
-        root = root.child(stockpile);
+        content = content.child(stockpile);
 
         // Divider
-        root = root.child(
+        content = content.child(
             div()
                 .w_full()
                 .h(px(2.0))
@@ -154,10 +172,12 @@ fn build_guild_ui(
         let mut card = div()
             .col()
             .w_full()
-            .p(px(12.0))
-            .gap(px(6.0))
-            .bg(Color::srgba(0.2, 0.2, 0.3, 0.6))
-            .rounded(px(6.0));
+            .p(px(16.0))
+            .gap(px(8.0))
+            .bg(CARD_BACKGROUND)
+            .rounded(px(8.0))
+            .insert(BorderColor::all(BORDER_IRON));
+        card.style_mut().border = UiRect::all(Val::Px(1.5));
 
         // Header row: name + level
         card = card.child(
@@ -168,7 +188,7 @@ fn build_guild_ui(
                 .justify_between()
                 .child(
                     text(building_type.name())
-                        .font_size(24.0)
+                        .font_size(22.0)
                         .color(HEADER_TEXT),
                 )
                 .child(
@@ -227,22 +247,22 @@ fn build_guild_ui(
             );
         }
 
-        root = root.child(card);
+        content = content.child(card);
     }
 
     // Workshop conversions section
     let workshop_level = buildings.level(BuildingType::Workshop);
     if workshop_level >= 1 {
-        root = root.child(
+        content = content.child(
             div()
                 .w_full()
                 .h(px(2.0))
                 .bg(Color::srgba(0.4, 0.4, 0.5, 0.6)),
         );
 
-        root = root.child(
+        content = content.child(
             text("Workshop Conversions")
-                .font_size(24.0)
+                .font_size(22.0)
                 .color(HEADER_TEXT),
         );
 
@@ -263,21 +283,25 @@ fn build_guild_ui(
             let can_convert = available >= recipe.input_count;
 
             let bg = if can_convert {
-                Color::srgba(0.2, 0.25, 0.3, 0.6)
+                CARD_BACKGROUND
             } else {
-                Color::srgba(0.2, 0.2, 0.2, 0.4)
+                Color::srgba(0.12, 0.13, 0.18, 0.45)
             };
 
-            root = root.child(
-                div()
-                    .row()
-                    .w_full()
-                    .p(px(8.0))
-                    .gap(px(12.0))
-                    .items_center()
-                    .justify_between()
-                    .bg(bg)
-                    .rounded(px(4.0))
+            let mut recipe_card = div()
+                .row()
+                .w_full()
+                .p(px(12.0))
+                .gap(px(12.0))
+                .items_center()
+                .justify_between()
+                .bg(bg)
+                .rounded(px(8.0))
+                .insert(BorderColor::all(BORDER_IRON));
+            recipe_card.style_mut().border = UiRect::all(Val::Px(1.5));
+
+            content = content.child(
+                recipe_card
                     .child(text(recipe_text).font_size(16.0).color(LABEL_TEXT))
                     .child(
                         div()
@@ -304,7 +328,7 @@ fn build_guild_ui(
         }
     }
 
-    root
+    root.child(content)
 }
 
 #[derive(Component)]

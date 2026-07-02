@@ -10,9 +10,8 @@ use rand::Rng;
 use crate::hero::status::INJURED_STAT_MULTIPLIER;
 use crate::hero::{Hero, HeroInfo, HeroStats};
 
-use super::Mission;
 use super::MissionParty;
-use super::data::{EnemyDatabase, EnemyType, MissionTemplateDatabase};
+use super::data::{EnemyDatabase, EnemyType, MissionTemplateDatabase, EnemyBehavior};
 use super::dungeon::{DungeonMap, RoomType};
 
 /// Tile size in world pixels (must match mission_view).
@@ -41,6 +40,48 @@ pub struct CombatStats {
     pub max_hp: i32,
     pub attack: i32,
     pub defense: i32,
+    pub speed: i32,
+}
+
+/// Move range of a token on the grid.
+///
+/// NOTE: This is ignored as entities are restricted to moving exactly 1 tile per movement turn.
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct MoveRange {
+    pub base: u32,
+    pub bonus: u32,
+}
+
+impl MoveRange {
+    pub fn max(&self) -> u32 {
+        self.base + self.bonus
+    }
+}
+
+/// The turn queue for sequential simulation on this mission.
+#[derive(Component, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct MissionTurnQueue {
+    pub queue: Vec<Entity>,
+    pub active_index: usize,
+    pub round_count: u64,
+    #[reflect(default)]
+    pub combat_round_count: u32,
+}
+
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Reflect, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActiveAbilityState {
+    pub ability_id: String,
+    pub remaining_cooldown: u32,
+}
+
+#[derive(Component, Debug, Clone, Reflect, Serialize, Deserialize)]
+#[reflect(Component)]
+pub struct ActiveAbilities {
+    pub abilities: Vec<ActiveAbilityState>,
 }
 
 /// Marks an entity as a hero token in the mission. Stores the hero roster entity.
@@ -54,9 +95,37 @@ pub struct EnemyToken {
     pub xp_reward: u32,
 }
 
+/// Custom AI behavior and range for an enemy.
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct EnemyAI {
+    pub behavior: EnemyBehavior,
+    pub attack_range: u32,
+}
+
+/// A chest containing loot that can be opened by heroes.
+#[derive(Component, Debug, Clone, Reflect, Serialize, Deserialize)]
+#[reflect(Component)]
+pub struct LootChest {
+    pub gold_reward: u32,
+    pub opened: bool,
+}
+
 /// Which room this entity is currently in (index into DungeonMap.rooms).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct InRoom(pub Option<usize>);
+
+/// Traversed intermediate coordinates for render proxies to walk step-by-step.
+#[derive(Component, Debug, Clone, Default)]
+pub struct VisualPathHistory {
+    pub waypoints: Vec<(u32, u32)>,
+}
+
+/// Queue of visual coordinates that the render proxy is currently stepping along.
+#[derive(Component, Debug, Clone, Default)]
+pub struct VisualPathQueue {
+    pub waypoints: Vec<(u32, u32)>,
+    pub current_target: Option<(u32, u32)>,
+}
 
 /// Per-mission room visit/clear state. Attached to the Mission entity.
 #[derive(Component, Debug, Default)]
@@ -101,12 +170,22 @@ pub fn spawn_tokens_for_mission(
     mission_entity: Entity,
     map: &DungeonMap,
     party: &MissionParty,
-    hero_q: &Query<(&HeroInfo, &HeroStats, Option<&crate::equipment::HeroEquipment>), With<Hero>>,
+    hero_q: &Query<(
+        &HeroInfo,
+        &HeroStats,
+        Option<&crate::equipment::HeroEquipment>,
+        &crate::hero::Fatigue,
+        Option<&MoveRange>,
+        Option<&crate::hero::Epithet>,
+        Option<&crate::hero::history::HeroHistory>,
+    ), With<Hero>>,
     equipment_db: &crate::equipment::EquipmentDatabase,
     templates: &MissionTemplateDatabase,
     enemy_db: &EnemyDatabase,
     template_id: &str,
     injured_q: &Query<(), With<crate::hero::status::Injured>>,
+    class_db: Option<&crate::hero::data::ClassDatabase>,
+    modifiers: &[crate::mission::data::MissionModifier],
 ) {
     // Find entrance room for hero placement
     let entrance = map.entrance_room().unwrap_or(&map.rooms[0]);
@@ -114,7 +193,7 @@ pub fn spawn_tokens_for_mission(
 
     // Spawn hero tokens
     for (i, &hero_entity) in party.0.iter().enumerate() {
-        let Ok((info, stats, maybe_equipment)) = hero_q.get(hero_entity) else {
+        let Ok((info, stats, maybe_equipment, fatigue, maybe_move_range, maybe_epithet, maybe_history)) = hero_q.get(hero_entity) else {
             continue;
         };
 
@@ -125,12 +204,16 @@ pub fn spawn_tokens_for_mission(
         let hy = (entrance_y as i32 + offset_y).clamp(0, map.height as i32 - 1) as u32;
 
         let is_injured = injured_q.get(hero_entity).is_ok();
+        let is_exhausted = fatigue.current <= 0.0;
         let mul = |v: i32| -> i32 {
+            let mut val = v as f32;
             if is_injured {
-                (v as f32 * INJURED_STAT_MULTIPLIER).floor() as i32
-            } else {
-                v
+                val *= INJURED_STAT_MULTIPLIER;
             }
+            if is_exhausted {
+                val *= 0.5;
+            }
+            val.floor() as i32
         };
         let str_eff = mul(stats.strength);
         let dex_eff = mul(stats.dexterity);
@@ -140,6 +223,14 @@ pub fn spawn_tokens_for_mission(
         let mut hp = con_eff * 3 + info.level as i32 * 5;
         let mut attack = (str_eff + dex_eff) / 2;
         let mut defense = (con_eff + dex_eff) / 2;
+        let mut speed = dex_eff;
+
+        // Apply veteran perk bonuses
+        if let Some(history) = maybe_history {
+            for perk in crate::hero::perk::get_earned_perks(history) {
+                perk.apply_bonuses(&mut hp, &mut attack, &mut defense, &mut speed);
+            }
+        }
 
         // Apply equipment bonuses
         if let Some(equipment) = maybe_equipment {
@@ -149,8 +240,33 @@ pub fn spawn_tokens_for_mission(
             hp += gear_stats.hp;
         }
 
+        let move_range = maybe_move_range.copied().unwrap_or_else(|| {
+            let base_move_range = match info.class {
+                crate::hero::data::HeroClass::Rogue | crate::hero::data::HeroClass::Ranger => 4,
+                _ => 3,
+            };
+            MoveRange {
+                base: base_move_range,
+                bonus: 0,
+            }
+        });
+
+        let mut starting_abilities = Vec::new();
+        if let Some(cdb) = class_db
+            && let Some(class_def) = cdb.get(info.class) {
+                starting_abilities = class_def
+                    .starting_abilities
+                    .iter()
+                    .map(|id| ActiveAbilityState {
+                        ability_id: id.clone(),
+                        remaining_cooldown: 0,
+                    })
+                    .collect();
+            }
+
+        let formatted_name = crate::hero::format_hero_name(&info.name, maybe_epithet);
         commands.spawn((
-            Name::new(format!("Hero Token: {}", info.name)),
+            Name::new(format!("Hero Token: {}", formatted_name)),
             HeroToken(hero_entity),
             GridPosition { x: hx, y: hy },
             InRoom(map.room_at(hx, hy)),
@@ -159,16 +275,41 @@ pub fn spawn_tokens_for_mission(
                 max_hp: hp,
                 attack,
                 defense,
+                speed,
             },
+            move_range,
             ChildOf(mission_entity),
+            ActiveAbilities {
+                abilities: starting_abilities,
+            },
         ));
+    }
+
+    let is_bountiful = modifiers.contains(&crate::mission::data::MissionModifier::Bountiful);
+
+    // Spawn chests in treasure rooms
+    for (room_idx, room) in map.rooms.iter().enumerate() {
+        if room.room_type == RoomType::Treasure {
+            let (cx, cy) = room.center();
+            let chest_gold = if is_bountiful { 150 } else { 100 };
+            commands.spawn((
+                Name::new("Loot Chest"),
+                LootChest {
+                    gold_reward: chest_gold,
+                    opened: false,
+                },
+                GridPosition { x: cx, y: cy },
+                InRoom(Some(room_idx)),
+                ChildOf(mission_entity),
+            ));
+        }
     }
 
     // Spawn enemy tokens based on mission template
     let Some(template) = templates.0.iter().find(|t| t.id == template_id) else {
         return;
     };
-    spawn_enemies_for_mission(commands, mission_entity, map, template, enemy_db);
+    spawn_enemies_for_mission(commands, mission_entity, map, template, enemy_db, modifiers);
 }
 
 fn spawn_enemies_for_mission(
@@ -177,7 +318,9 @@ fn spawn_enemies_for_mission(
     map: &DungeonMap,
     template: &super::data::MissionTemplate,
     enemy_db: &EnemyDatabase,
+    modifiers: &[crate::mission::data::MissionModifier],
 ) {
+    let is_infested = modifiers.contains(&crate::mission::data::MissionModifier::Infested);
     let mut rng = rand::rng();
 
     let enemy_rooms: Vec<usize> = map
@@ -192,23 +335,60 @@ fn spawn_enemies_for_mission(
         return;
     }
 
+    let boss_room_idx = map.rooms.iter().position(|r| r.room_type == RoomType::Boss);
+
     for &(enemy_type, count) in &template.enemy_types {
         let Some(enemy_def) = enemy_db.get(enemy_type) else {
             continue;
         };
 
+        let mut count = count;
+        if is_infested {
+            count = count + (count / 2).max(1);
+        }
+
         for _ in 0..count {
-            let room_idx = enemy_rooms[rng.random_range(0..enemy_rooms.len())];
+            let spawn_in_boss_room = enemy_type == EnemyType::BossRat;
+            let room_idx = if spawn_in_boss_room && boss_room_idx.is_some() {
+                boss_room_idx.unwrap()
+            } else {
+                enemy_rooms[rng.random_range(0..enemy_rooms.len())]
+            };
             let room = &map.rooms[room_idx];
 
             let ex = room.x + rng.random_range(0..room.w);
             let ey = room.y + rng.random_range(0..room.h);
+
+            let enemy_speed = match enemy_type {
+                EnemyType::Goblin => 14,
+                EnemyType::BossRat => 13,
+                EnemyType::Skeleton => 8,
+                EnemyType::Slime => 5,
+                EnemyType::Orc => 10,
+                EnemyType::GiantRat => 12,
+                EnemyType::GoblinArcher => 13,
+                EnemyType::GoblinShaman => 11,
+                EnemyType::SpiderSwarmer => 16,
+            };
+
+            let starting_abilities = enemy_def
+                .abilities
+                .iter()
+                .map(|id| ActiveAbilityState {
+                    ability_id: id.clone(),
+                    remaining_cooldown: 0,
+                })
+                .collect();
 
             commands.spawn((
                 Name::new(format!("Enemy: {}", enemy_def.name)),
                 EnemyToken {
                     enemy_type,
                     xp_reward: enemy_def.xp_reward,
+                },
+                EnemyAI {
+                    behavior: enemy_def.behavior,
+                    attack_range: enemy_def.attack_range,
                 },
                 GridPosition { x: ex, y: ey },
                 InRoom(Some(room_idx)),
@@ -217,6 +397,14 @@ fn spawn_enemies_for_mission(
                     max_hp: enemy_def.hp,
                     attack: enemy_def.attack,
                     defense: enemy_def.defense,
+                    speed: enemy_speed,
+                },
+                MoveRange {
+                    base: 3,
+                    bonus: 0,
+                },
+                ActiveAbilities {
+                    abilities: starting_abilities,
                 },
                 ChildOf(mission_entity),
             ));
@@ -226,33 +414,7 @@ fn spawn_enemies_for_mission(
 
 // ── Simulation systems ─────────────────────────────────────────────
 
-/// Advance hero tokens along their `MoveTarget` path by one cell. Runs first
-/// in the `FixedUpdate` chain so downstream systems see fresh positions.
-pub fn move_tokens_along_paths(
-    missions: Query<(&super::MissionDungeon, &Children), With<Mission>>,
-    mut heroes: Query<
-        (&mut GridPosition, &mut MoveTarget, &mut InRoom),
-        (With<HeroToken>, Without<EnemyToken>),
-    >,
-) {
-    for (dungeon, children) in &missions {
-        let map = &dungeon.0;
-        for child in children.iter() {
-            let Ok((mut grid_pos, mut target, mut in_room)) = heroes.get_mut(child) else {
-                continue;
-            };
-            if target.path_index >= target.path.len() {
-                continue;
-            }
 
-            let (nx, ny) = target.path[target.path_index];
-            grid_pos.x = nx;
-            grid_pos.y = ny;
-            in_room.0 = map.room_at(nx, ny);
-            target.path_index += 1;
-        }
-    }
-}
 
 // ── Render proxy systems (Update schedule) ────────────────────────
 
@@ -262,40 +424,75 @@ pub fn move_tokens_along_paths(
 /// is gone (despawned this frame), the proxy is skipped; `cleanup_orphaned_proxies`
 /// will reap it on its next run.
 pub fn sync_proxy_visuals(
+    mut commands: Commands,
     time: Res<Time>,
-    tokens: Query<(&GridPosition, &CombatStats), Or<(With<HeroToken>, With<EnemyToken>)>>,
-    mut proxies: Query<(&RenderProxyOf, &mut Transform, &mut Visibility)>,
+    tokens: Query<(Entity, &GridPosition, &CombatStats, Option<&VisualPathHistory>), Or<(With<HeroToken>, With<EnemyToken>)>>,
+    chests: Query<(Entity, &GridPosition, &LootChest)>,
+    mut proxies: Query<(&RenderProxyOf, &mut Transform, &mut Visibility, &mut VisualPathQueue, Option<&mut Sprite>)>,
 ) {
-    for (proxy_of, mut transform, mut visibility) in &mut proxies {
-        let Ok((grid_pos, stats)) = tokens.get(proxy_of.0) else {
-            continue;
-        };
-        let target_pos = tile_world_pos(grid_pos.x, grid_pos.y);
-        let target_with_z = target_pos.with_z(transform.translation.z);
+    for (proxy_of, mut transform, mut visibility, mut queue, maybe_sprite) in &mut proxies {
+        if let Ok((token_entity, grid_pos, stats, maybe_history)) = tokens.get(proxy_of.0) {
+            // If the token has a traversed path, consume it and append to proxy's queue
+            if let Some(history) = maybe_history {
+                queue.waypoints.extend(&history.waypoints);
+                commands.entity(token_entity).remove::<VisualPathHistory>();
+            }
 
-        // Frame-based smoothing — matches old sync_sprite_positions feel.
-        // Virtual time scaling naturally speeds this up when the sim is fast.
-        let speed_factor = 8.0;
-        transform.translation = transform
-            .translation
-            .lerp(target_with_z, (time.delta_secs() * speed_factor).min(1.0));
+            // Determine current target position (waypoint or final grid position)
+            let target_tile = if let Some(target) = queue.current_target {
+                target
+            } else if !queue.waypoints.is_empty() {
+                let next = queue.waypoints.remove(0);
+                queue.current_target = Some(next);
+                next
+            } else {
+                (grid_pos.x, grid_pos.y)
+            };
 
-        *visibility = if stats.hp <= 0 {
-            Visibility::Hidden
-        } else {
-            Visibility::Visible
-        };
+            let target_pos = tile_world_pos(target_tile.0, target_tile.1);
+            let target_with_z = target_pos.with_z(transform.translation.z);
+
+            // Frame-based smoothing
+            let speed_factor = 8.0;
+            transform.translation = transform
+                .translation
+                .lerp(target_with_z, (time.delta_secs() * speed_factor).min(1.0));
+
+            // If we are close enough to the current waypoint, clear it to advance
+            if queue.current_target.is_some() {
+                let dist = transform.translation.distance(target_with_z);
+                if dist < 2.0 {
+                    queue.current_target = None;
+                }
+            }
+
+            *visibility = if stats.hp <= 0 {
+                Visibility::Hidden
+            } else {
+                Visibility::Visible
+            };
+        } else if let Ok((_, grid_pos, chest)) = chests.get(proxy_of.0) {
+            let target_pos = tile_world_pos(grid_pos.x, grid_pos.y);
+            transform.translation = target_pos.with_z(1.0);
+            *visibility = Visibility::Visible;
+            if let Some(mut sprite) = maybe_sprite {
+                sprite.color = if chest.opened { Color::srgb(0.4, 0.4, 0.4) } else { Color::srgb(0.85, 0.65, 0.15) };
+            }
+        }
     }
 }
 
-/// Despawn proxies whose token no longer exists (killed enemies, etc.).
+/// Despawn proxies whose token or chest no longer exists.
 pub fn cleanup_orphaned_proxies(
     mut commands: Commands,
     proxies: Query<(Entity, &RenderProxyOf)>,
     tokens: Query<(), Or<(With<HeroToken>, With<EnemyToken>)>>,
+    chests: Query<(), With<LootChest>>,
 ) {
     for (proxy, proxy_of) in &proxies {
-        if tokens.get(proxy_of.0).is_err() {
+        let token_exists = tokens.get(proxy_of.0).is_ok();
+        let chest_exists = chests.get(proxy_of.0).is_ok();
+        if !token_exists && !chest_exists {
             commands.entity(proxy).despawn();
         }
     }
@@ -332,5 +529,46 @@ pub fn enemy_color(enemy_type: EnemyType) -> Color {
         EnemyType::Slime => Color::srgb(0.5, 0.9, 0.3),
         EnemyType::Orc => Color::srgb(0.5, 0.15, 0.1),
         EnemyType::BossRat => Color::srgb(0.5, 0.35, 0.2),
+        EnemyType::GiantRat => Color::srgb(0.4, 0.3, 0.2),
+        EnemyType::GoblinArcher => Color::srgb(0.2, 0.6, 0.3),
+        EnemyType::GoblinShaman => Color::srgb(0.4, 0.8, 0.4),
+        EnemyType::SpiderSwarmer => Color::srgb(0.3, 0.1, 0.4),
     }
 }
+
+/// Event component placed on a token entity to trigger visual hit feedback.
+#[derive(Component, Debug, Clone)]
+pub struct VisualHit {
+    pub amount: i32,
+    pub is_hit: bool,
+    pub is_crit: bool,
+    pub effect_type: String, // "Damage", "Heal", "Shield"
+    pub source: Option<Entity>,
+    pub is_signature: bool,
+}
+
+/// Marker component indicating that a token's death has already spawned a death poof.
+#[derive(Component, Debug, Clone)]
+pub struct ProcessedDeath;
+
+/// Represents a telegraphed boss attack targeting a specific room.
+#[derive(Component, Debug, Clone, Reflect)]
+#[reflect(Component)]
+pub struct TelegraphedAttack {
+    pub target_room: usize,
+    pub turns_remaining: u32,
+}
+
+/// Marker component indicating that an enemy is enraged and deals double damage.
+#[derive(Component, Debug, Clone, Reflect)]
+#[reflect(Component)]
+pub struct Enraged;
+
+/// Tracks the state of mid-mission random events for a mission.
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct MissionEventsState {
+    pub events_fired: u32,
+    pub max_events: u32,
+}
+

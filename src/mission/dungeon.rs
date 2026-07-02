@@ -296,27 +296,23 @@ fn find_room_center(node: &BspNode, rng: &mut impl Rng) -> Option<(u32, u32)> {
     let search_left_first = rng.random_bool(0.5);
 
     if search_left_first {
-        if let Some(ref left) = node.left {
-            if let Some(center) = find_room_center(left, rng) {
+        if let Some(ref left) = node.left
+            && let Some(center) = find_room_center(left, rng) {
                 return Some(center);
             }
-        }
-        if let Some(ref right) = node.right {
-            if let Some(center) = find_room_center(right, rng) {
+        if let Some(ref right) = node.right
+            && let Some(center) = find_room_center(right, rng) {
                 return Some(center);
             }
-        }
     } else {
-        if let Some(ref right) = node.right {
-            if let Some(center) = find_room_center(right, rng) {
+        if let Some(ref right) = node.right
+            && let Some(center) = find_room_center(right, rng) {
                 return Some(center);
             }
-        }
-        if let Some(ref left) = node.left {
-            if let Some(center) = find_room_center(left, rng) {
+        if let Some(ref left) = node.left
+            && let Some(center) = find_room_center(left, rng) {
                 return Some(center);
             }
-        }
     }
     None
 }

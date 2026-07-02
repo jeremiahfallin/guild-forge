@@ -45,5 +45,14 @@
                 (gold: 600, materials: [(EnchantedSteel, 3), (ArcaneWood, 3)]),
             ],
         ),
+        (
+            id: Tavern,
+            max_level: 3,
+            level_costs: [
+                (gold: 50, materials: [(Wood, 5)]),
+                (gold: 150, materials: [(Lumber, 4), (RawLeather, 4)]),
+                (gold: 400, materials: [(ArcaneWood, 3), (CuredLeather, 3)]),
+            ],
+        ),
     ],
 )

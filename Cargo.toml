@@ -15,6 +15,7 @@ bevy_declarative = { path = "crates/bevy_declarative" }
 dirs = "6"
 rand = "0.9"
 ron = "0.9"
+rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 # Compile out low-severity logs to improve performance.
 # Remove these features if you want to profile your game with tracy.

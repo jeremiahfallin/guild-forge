@@ -3,164 +3,134 @@
 use bevy::prelude::*;
 use rand::Rng;
 
-use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
+use crate::hero::{HeroInfo, HeroStats, HeroTraits};
 use crate::hero::data::{HeroClass, HeroTrait};
 
-use super::Mission;
 use super::dungeon::{DungeonMap, RoomType};
 use super::entities::*;
 use super::pathfinding::find_path;
 
 /// The action a hero has decided to take this tick.
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, PartialEq, Eq)]
 pub enum HeroAction {
     /// Move toward a room (index into rooms).
     MoveTo(usize),
+    /// Move toward a specific tile.
+    MoveToTile(u32, u32),
     /// Attack an enemy entity.
     Attack(Entity),
     /// Heal an ally entity (Cleric only).
     Heal(Entity),
     /// Stay and hold position.
     Hold,
+    /// Use an ability on a target entity.
+    UseAbility(String, Entity),
+    /// Open a loot chest.
+    OpenChest(Entity),
 }
 
-/// Run AI decision-making for all hero tokens each simulation tick.
-///
-/// Iterates missions and walks `Children` so each mission's heroes only
-/// target enemies within their own dungeon.
-pub fn hero_ai_system(
-    missions: Query<(&super::MissionDungeon, &RoomStatus, &Children), With<Mission>>,
-    heroes: Query<
-        (
-            Entity,
-            &HeroToken,
-            &GridPosition,
-            &InRoom,
-            &CombatStats,
-            Option<&MoveTarget>,
-        ),
-        Without<EnemyToken>,
-    >,
-    hero_data: Query<(&HeroInfo, &HeroStats, &HeroTraits), With<Hero>>,
-    enemies: Query<(Entity, &GridPosition, &InRoom, &CombatStats), With<EnemyToken>>,
-    ally_stats: Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
-    mut commands: Commands,
-) {
-    let mut rng = rand::rng();
 
-    for (dungeon, room_status, children) in &missions {
-        let map = &dungeon.0;
-
-        // Collect this mission's token entities
-        let mission_hero_entities: Vec<Entity> = children
-            .iter()
-            .filter(|c| heroes.get(*c).is_ok())
-            .collect();
-        let mission_enemy_entities: Vec<Entity> = children
-            .iter()
-            .filter(|c| enemies.get(*c).is_ok())
-            .collect();
-
-        for hero_entity in &mission_hero_entities {
-            let Ok((entity, hero_token, grid_pos, in_room, combat, existing_move)) =
-                heroes.get(*hero_entity)
-            else {
-                continue;
-            };
-
-            if combat.hp <= 0 {
-                continue;
-            }
-
-            if let Some(mt) = existing_move {
-                if mt.path_index < mt.path.len() {
-                    continue; // Still moving
-                }
-            }
-
-            let Ok((info, stats, traits)) = hero_data.get(hero_token.0) else {
-                continue;
-            };
-
-            let action = decide_action(
-                entity,
-                info,
-                stats,
-                traits,
-                grid_pos,
-                in_room,
-                combat,
-                map,
-                room_status,
-                &enemies,
-                &mission_enemy_entities,
-                &ally_stats,
-                &mission_hero_entities,
-                &mut rng,
-            );
-
-            match action {
-                HeroAction::MoveTo(room_idx) => {
-                    let room = &map.rooms[room_idx];
-                    let (gx, gy) = room.center();
-                    if let Some(path) = find_path(map, (grid_pos.x, grid_pos.y), (gx, gy)) {
-                        commands.entity(entity).insert(MoveTarget {
-                            path,
-                            path_index: 1, // Skip current position
-                        });
-                    }
-                }
-                HeroAction::Attack(_) | HeroAction::Heal(_) | HeroAction::Hold => {}
-            }
-
-            commands.entity(entity).insert(action);
-        }
-    }
-}
 
 #[allow(clippy::too_many_arguments)]
-fn decide_action(
+pub(crate) fn decide_action(
     entity: Entity,
     info: &HeroInfo,
     stats: &HeroStats,
     traits: &HeroTraits,
-    _grid_pos: &GridPosition,
+    grid_pos: &GridPosition,
     in_room: &InRoom,
     combat: &CombatStats,
     map: &DungeonMap,
     room_status: &RoomStatus,
-    enemies: &Query<(Entity, &GridPosition, &InRoom, &CombatStats), With<EnemyToken>>,
+    enemies: &[(Entity, GridPosition, InRoom, CombatStats)],
     mission_enemies: &[Entity],
-    allies: &Query<(Entity, &CombatStats, &InRoom), (With<HeroToken>, Without<EnemyToken>)>,
+    allies: &[(Entity, CombatStats, InRoom, GridPosition)],
     mission_allies: &[Entity],
+    active_abilities: Option<&ActiveAbilities>,
+    ability_db: Option<&crate::hero::data::AbilityDatabase>,
+    combat_round_count: u32,
+    mission_chests: &[(Entity, GridPosition, InRoom, bool)],
     rng: &mut impl Rng,
+    modifiers: &[super::data::MissionModifier],
+    unsafe_rooms: &[usize],
 ) -> HeroAction {
+    let is_foggy = modifiers.contains(&super::data::MissionModifier::Foggy);
+    let is_cursed_ground = modifiers.contains(&super::data::MissionModifier::CursedGround);
+
     let hp_pct = combat.hp as f32 / combat.max_hp.max(1) as f32;
     let current_room = in_room.0;
 
-    // Find this mission's enemies in the same room
-    let enemies_in_room: Vec<(Entity, &CombatStats)> = mission_enemies
+    // Scatter check: if in an unsafe room (targeted by telegraphed attack), flee to safety!
+    if let Some(r_idx) = current_room {
+        if unsafe_rooms.contains(&r_idx) {
+            let mut best_safe_room = None;
+            let mut best_dist = 9999;
+            for (idx, r) in map.rooms.iter().enumerate() {
+                if idx != r_idx && room_status.visited.get(idx).copied().unwrap_or(false) && !unsafe_rooms.contains(&idx) {
+                    let (cx, cy) = r.center();
+                    if let Some(path) = find_path(map, (grid_pos.x, grid_pos.y), (cx, cy)) {
+                        if path.len() < best_dist {
+                            best_dist = path.len();
+                            best_safe_room = Some(idx);
+                        }
+                    }
+                }
+            }
+            if let Some(safe_idx) = best_safe_room {
+                return HeroAction::MoveTo(safe_idx);
+            }
+        }
+    }
+
+    // Find this mission's enemies in the same room with their grid positions
+    let enemies_in_room: Vec<(Entity, &CombatStats, GridPosition)> = mission_enemies
         .iter()
         .filter_map(|&e| {
-            let (_, _, er, ec) = enemies.get(e).ok()?;
+            let (_, gp, er, ec) = enemies.iter().find(|&&(ent, _, _, _)| ent == e)?;
             if ec.hp > 0 && er.0 == current_room && current_room.is_some() {
-                Some((e, ec))
+                Some((e, ec, *gp))
             } else {
                 None
             }
         })
         .collect();
 
-    // Find this mission's injured allies in the same room
-    let injured_allies: Vec<(Entity, &CombatStats)> = mission_allies
+    // 0. Greedy Loot Chest priority when no enemies around
+    if traits.0.contains(&HeroTrait::Greedy) && enemies_in_room.is_empty() {
+        let unopened_chests_in_room: Vec<(Entity, GridPosition)> = mission_chests
+            .iter()
+            .filter_map(|&(ent, gp, ir, opened)| {
+                if !opened && ir.0 == current_room && current_room.is_some() {
+                    Some((ent, gp))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if let Some(&(chest_ent, chest_gp)) = unopened_chests_in_room
+            .iter()
+            .min_by_key(|(_, gp)| grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y))
+        {
+            let dist = grid_pos.x.abs_diff(chest_gp.x) + grid_pos.y.abs_diff(chest_gp.y);
+            if dist <= 1 {
+                return HeroAction::OpenChest(chest_ent);
+            } else {
+                return HeroAction::MoveToTile(chest_gp.x, chest_gp.y);
+            }
+        }
+    }
+
+    // Find this mission's injured allies in the same room with their grid positions
+    let injured_allies: Vec<(Entity, &CombatStats, GridPosition)> = mission_allies
         .iter()
         .filter_map(|&e| {
             if e == entity {
                 return None;
             }
-            let (_, c, ar) = allies.get(e).ok()?;
+            let (_, c, ar, gp) = allies.iter().find(|&&(ent, _, _, _)| ent == e)?;
             if c.hp > 0 && c.hp < c.max_hp && ar.0 == current_room && current_room.is_some() {
-                Some((e, c))
+                Some((e, c, *gp))
             } else {
                 None
             }
@@ -173,7 +143,7 @@ fn decide_action(
             if e == entity {
                 return None;
             }
-            let (_, c, ar) = allies.get(e).ok()?;
+            let (_, c, ar, _) = allies.iter().find(|&&(ent, _, _, _)| ent == e)?;
             if c.hp > 0 && ar.0 == current_room && current_room.is_some() {
                 Some(())
             } else {
@@ -186,14 +156,36 @@ fn decide_action(
     let mut best_action = HeroAction::Hold;
     let mut best_score = 10.0_f32; // Hold base score
 
-    // 1. Attack — if enemies are in the room
-    if !enemies_in_room.is_empty() {
+    // Determine attack range based on class
+    let mut attack_range = match info.class {
+        HeroClass::Ranger => 6,
+        HeroClass::Mage => 5,
+        _ => 1,
+    };
+    if is_foggy {
+        attack_range = (attack_range / 2).max(1);
+    }
+
+    let mut enemies_in_range = Vec::new();
+    let mut enemies_out_of_range = Vec::new();
+
+    for &(e, ec, gp) in &enemies_in_room {
+        let dist = grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y);
+        if dist <= attack_range {
+            enemies_in_range.push((e, ec, gp));
+        } else {
+            enemies_out_of_range.push((e, ec, gp));
+        }
+    }
+
+    // 1. Attack / Close Distance — if enemies are in the room
+    if !enemies_in_range.is_empty() {
         let mut attack_score = 60.0;
 
         // Bonus for low-HP enemies (finisher instinct)
-        let weakest = enemies_in_room
+        let weakest = enemies_in_range
             .iter()
-            .min_by_key(|(_, c)| c.hp)
+            .min_by_key(|(_, c, _)| c.hp)
             .unwrap();
         let enemy_hp_pct = weakest.1.hp as f32 / weakest.1.max_hp.max(1) as f32;
         if enemy_hp_pct < 0.3 {
@@ -215,25 +207,53 @@ fn decide_action(
             best_score = attack_score;
             best_action = HeroAction::Attack(weakest.0);
         }
+    } else if !enemies_out_of_range.is_empty() {
+        // Find closest enemy out of range to walk toward
+        let closest = enemies_out_of_range
+            .iter()
+            .min_by_key(|(_, _, gp)| grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y))
+            .unwrap();
+
+        let move_score = 55.0; // Higher than standard explore (50.0)
+
+        if move_score > best_score {
+            best_score = move_score;
+            best_action = HeroAction::MoveToTile(closest.2.x, closest.2.y);
+        }
     }
 
-    // 2. Heal — if cleric or high WIS and injured allies present
-    let can_heal = info.class == HeroClass::Cleric || stats.wisdom > 14;
+    // 2. Heal — if cleric or high WIS and injured allies present in range (4 tiles)
+    let can_heal = !is_cursed_ground && (info.class == HeroClass::Cleric || stats.wisdom > 14);
     if can_heal && !injured_allies.is_empty() {
-        let most_injured = injured_allies
+        // Filter injured allies within 4 tiles
+        let allies_in_heal_range: Vec<_> = injured_allies
             .iter()
-            .max_by_key(|(_, c)| c.max_hp - c.hp)
-            .unwrap();
-        let missing_pct = 1.0 - (most_injured.1.hp as f32 / most_injured.1.max_hp.max(1) as f32);
+            .filter(|(_, _, gp)| {
+                let dist = grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y);
+                dist <= 4
+            })
+            .collect();
 
-        let mut heal_score = 70.0 * missing_pct;
+        if !allies_in_heal_range.is_empty() {
+            let most_injured = allies_in_heal_range
+                .iter()
+                .max_by_key(|(_, c, _)| c.max_hp - c.hp)
+                .unwrap();
+            let missing_pct = 1.0 - (most_injured.1.hp as f32 / most_injured.1.max_hp.max(1) as f32);
 
-        // Class multiplier
-        heal_score *= class_heal_mult(&info.class);
+            let mut heal_score = 70.0 * missing_pct;
 
-        if heal_score > best_score {
-            best_score = heal_score;
-            best_action = HeroAction::Heal(most_injured.0);
+            // Class multiplier
+            heal_score *= class_heal_mult(&info.class);
+
+            if traits.0.contains(&HeroTrait::Leader) {
+                heal_score += 15.0;
+            }
+
+            if heal_score > best_score {
+                best_score = heal_score;
+                best_action = HeroAction::Heal(most_injured.0);
+            }
         }
     }
 
@@ -305,7 +325,12 @@ fn decide_action(
     // 5. Flee — move toward entrance if low HP (but not if already there)
     let entrance_idx = map.rooms.iter().position(|r| r.room_type == RoomType::Entrance);
     let already_at_entrance = entrance_idx.is_some_and(|idx| current_room == Some(idx));
-    if hp_pct < 0.25 && !already_at_entrance {
+    let flee_threshold = if traits.0.contains(&HeroTrait::Cautious) {
+        0.30
+    } else {
+        0.25
+    };
+    if hp_pct < flee_threshold && !already_at_entrance {
         let mut flee_score = 60.0;
         if enemies_in_room.len() >= 2 {
             flee_score += 20.0;
@@ -317,9 +342,351 @@ fn decide_action(
             flee_score *= trait_flee_mult(t);
         }
 
-        if flee_score > best_score {
-            if let Some(entrance_idx) = entrance_idx {
+        if flee_score > best_score
+            && let Some(entrance_idx) = entrance_idx {
                 best_action = HeroAction::MoveTo(entrance_idx);
+            }
+    }
+
+    // 6. Cooldown Abilities Evaluation
+    if let (Some(active_abilities), Some(ability_db)) = (active_abilities, ability_db) {
+        for active_ability in &active_abilities.abilities {
+            if active_ability.remaining_cooldown > 0 {
+                continue;
+            }
+
+            let Some(ability_def) = ability_db.get(&active_ability.ability_id) else {
+                continue;
+            };
+
+            let mut range = ability_def.range;
+            if is_foggy {
+                range = (range / 2).max(1);
+            }
+
+            match ability_def.effect {
+                crate::hero::data::AbilityEffect::Damage | crate::hero::data::AbilityEffect::Debuff => {
+                    // Find enemies in the same room within ability range
+                    let mut targets = Vec::new();
+                    for &(e, ec, gp) in &enemies_in_room {
+                        let dist = grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y);
+                        if dist <= range {
+                            targets.push((e, ec, gp));
+                        }
+                    }
+
+                    if targets.is_empty() {
+                        continue;
+                    }
+
+                    // Evaluate based on priority rule
+                    match ability_def.ai_priority {
+                        crate::hero::data::AiPriorityRule::Always => {
+                            let target = targets.iter().min_by_key(|(_, ec, _)| ec.hp).unwrap();
+                            let mut score = 60.0;
+                            let enemy_hp_pct = target.1.hp as f32 / target.1.max_hp.max(1) as f32;
+                            if enemy_hp_pct < 0.3 {
+                                score += 20.0;
+                            }
+                            score += allies_in_room as f32 * 10.0;
+                            score *= class_attack_mult(&info.class);
+                            for t in &traits.0 {
+                                score *= trait_attack_mult(t, allies_in_room);
+                            }
+                            score += 20.0; // Ability bonus
+
+                            if score > best_score {
+                                best_score = score;
+                                best_action = HeroAction::UseAbility(ability_def.id.clone(), target.0);
+                            }
+                        }
+                        crate::hero::data::AiPriorityRule::MultipleEnemiesAdjacent(count) => {
+                            let mut best_target = None;
+                            let mut max_adj_count = 0;
+
+                            for &(e, _, gp) in &targets {
+                                let adj_count = enemies_in_room
+                                    .iter()
+                                    .filter(|(_, _, egp)| egp.x.abs_diff(gp.x) + egp.y.abs_diff(gp.y) <= 1)
+                                    .count() as u32;
+
+                                if adj_count >= count && adj_count > max_adj_count {
+                                    max_adj_count = adj_count;
+                                    best_target = Some((e, adj_count));
+                                }
+                            }
+
+                            if let Some((target_ent, adj_count)) = best_target {
+                                let mut score = 60.0;
+                                score += allies_in_room as f32 * 10.0;
+                                score += (adj_count as f32) * 5.0;
+                                score *= class_attack_mult(&info.class);
+                                for t in &traits.0 {
+                                    score *= trait_attack_mult(t, allies_in_room);
+                                }
+                                score += 20.0; // Ability bonus
+
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), target_ent);
+                                }
+                            }
+                        }
+                        crate::hero::data::AiPriorityRule::Flanking => {
+                            let mut flanked_targets = Vec::new();
+                            for &(e, ec, gp) in &targets {
+                                let is_flanked = allies.iter().any(|(ally_ent, _, _, ally_gp)| {
+                                    ally_ent != &entity
+                                        && ally_gp.x.abs_diff(gp.x) + ally_gp.y.abs_diff(gp.y) <= 1
+                                });
+                                if is_flanked {
+                                    flanked_targets.push((e, ec));
+                                }
+                            }
+
+                            if !flanked_targets.is_empty() {
+                                let target = flanked_targets.iter().min_by_key(|(_, ec)| ec.hp).unwrap();
+                                let mut score = 60.0;
+                                let enemy_hp_pct = target.1.hp as f32 / target.1.max_hp.max(1) as f32;
+                                if enemy_hp_pct < 0.3 {
+                                    score += 20.0;
+                                }
+                                score += allies_in_room as f32 * 10.0;
+                                score *= class_attack_mult(&info.class);
+                                for t in &traits.0 {
+                                    score *= trait_attack_mult(t, allies_in_room);
+                                }
+                                score += 25.0; // Ability bonus
+
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), target.0);
+                                }
+                            }
+                        }
+                        crate::hero::data::AiPriorityRule::RogueAssassinate => {
+                            let mut eligible = Vec::new();
+                            for &(e, ec, _) in &targets {
+                                let target_hp_pct = ec.hp as f32 / ec.max_hp.max(1) as f32;
+                                let hp_threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                    0.5
+                                } else if traits.0.contains(&HeroTrait::Cautious) {
+                                    0.15
+                                } else {
+                                    0.3
+                                };
+                                if target_hp_pct < hp_threshold {
+                                    eligible.push((e, ec));
+                                }
+                            }
+                            if !eligible.is_empty() {
+                                let target = eligible.iter().min_by_key(|(_, ec)| ec.hp).unwrap();
+                                let score = 95.0;
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), target.0);
+                                }
+                            }
+                        }
+                        crate::hero::data::AiPriorityRule::MageMeteor => {
+                            let mut best_target = None;
+                            let mut max_adj_count = 0;
+                            for &(e, _, gp) in &targets {
+                                let adj_count = enemies_in_room
+                                    .iter()
+                                    .filter(|(_, _, egp)| egp.x.abs_diff(gp.x) + egp.y.abs_diff(gp.y) <= 1)
+                                    .count() as u32;
+                                if adj_count > max_adj_count {
+                                    max_adj_count = adj_count;
+                                    best_target = Some(e);
+                                }
+                            }
+                            let cluster_threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                2
+                            } else if traits.0.contains(&HeroTrait::Cautious) {
+                                4
+                            } else {
+                                3
+                            };
+                            let round_threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                3
+                            } else if traits.0.contains(&HeroTrait::Cautious) {
+                                7
+                            } else {
+                                5
+                            };
+                            if (max_adj_count >= cluster_threshold || combat_round_count >= round_threshold)
+                                && let Some(target_ent) = best_target {
+                                    let score = 95.0;
+                                    if score > best_score {
+                                        best_score = score;
+                                        best_action = HeroAction::UseAbility(ability_def.id.clone(), target_ent);
+                                    }
+                                }
+                        }
+                        crate::hero::data::AiPriorityRule::RangerVolley => {
+                            let mut best_target = None;
+                            let mut max_cluster_count = 0;
+                            for &(e, _, gp) in &targets {
+                                let cluster_count = enemies_in_room
+                                    .iter()
+                                    .filter(|(_, _, egp)| egp.x.abs_diff(gp.x) + egp.y.abs_diff(gp.y) <= 2)
+                                    .count() as u32;
+                                if cluster_count > max_cluster_count {
+                                    max_cluster_count = cluster_count;
+                                    best_target = Some(e);
+                                }
+                            }
+                            let cluster_threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                2
+                            } else if traits.0.contains(&HeroTrait::Cautious) {
+                                4
+                            } else {
+                                3
+                            };
+                            if max_cluster_count >= cluster_threshold
+                                && let Some(target_ent) = best_target {
+                                    let score = 95.0;
+                                    if score > best_score {
+                                        best_score = score;
+                                        best_action = HeroAction::UseAbility(ability_def.id.clone(), target_ent);
+                                    }
+                                }
+                        }
+                        _ => {}
+                    }
+                }
+                crate::hero::data::AbilityEffect::Heal => {
+                    if is_cursed_ground {
+                        continue;
+                    }
+                    let mut heal_targets = Vec::new();
+                    if combat.hp < combat.max_hp {
+                        heal_targets.push((entity, combat.clone(), *grid_pos));
+                    }
+                    for &(ally_ent, ref ally_cs, ar, ally_gp) in allies {
+                        if ally_ent == entity {
+                            continue;
+                        }
+                        if ar.0 == current_room && current_room.is_some() && ally_cs.hp < ally_cs.max_hp {
+                            let dist = grid_pos.x.abs_diff(ally_gp.x) + grid_pos.y.abs_diff(ally_gp.y);
+                            if dist <= range {
+                                heal_targets.push((ally_ent, ally_cs.clone(), ally_gp));
+                            }
+                        }
+                    }
+
+                    if heal_targets.is_empty() {
+                        continue;
+                    }
+
+                    match ability_def.ai_priority {
+                        crate::hero::data::AiPriorityRule::HpBelowPct(pct) => {
+                            let eligible: Vec<_> = heal_targets
+                                .into_iter()
+                                .filter(|(_, cs, _)| (cs.hp as f32 / cs.max_hp.max(1) as f32) < pct)
+                                .collect();
+
+                            if !eligible.is_empty() {
+                                let target = eligible.iter().min_by_key(|(_, cs, _)| cs.hp).unwrap();
+                                let target_hp_pct = target.1.hp as f32 / target.1.max_hp.max(1) as f32;
+                                let mut score = 70.0 * (1.0 - target_hp_pct);
+                                score *= class_heal_mult(&info.class);
+                                score += 25.0; // Ability bonus
+                                if traits.0.contains(&HeroTrait::Leader) {
+                                    score += 15.0;
+                                }
+
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), target.0);
+                                }
+                            }
+                        }
+                        crate::hero::data::AiPriorityRule::ClericMassHeal => {
+                            let low_hp_count = heal_targets
+                                .iter()
+                                .filter(|(_, cs, _)| (cs.hp as f32 / cs.max_hp.max(1) as f32) < 0.4)
+                                .count();
+                            let target_count_threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                1
+                            } else if traits.0.contains(&HeroTrait::Cautious) {
+                                3
+                            } else {
+                                2
+                            };
+                            if low_hp_count >= target_count_threshold {
+                                let target = heal_targets.iter().min_by_key(|(_, cs, _)| cs.hp).unwrap();
+                                let mut score = 95.0;
+                                if traits.0.contains(&HeroTrait::Leader) {
+                                    score += 15.0;
+                                }
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), target.0);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                crate::hero::data::AbilityEffect::Shield | crate::hero::data::AbilityEffect::Buff => {
+                    if range == 0 {
+                        match ability_def.ai_priority {
+                            crate::hero::data::AiPriorityRule::HpBelowPct(pct) => {
+                                if hp_pct < pct {
+                                    let mut score = 80.0 + (1.0 - hp_pct) * 15.0;
+                                    if traits.0.contains(&HeroTrait::Leader) {
+                                        score += 15.0;
+                                    }
+                                    if score > best_score {
+                                        best_score = score;
+                                        best_action = HeroAction::UseAbility(ability_def.id.clone(), entity);
+                                    }
+                                }
+                            }
+                            crate::hero::data::AiPriorityRule::Always => {
+                                let mut score = 75.0;
+                                if traits.0.contains(&HeroTrait::Leader) {
+                                    score += 15.0;
+                                }
+                                if score > best_score {
+                                    best_score = score;
+                                    best_action = HeroAction::UseAbility(ability_def.id.clone(), entity);
+                                }
+                            }
+                            crate::hero::data::AiPriorityRule::WarriorRallyingCry => {
+                                let adj_enemies = enemies_in_room
+                                    .iter()
+                                    .filter(|(_, _, gp)| grid_pos.x.abs_diff(gp.x) + grid_pos.y.abs_diff(gp.y) <= 1)
+                                    .count();
+                                let threshold = if traits.0.contains(&HeroTrait::Brave) {
+                                    1
+                                } else if traits.0.contains(&HeroTrait::Cautious) {
+                                    3
+                                } else {
+                                    2
+                                };
+                                let round_ok = if traits.0.contains(&HeroTrait::Cautious) {
+                                    combat_round_count >= 3
+                                } else {
+                                    combat_round_count == 1
+                                };
+                                if round_ok || adj_enemies >= threshold {
+                                    let mut score = 95.0;
+                                    if traits.0.contains(&HeroTrait::Leader) {
+                                        score += 15.0;
+                                    }
+                                    if score > best_score {
+                                        best_score = score;
+                                        best_action = HeroAction::UseAbility(ability_def.id.clone(), entity);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
     }

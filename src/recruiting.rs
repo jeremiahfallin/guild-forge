@@ -7,7 +7,7 @@ use crate::buildings::GuildBuildings;
 use crate::economy::Gold;
 use crate::equipment::HeroEquipment;
 use crate::hero::data::*;
-use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits};
+use crate::hero::{Hero, HeroInfo, HeroStats, HeroTraits, HeroPortrait};
 use crate::reputation::Reputation;
 use crate::screens::Screen;
 
@@ -35,6 +35,8 @@ pub struct Applicant {
     pub growth: crate::hero::HeroGrowth,
     pub hire_cost: u32,
     pub time_remaining: f32,
+    pub portrait: HeroPortrait,
+    pub portrait_handle: Option<Handle<Image>>,
 }
 
 /// The applicant board resource tracking available candidates.
@@ -122,6 +124,8 @@ fn generate_applicant(
 
     let growth = crate::hero::roll_growth(class_def, quality, rng);
 
+    let portrait = HeroPortrait::random(rng);
+
     Applicant {
         name,
         class: class_def.id,
@@ -130,6 +134,8 @@ fn generate_applicant(
         growth,
         hire_cost,
         time_remaining,
+        portrait,
+        portrait_handle: None,
     }
 }
 
@@ -142,6 +148,7 @@ fn tick_applicant_board(
     class_db: Res<ClassDatabase>,
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let dt = time.delta_secs();
 
@@ -159,8 +166,10 @@ fn tick_applicant_board(
         let max = buildings.max_applicants() as usize;
         if board.applicants.len() < max {
             let mut rng = rand::rng();
-            let applicant =
+            let mut applicant =
                 generate_applicant(&reputation, &buildings, &class_db, &trait_db, &name_db, &mut rng);
+            let img = crate::hero::portrait::composite_portrait(&applicant.portrait, None);
+            applicant.portrait_handle = Some(images.add(img));
             info!("New applicant arrived: {} ({})", applicant.name, applicant.class);
             board.applicants.push(applicant);
         }
@@ -175,6 +184,7 @@ fn seed_applicant_board(
     class_db: Res<ClassDatabase>,
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     if !board.applicants.is_empty() || crate::save::has_save_file() {
         return;
@@ -182,8 +192,10 @@ fn seed_applicant_board(
 
     let mut rng = rand::rng();
     for _ in 0..2 {
-        let applicant =
+        let mut applicant =
             generate_applicant(&reputation, &buildings, &class_db, &trait_db, &name_db, &mut rng);
+        let img = crate::hero::portrait::composite_portrait(&applicant.portrait, None);
+        applicant.portrait_handle = Some(images.add(img));
         info!("Seeded applicant: {} ({})", applicant.name, applicant.class);
         board.applicants.push(applicant);
     }
@@ -235,6 +247,11 @@ fn handle_hire_applicant(
     let hero_name = applicant.name.clone();
     let hero_class = applicant.class;
 
+    let base_move_range = match applicant.class {
+        HeroClass::Rogue | HeroClass::Ranger => 4,
+        _ => 3,
+    };
+
     // Spawn hero entity
     commands.spawn((
         Name::new(applicant.name.clone()),
@@ -251,12 +268,21 @@ fn handle_hire_applicant(
         HeroEquipment::default(),
         applicant.growth,
         crate::hero::HeroStatProgress::default(),
+        crate::hero::Fatigue { current: 100.0, max_base: 100.0 },
+        crate::mission::entities::MoveRange {
+            base: base_move_range,
+            bonus: 0,
+        },
+        crate::hero::history::HeroHistory::default(),
+        crate::hero::Epithet(None),
+        applicant.portrait,
     ));
 
     commands.trigger(crate::ui::toast::ToastEvent {
         title: format!("{hero_name} joined the guild!"),
         body: format!("{hero_class} — hired for {cost}g"),
         kind: crate::ui::toast::ToastKind::Success,
+        action: None,
     });
 
     info!("Hired applicant for {} gold", cost);

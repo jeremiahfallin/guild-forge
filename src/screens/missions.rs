@@ -7,34 +7,124 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
-    mission::data::MissionTemplateDatabase,
+    mission::data::{MissionTemplateDatabase, MissionModifier},
+    mission::dungeon::DungeonMap,
     screens::GameTab,
     theme::{palette::*, widgets},
 };
+use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(OnEnter(GameTab::Missions), spawn_mission_board);
+    app.init_resource::<MissionBoard>();
+    app.add_systems(Update, update_mission_board.run_if(in_state(GameTab::Missions)));
 }
 
-/// Tracks which mission template the player selected.
-#[derive(Resource, Default, Debug)]
-pub struct SelectedMission(pub Option<usize>);
+/// Active mission board offers.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct MissionBoard {
+    pub offers: Vec<MissionOffer>,
+    pub rescue_offers: Vec<RescueOffer>,
+}
 
-/// Component on mission list buttons, storing which template index they represent.
+#[derive(Debug, Clone)]
+pub struct RescueOffer {
+    pub template_idx: usize,
+    pub modifiers: Vec<MissionModifier>,
+    pub map: DungeonMap,
+    pub rescue_heroes: Vec<Entity>,
+    pub expires_at: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MissionOffer {
+    pub template_idx: usize,
+    pub modifiers: Vec<MissionModifier>,
+}
+
+/// Tracks which mission offer index in MissionBoard the player selected.
+#[derive(Resource, Default, Debug)]
+pub struct SelectedMission {
+    pub index: Option<usize>,
+    pub is_rescue: bool,
+}
+
+/// Component on mission list buttons, storing which offer index they represent.
 #[derive(Component)]
 struct SelectMissionButton(usize);
 
-fn spawn_mission_board(
+/// Component on rescue mission buttons, storing which rescue offer index they represent.
+#[derive(Component)]
+struct SelectRescueButton(usize);
+
+/// Marker for the mission board UI root.
+#[derive(Component)]
+struct MissionBoardUi;
+
+fn update_mission_board(
     mut commands: Commands,
+    mut timer: Local<f32>,
+    time: Res<Time<Virtual>>,
     gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
     templates: Option<Res<MissionTemplateDatabase>>,
     reputation: Res<crate::reputation::Reputation>,
+    mut board: ResMut<MissionBoard>,
+    board_ui: Query<Entity, With<MissionBoardUi>>,
+    hero_infos: Query<(&crate::hero::HeroInfo, Option<&crate::hero::Epithet>)>,
 ) {
+    let has_ui = !board_ui.is_empty();
+    let mut should_rebuild = !has_ui;
+
+    if has_ui && !board.rescue_offers.is_empty() {
+        *timer += time.delta_secs();
+        if *timer >= 1.0 {
+            *timer = 0.0;
+            should_rebuild = true;
+        }
+    } else {
+        *timer = 0.0;
+    }
+
+    if !should_rebuild {
+        return;
+    }
+
     let Ok(root_entity) = gameplay_root.single() else { return };
     commands.init_resource::<SelectedMission>();
 
+    // Clean up old UI
+    for entity in &board_ui {
+        commands.entity(entity).despawn();
+    }
+
+    if let Some(templates) = &templates {
+        if board.offers.len() != templates.0.len() {
+            board.offers.clear();
+            let mut rng = rand::rng();
+            for (idx, template) in templates.0.iter().enumerate() {
+                let mut modifiers = Vec::new();
+                if !template.allowed_modifiers.is_empty() {
+                    let num_modifiers = rng.random_range(0..=2);
+                    if num_modifiers > 0 {
+                        let mut pool = template.allowed_modifiers.clone();
+                        for _ in 0..num_modifiers {
+                            if pool.is_empty() {
+                                break;
+                            }
+                            let p_idx = rng.random_range(0..pool.len());
+                            modifiers.push(pool.remove(p_idx));
+                        }
+                    }
+                }
+                board.offers.push(MissionOffer {
+                    template_idx: idx,
+                    modifiers,
+                });
+            }
+        }
+    }
+
     let mut root = widgets::content_area("Mission Board")
-        .insert(DespawnOnExit(GameTab::Missions));
+        .insert((DespawnOnExit(GameTab::Missions), MissionBoardUi));
 
     // Top bar
     let top_bar = div()
@@ -59,7 +149,107 @@ fn spawn_mission_board(
             .overflow_y_scroll()
             .insert((Name::new("Mission List"), ScrollPosition::default()));
 
-        for (idx, template) in templates.0.iter().enumerate() {
+        // Render rescue offers pinned to the top
+        for (idx, offer) in board.rescue_offers.iter().enumerate() {
+            let template = &templates.0[offer.template_idx];
+            let remaining_secs = (offer.expires_at - time.elapsed_secs_f64()).max(0.0);
+            let countdown_str = crate::hero::status::format_countdown(remaining_secs);
+
+            let rescued_names: Vec<String> = offer
+                .rescue_heroes
+                .iter()
+                .filter_map(|e| hero_infos.get(*e).ok().map(|(hi, ep)| crate::hero::format_hero_name(&hi.name, ep)))
+                .collect();
+            let rescued_names_str = rescued_names.join(", ");
+
+            let info_row = div()
+                .row()
+                .gap(px(16.0))
+                .child(
+                    text(format!("Rescue Window: {countdown_str}"))
+                        .font_size(16.0)
+                        .color(Color::srgb(1.0, 0.4, 0.4)),
+                )
+                .child(
+                    text(format!("Rescuing: {rescued_names_str}"))
+                        .font_size(16.0)
+                        .color(Color::srgb(0.9, 0.7, 0.7)),
+                );
+
+            let mut card = div()
+                .row()
+                .w(px(700.0))
+                .p(px(16.0))
+                .gap(px(16.0))
+                .items_center()
+                .bg(Color::srgba(0.25, 0.08, 0.08, 0.6))
+                .rounded(px(8.0))
+                .insert((
+                    SelectRescueButton(idx),
+                    BorderColor::all(Color::srgb(0.9, 0.2, 0.2)),
+                    bevy_declarative::InteractionPalette {
+                        none: Color::srgba(0.25, 0.08, 0.08, 0.6),
+                        hovered: Color::srgba(0.35, 0.12, 0.12, 0.8),
+                        pressed: Color::srgba(0.20, 0.05, 0.05, 0.9),
+                    }
+                ))
+                .on_click(select_rescue_mission);
+            card.style_mut().border = UiRect::all(Val::Px(2.5));
+
+            let mut name_row = div().row().items_center().gap(px(8.0))
+                .child(
+                    text("⚠️ RESCUE REQUIRED:")
+                        .font_size(18.0)
+                        .color(Color::srgb(1.0, 0.3, 0.3))
+                )
+                .child(
+                    text(&template.name)
+                        .font_size(22.0)
+                        .color(Color::srgb(1.0, 0.8, 0.8)),
+                );
+
+            for modifier in &offer.modifiers {
+                let badge_bg = match modifier {
+                    MissionModifier::Bountiful => Color::srgb(0.1, 0.5, 0.2),
+                    MissionModifier::CursedGround => Color::srgb(0.6, 0.1, 0.1),
+                    MissionModifier::Infested => Color::srgb(0.7, 0.5, 0.1),
+                    MissionModifier::Trapped => Color::srgb(0.5, 0.1, 0.5),
+                    MissionModifier::Foggy => Color::srgb(0.4, 0.4, 0.4),
+                };
+                let badge_text = modifier.to_string();
+                name_row = name_row.child(
+                    div()
+                        .p(px(4.0))
+                        .bg(badge_bg)
+                        .rounded(px(4.0))
+                        .child(
+                            text(badge_text)
+                                .font_size(12.0)
+                                .color(Color::srgb(1.0, 1.0, 1.0)),
+                        )
+                );
+            }
+
+            list = list.child(
+                card.child(
+                    div()
+                        .col()
+                        .flex_1()
+                        .gap(px(4.0))
+                        .child(name_row)
+                        .child(
+                            text(&template.description)
+                                .font_size(16.0)
+                                .color(Color::srgb(0.9, 0.8, 0.8)),
+                        )
+                        .child(info_row),
+                ),
+            );
+        }
+
+        // Render standard offers
+        for (idx, offer) in board.offers.iter().enumerate() {
+            let template = &templates.0[offer.template_idx];
             if reputation.0 < template.reputation_required {
                 continue;
             }
@@ -118,35 +308,61 @@ fn spawn_mission_board(
                         .color(Color::srgb(0.5, 0.7, 0.5)),
                 );
 
+            let mut card = div()
+                .row()
+                .w(px(700.0))
+                .p(px(16.0))
+                .gap(px(16.0))
+                .items_center()
+                .bg(CARD_BACKGROUND)
+                .rounded(px(8.0))
+                .insert((SelectMissionButton(idx), BorderColor::all(BORDER_IRON)))
+                .on_click(select_mission);
+            card.style_mut().border = UiRect::all(Val::Px(1.5));
+
+            let mut name_row = div().row().items_center().gap(px(8.0)).child(
+                text(&template.name)
+                    .font_size(22.0)
+                    .color(HEADER_TEXT),
+            );
+
+            for modifier in &offer.modifiers {
+                let badge_bg = match modifier {
+                    MissionModifier::Bountiful => Color::srgb(0.1, 0.5, 0.2),
+                    MissionModifier::CursedGround => Color::srgb(0.6, 0.1, 0.1),
+                    MissionModifier::Infested => Color::srgb(0.7, 0.5, 0.1),
+                    MissionModifier::Trapped => Color::srgb(0.5, 0.1, 0.5),
+                    MissionModifier::Foggy => Color::srgb(0.4, 0.4, 0.4),
+                };
+                let badge_text = modifier.to_string();
+                name_row = name_row.child(
+                    div()
+                        .p(px(4.0))
+                        .bg(badge_bg)
+                        .rounded(px(4.0))
+                        .child(
+                            text(badge_text)
+                                .font_size(12.0)
+                                .color(Color::srgb(1.0, 1.0, 1.0)),
+                        )
+                );
+            }
+
             list = list.child(
-                div()
-                    .row()
-                    .w(px(700.0))
-                    .p(px(16.0))
-                    .gap(px(16.0))
-                    .items_center()
-                    .bg(Color::srgba(0.2, 0.2, 0.3, 0.6))
-                    .rounded(px(8.0))
-                    .insert(SelectMissionButton(idx))
-                    .on_click(select_mission)
-                    .child(
-                        div()
-                            .col()
-                            .flex_1()
-                            .gap(px(4.0))
-                            .child(
-                                text(&template.name)
-                                    .font_size(26.0)
-                                    .color(HEADER_TEXT),
-                            )
-                            .child(
-                                text(&template.description)
-                                    .font_size(16.0)
-                                    .color(LABEL_TEXT),
-                            )
-                            .child(info_row)
-                            .child(drops_row),
-                    ),
+                card.child(
+                    div()
+                        .col()
+                        .flex_1()
+                        .gap(px(4.0))
+                        .child(name_row)
+                        .child(
+                            text(&template.description)
+                                .font_size(16.0)
+                                .color(LABEL_TEXT),
+                        )
+                        .child(info_row)
+                        .child(drops_row),
+                ),
             );
         }
 
@@ -165,7 +381,21 @@ fn select_mission(
     mut next_tab: ResMut<NextState<GameTab>>,
 ) {
     if let Ok(button) = buttons.get(click.event_target()) {
-        selected.0 = Some(button.0);
+        selected.index = Some(button.0);
+        selected.is_rescue = false;
+        next_tab.set(GameTab::PartySelect);
+    }
+}
+
+fn select_rescue_mission(
+    click: On<Pointer<Click>>,
+    buttons: Query<&SelectRescueButton>,
+    mut selected: ResMut<SelectedMission>,
+    mut next_tab: ResMut<NextState<GameTab>>,
+) {
+    if let Ok(button) = buttons.get(click.event_target()) {
+        selected.index = Some(button.0);
+        selected.is_rescue = true;
         next_tab.set(GameTab::PartySelect);
     }
 }

@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
-use crate::equipment::HeroEquipment;
+use crate::equipment::{HeroEquipment, GearRarity, BehavioralAffix};
 use crate::hero::data::{ClassDatabase, HeroClass, HeroTrait};
 use crate::hero::status::{Injured, Missing};
 use crate::hero::{
@@ -18,11 +18,12 @@ use crate::hero::{
 use crate::materials::{MaterialType, Materials};
 use crate::mission::dungeon::DungeonMap;
 use crate::mission::entities::{
-    CombatStats, EnemyToken, GridPosition, HeroToken, InRoom, MoveTarget, RoomStatus,
+    CombatStats, EnemyToken, GridPosition, HeroToken, InRoom, MoveTarget, RoomStatus, MoveRange,
 };
 use crate::mission::{
     Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
 };
+use crate::ui::feed::{MissionLogHistory, MissionLogEntry};
 use crate::recruiting::{Applicant, ApplicantBoard};
 use crate::reputation::Reputation;
 use crate::mission::data::EnemyType;
@@ -88,25 +89,55 @@ fn load_save(
     existing_heroes: Query<(), With<Hero>>,
     class_db: Res<ClassDatabase>,
     time: Res<Time<Virtual>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     // Already have heroes — skip (re-entry or already loaded).
     if !existing_heroes.is_empty() {
         return;
     }
 
-    // Read the save file.
     let Some(path) = save_file_path() else {
         return;
     };
-    let Ok(ron_string) = std::fs::read_to_string(&path) else {
-        return;
-    };
-    let save_data: SaveData = match ron::from_str(&ron_string) {
-        Ok(d) => d,
-        Err(e) => {
-            warn!("Failed to deserialize save file: {e}");
-            return;
+    let bak_path = path.with_extension("ron.bak");
+
+    let mut loaded_data = None;
+
+    if path.exists() {
+        if let Ok(ron_string) = std::fs::read_to_string(&path) {
+            match deserialize_and_migrate(&ron_string) {
+                Ok(data) => {
+                    loaded_data = Some(data);
+                }
+                Err(e) => {
+                    warn!("Failed to load save file: {e}. Trying backup...");
+                }
+            }
         }
+    }
+
+    if loaded_data.is_none() && bak_path.exists() {
+        if let Ok(ron_string) = std::fs::read_to_string(&bak_path) {
+            match deserialize_and_migrate(&ron_string) {
+                Ok(data) => {
+                    loaded_data = Some(data);
+                    info!("Restored save game from backup");
+                }
+                Err(e) => {
+                    warn!("Failed to load backup save file: {e}");
+                }
+            }
+        }
+    }
+
+    if loaded_data.is_none() && path.exists() {
+        let corrupt_path = path.with_extension("ron.corrupt");
+        warn!("Save game is corrupted and backup recovery failed. Renaming corrupt file to: {}", corrupt_path.display());
+        let _ = std::fs::rename(&path, corrupt_path);
+    }
+
+    let Some(save_data) = loaded_data else {
+        return;
     };
 
     info!("Loading save from {}", path.display());
@@ -122,21 +153,38 @@ fn load_save(
     let applicants: Vec<Applicant> = save_data
         .applicants
         .iter()
-        .map(|a| Applicant {
-            name: a.name.clone(),
-            class: a.class,
-            traits: a.traits.clone(),
-            stats: HeroStats {
-                strength: a.stats.strength,
-                dexterity: a.stats.dexterity,
-                constitution: a.stats.constitution,
-                intelligence: a.stats.intelligence,
-                wisdom: a.stats.wisdom,
-                charisma: a.stats.charisma,
-            },
-            growth: restore_growth(&a.growth, a.class, &class_db),
-            hire_cost: a.hire_cost,
-            time_remaining: a.time_remaining,
+        .map(|a| {
+            let portrait = a.portrait.as_ref().map(|p| {
+                crate::hero::HeroPortrait {
+                    base_idx: p.base_idx,
+                    hair_idx: p.hair_idx,
+                    hair_color: Color::srgba(p.hair_color[0], p.hair_color[1], p.hair_color[2], p.hair_color[3]),
+                    gear_idx: p.gear_idx,
+                }
+            }).unwrap_or_else(|| {
+                crate::hero::HeroPortrait::random(&mut rand::rng())
+            });
+            let image = crate::hero::portrait::composite_portrait(&portrait, None);
+            let portrait_handle = Some(images.add(image));
+
+            Applicant {
+                name: a.name.clone(),
+                class: a.class,
+                traits: a.traits.clone(),
+                stats: HeroStats {
+                    strength: a.stats.strength,
+                    dexterity: a.stats.dexterity,
+                    constitution: a.stats.constitution,
+                    intelligence: a.stats.intelligence,
+                    wisdom: a.stats.wisdom,
+                    charisma: a.stats.charisma,
+                },
+                growth: restore_growth(&a.growth, a.class, &class_db),
+                hire_cost: a.hire_cost,
+                time_remaining: a.time_remaining,
+                portrait,
+                portrait_handle,
+            }
         })
         .collect();
     commands.insert_resource(ApplicantBoard {
@@ -168,8 +216,14 @@ fn load_save(
             HeroTraits(dto.traits.clone()),
             HeroEquipment {
                 weapon_tier: dto.equipment.weapon_tier,
+                weapon_rarity: dto.equipment.weapon_rarity,
+                weapon_affix: dto.equipment.weapon_affix,
                 armor_tier: dto.equipment.armor_tier,
+                armor_rarity: dto.equipment.armor_rarity,
+                armor_affix: dto.equipment.armor_affix,
                 accessory_tier: dto.equipment.accessory_tier,
+                accessory_rarity: dto.equipment.accessory_rarity,
+                accessory_affix: dto.equipment.accessory_affix,
             },
             restore_growth(&dto.growth, dto.class, &class_db),
             HeroStatProgress {
@@ -180,6 +234,38 @@ fn load_save(
                 wisdom: dto.progress.wisdom,
                 charisma: dto.progress.charisma,
             },
+            crate::hero::Fatigue {
+                current: dto.fatigue_current,
+                max_base: dto.fatigue_max_base,
+            },
+            MoveRange {
+                base: dto.move_range_base,
+                bonus: dto.move_range_bonus,
+            },
+            crate::hero::history::HeroHistory {
+                missions_run: dto.history.missions_run,
+                kills: dto.history.kills,
+                near_deaths: dto.history.near_deaths,
+                rescues_given: dto.history.rescues_given,
+                rescues_received: dto.history.rescues_received,
+                lifetime_gold: dto.history.lifetime_gold,
+                timeline: if dto.history.timeline.is_empty() {
+                    vec!["Joined the guild".to_string()]
+                } else {
+                    dto.history.timeline.clone()
+                },
+            },
+            crate::hero::Epithet(dto.epithet.clone()),
+            dto.portrait.as_ref().map(|p| {
+                crate::hero::HeroPortrait {
+                    base_idx: p.base_idx,
+                    hair_idx: p.hair_idx,
+                    hair_color: Color::srgba(p.hair_color[0], p.hair_color[1], p.hair_color[2], p.hair_color[3]),
+                    gear_idx: p.gear_idx,
+                }
+            }).unwrap_or_else(|| {
+                crate::hero::HeroPortrait::random(&mut rand::rng())
+            }),
         ));
         if dto.favorite {
             entity_commands.insert(Favorite);
@@ -189,6 +275,18 @@ fn load_save(
         }
         let now = time.elapsed_secs_f64();
         if let Some(rem) = dto.missing_remaining {
+            let dropped = dto.dropped_equipment.as_ref().map(|eq| crate::equipment::HeroEquipment {
+                weapon_tier: eq.weapon_tier,
+                weapon_rarity: eq.weapon_rarity,
+                weapon_affix: eq.weapon_affix,
+                armor_tier: eq.armor_tier,
+                armor_rarity: eq.armor_rarity,
+                armor_affix: eq.armor_affix,
+                accessory_tier: eq.accessory_tier,
+                accessory_rarity: eq.accessory_rarity,
+                accessory_affix: eq.accessory_affix,
+            });
+
             if rem < NEAR_EXPIRED_MISSING_THRESHOLD_SECS {
                 // Save was taken in the final second of Missing — restoring
                 // the tail would just fire the "X has returned" toast moments
@@ -199,7 +297,10 @@ fn load_save(
                     expires_at: now + INJURED_DURATION_SECS,
                 });
             } else {
-                entity_commands.insert(Missing { expires_at: now + rem });
+                entity_commands.insert(Missing {
+                    expires_at: now + rem,
+                    dropped_equipment: dropped,
+                });
             }
         }
         if let Some(rem) = dto.injured_remaining {
@@ -217,24 +318,45 @@ fn load_save(
             .filter_map(|&idx| hero_entities.get(idx).copied())
             .collect();
 
-        let mission_entity = commands
-            .spawn((
-                Name::new(mdto.name.clone()),
-                Mission,
-                MissionInfo {
-                    template_id: mdto.template_id.clone(),
-                    name: mdto.name.clone(),
-                    difficulty: mdto.difficulty,
-                },
-                mdto.progress,
-                MissionParty(party_entities.clone()),
-                MissionDungeon(mdto.dungeon_map.clone()),
-                RoomStatus {
-                    visited: mdto.room_visited.clone(),
-                    cleared: mdto.room_cleared.clone(),
-                },
-            ))
-            .id();
+        let mut mission_cmd = commands.spawn((
+            Name::new(mdto.name.clone()),
+            Mission,
+            MissionInfo {
+                template_id: mdto.template_id.clone(),
+                name: mdto.name.clone(),
+                difficulty: mdto.difficulty,
+                modifiers: mdto.modifiers.clone(),
+                biome: mdto.biome,
+            },
+            mdto.progress,
+            MissionParty(party_entities.clone()),
+            MissionDungeon(mdto.dungeon_map.clone()),
+            RoomStatus {
+                visited: mdto.room_visited.clone(),
+                cleared: mdto.room_cleared.clone(),
+            },
+            crate::mission::entities::MissionTurnQueue::default(),
+            crate::mission::entities::MissionEventsState {
+                events_fired: mdto.events_fired,
+                max_events: mdto.max_events,
+            },
+            MissionLogHistory {
+                logs: mdto.logs.clone(),
+            },
+        ));
+
+        if let Some(ref rescue_indices) = mdto.rescue_hero_indices {
+            let rescue_entities: Vec<Entity> = rescue_indices
+                .iter()
+                .filter_map(|&idx| hero_entities.get(idx).copied())
+                .collect();
+            mission_cmd.insert(crate::mission::RescueMission {
+                rescue_heroes: rescue_entities,
+                gear_recovered: mdto.rescue_gear_recovered.unwrap_or(false),
+            });
+        }
+
+        let mission_entity = mission_cmd.id();
 
         // Mark party heroes as on-mission.
         for &hero_entity in &party_entities {
@@ -247,8 +369,24 @@ fn load_save(
                 .get(ht.roster_index)
                 .copied()
                 .unwrap_or(Entity::PLACEHOLDER);
+
+            let mut starting_abilities = ht.abilities.clone();
+            if starting_abilities.is_empty()
+                && let Some(roster_class) = save_data.heroes.get(ht.roster_index).map(|h| h.class)
+                    && let Some(class_def) = class_db.get(roster_class) {
+                        starting_abilities = class_def
+                            .starting_abilities
+                            .iter()
+                            .map(|id| crate::mission::entities::ActiveAbilityState {
+                                ability_id: id.clone(),
+                                remaining_cooldown: 0,
+                            })
+                            .collect();
+                    }
+
+            let hero_name = save_data.heroes.get(ht.roster_index).map(|h| h.name.clone()).unwrap_or_else(|| "Hero".to_string());
             let mut token = commands.spawn((
-                Name::new(format!("Hero Token")),
+                Name::new(format!("Hero Token: {}", hero_name)),
                 HeroToken(roster_entity),
                 GridPosition {
                     x: ht.grid_x,
@@ -260,23 +398,30 @@ fn load_save(
                     max_hp: ht.max_hp,
                     attack: ht.attack,
                     defense: ht.defense,
+                    speed: ht.speed,
+                },
+                MoveRange {
+                    base: ht.move_range_base,
+                    bonus: ht.move_range_bonus,
                 },
                 ChildOf(mission_entity),
+                crate::mission::entities::ActiveAbilities {
+                    abilities: starting_abilities,
+                },
             ));
-            if let Some(ref path) = ht.path {
-                if ht.path_index < path.len() {
+            if let Some(ref path) = ht.path
+                && ht.path_index < path.len() {
                     token.insert(MoveTarget {
                         path: path.clone(),
                         path_index: ht.path_index,
                     });
                 }
-            }
         }
 
         // Spawn enemy tokens as children.
         for et in &mdto.enemy_tokens {
             commands.spawn((
-                Name::new(format!("Enemy Token")),
+                Name::new("Enemy Token".to_string()),
                 EnemyToken {
                     enemy_type: et.enemy_type,
                     xp_reward: et.xp_reward,
@@ -291,11 +436,35 @@ fn load_save(
                     max_hp: et.max_hp,
                     attack: et.attack,
                     defense: et.defense,
+                    speed: et.speed,
+                },
+                MoveRange {
+                    base: et.move_range_base,
+                    bonus: et.move_range_bonus,
                 },
                 ChildOf(mission_entity),
             ));
         }
     }
+
+    // Restore MissionBoard resource with rescue offers
+    let mut board = crate::screens::missions::MissionBoard::default();
+    let virtual_now = time.elapsed_secs_f64();
+    for rdto in &save_data.rescue_offers {
+        let rescue_entities: Vec<Entity> = rdto
+            .rescue_hero_indices
+            .iter()
+            .filter_map(|&idx| hero_entities.get(idx).copied())
+            .collect();
+        board.rescue_offers.push(crate::screens::missions::RescueOffer {
+            template_idx: rdto.template_idx,
+            modifiers: rdto.modifiers.clone(),
+            map: rdto.map.clone(),
+            rescue_heroes: rescue_entities,
+            expires_at: virtual_now + rdto.expires_at_remaining,
+        });
+    }
+    commands.insert_resource(board);
 
     // ── Offline time calculation ───────────────────────────────────
     let now = SystemTime::now()
@@ -314,6 +483,7 @@ fn load_save(
         title: "Welcome Back!".to_string(),
         body: format!("Banked time: {formatted}"),
         kind: ToastKind::Info,
+        action: None,
     });
 
     // Insert marker resource.
@@ -344,10 +514,17 @@ fn handle_save(
             &HeroGrowth,
             &HeroStatProgress,
             Option<&OnMission>,
-            Has<Favorite>,
-            Has<PersonallyManaged>,
-            Option<&Missing>,
-            Option<&Injured>,
+            &crate::hero::Fatigue,
+            Option<&MoveRange>,
+            &crate::hero::history::HeroHistory,
+            (
+                Has<Favorite>,
+                Has<PersonallyManaged>,
+                Option<&Missing>,
+                Option<&Injured>,
+                Option<&crate::hero::Epithet>,
+                Option<&crate::hero::HeroPortrait>,
+            ),
         ),
         With<Hero>,
     >,
@@ -360,6 +537,9 @@ fn handle_save(
             &MissionDungeon,
             &RoomStatus,
             &Children,
+            Option<&MissionLogHistory>,
+            Option<&crate::mission::entities::MissionEventsState>,
+            Option<&crate::mission::RescueMission>,
         ),
         With<Mission>,
     >,
@@ -369,22 +549,35 @@ fn handle_save(
             &GridPosition,
             &CombatStats,
             &InRoom,
+            &MoveRange,
             Option<&MoveTarget>,
+            Option<&crate::mission::entities::ActiveAbilities>,
         ),
         Without<EnemyToken>,
     >,
     enemy_tokens: Query<
-        (&EnemyToken, &GridPosition, &CombatStats, &InRoom),
+        (&EnemyToken, &GridPosition, &CombatStats, &InRoom, &MoveRange),
         Without<HeroToken>,
     >,
+    board: Option<Res<crate::screens::missions::MissionBoard>>,
 ) {
     // 1. Build hero roster and entity→index mapping.
     let mut hero_dtos = Vec::new();
     let mut entity_to_index: HashMap<Entity, usize> = HashMap::new();
 
-    for (entity, info, stats, traits, equipment, growth, progress, on_mission, is_favorite, is_managed, missing, injured) in &heroes {
+    for (entity, info, stats, traits, equipment, growth, progress, on_mission, fatigue, maybe_move_range, history, (is_favorite, is_managed, missing, injured, maybe_epithet, maybe_portrait)) in &heroes {
         let idx = hero_dtos.len();
         entity_to_index.insert(entity, idx);
+
+        let (mr_base, mr_bonus) = if let Some(mr) = maybe_move_range {
+            (mr.base, mr.bonus)
+        } else {
+            let base = match info.class {
+                HeroClass::Rogue | HeroClass::Ranger => 4,
+                _ => 3,
+            };
+            (base, 0)
+        };
 
         hero_dtos.push(HeroSaveDto {
             name: info.name.clone(),
@@ -403,8 +596,14 @@ fn handle_save(
             traits: traits.0.clone(),
             equipment: HeroEquipmentSave {
                 weapon_tier: equipment.weapon_tier,
+                weapon_rarity: equipment.weapon_rarity,
+                weapon_affix: equipment.weapon_affix,
                 armor_tier: equipment.armor_tier,
+                armor_rarity: equipment.armor_rarity,
+                armor_affix: equipment.armor_affix,
                 accessory_tier: equipment.accessory_tier,
+                accessory_rarity: equipment.accessory_rarity,
+                accessory_affix: equipment.accessory_affix,
             },
             on_mission: on_mission.is_some(),
             growth: HeroGrowthSave {
@@ -426,7 +625,41 @@ fn handle_save(
             favorite: is_favorite,
             personally_managed: is_managed,
             missing_remaining: missing.map(|m| (m.expires_at - time.elapsed_secs_f64()).max(0.0)),
+            dropped_equipment: missing.and_then(|m| m.dropped_equipment.as_ref().map(|eq| HeroEquipmentSave {
+                weapon_tier: eq.weapon_tier,
+                weapon_rarity: eq.weapon_rarity,
+                weapon_affix: eq.weapon_affix,
+                armor_tier: eq.armor_tier,
+                armor_rarity: eq.armor_rarity,
+                armor_affix: eq.armor_affix,
+                accessory_tier: eq.accessory_tier,
+                accessory_rarity: eq.accessory_rarity,
+                accessory_affix: eq.accessory_affix,
+            })),
             injured_remaining: injured.map(|i| (i.expires_at - time.elapsed_secs_f64()).max(0.0)),
+            fatigue_current: fatigue.current,
+            fatigue_max_base: fatigue.max_base,
+            move_range_base: mr_base,
+            move_range_bonus: mr_bonus,
+            history: HeroHistorySave {
+                missions_run: history.missions_run,
+                kills: history.kills,
+                near_deaths: history.near_deaths,
+                rescues_given: history.rescues_given,
+                rescues_received: history.rescues_received,
+                lifetime_gold: history.lifetime_gold,
+                timeline: history.timeline.clone(),
+            },
+            epithet: maybe_epithet.and_then(|e| e.0.clone()),
+            portrait: maybe_portrait.map(|p| HeroPortraitSave {
+                base_idx: p.base_idx,
+                hair_idx: p.hair_idx,
+                hair_color: {
+                    let rgba = p.hair_color.to_srgba();
+                    [rgba.red, rgba.green, rgba.blue, rgba.alpha]
+                },
+                gear_idx: p.gear_idx,
+            }),
         });
     }
 
@@ -456,13 +689,24 @@ fn handle_save(
                 wisdom: a.growth.wisdom,
                 charisma: a.growth.charisma,
             },
+            portrait: Some(HeroPortraitSave {
+                base_idx: a.portrait.base_idx,
+                hair_idx: a.portrait.hair_idx,
+                hair_color: {
+                    let rgba = a.portrait.hair_color.to_srgba();
+                    [rgba.red, rgba.green, rgba.blue, rgba.alpha]
+                },
+                gear_idx: a.portrait.gear_idx,
+            }),
         })
         .collect();
 
     // 3. Build mission DTOs.
     let mut mission_dtos = Vec::new();
 
-    for (_entity, info, progress, party, dungeon, room_status, children) in &missions {
+    for (_entity, info, progress, party, dungeon, room_status, children, maybe_log_history, maybe_events_state, maybe_rescue) in &missions {
+        let events_fired = maybe_events_state.map_or(0, |es| es.events_fired);
+        let max_events = maybe_events_state.map_or(0, |es| es.max_events);
         // Map party entities to hero roster indices.
         let party_hero_indices: Vec<usize> = party
             .0
@@ -470,12 +714,21 @@ fn handle_save(
             .filter_map(|e| entity_to_index.get(e).copied())
             .collect();
 
+        // Get rescue hero indices if present
+        let rescue_hero_indices = maybe_rescue.map(|rm| {
+            rm.rescue_heroes
+                .iter()
+                .filter_map(|e| entity_to_index.get(e).copied())
+                .collect()
+        });
+        let rescue_gear_recovered = maybe_rescue.map(|rm| rm.gear_recovered);
+
         // Collect hero tokens that are children of this mission.
         let mut hero_token_dtos = Vec::new();
         let mut enemy_token_dtos = Vec::new();
 
         for child in children.iter() {
-            if let Ok((ht, pos, combat, in_room, move_target)) = hero_tokens.get(child) {
+            if let Ok((ht, pos, combat, in_room, move_range, move_target, active_abilities)) = hero_tokens.get(child) {
                 let roster_index = entity_to_index.get(&ht.0).copied().unwrap_or(0);
                 hero_token_dtos.push(HeroTokenDto {
                     roster_index,
@@ -486,12 +739,16 @@ fn handle_save(
                     max_hp: combat.max_hp,
                     attack: combat.attack,
                     defense: combat.defense,
+                    speed: combat.speed,
+                    move_range_base: move_range.base,
+                    move_range_bonus: move_range.bonus,
                     path: move_target.as_ref().map(|mt| mt.path.clone()),
                     path_index: move_target.as_ref().map_or(0, |mt| mt.path_index),
+                    abilities: active_abilities.map_or(Vec::new(), |aa| aa.abilities.clone()),
                 });
             }
 
-            if let Ok((et, pos, combat, in_room)) = enemy_tokens.get(child) {
+            if let Ok((et, pos, combat, in_room, move_range)) = enemy_tokens.get(child) {
                 enemy_token_dtos.push(EnemyTokenDto {
                     enemy_type: et.enemy_type,
                     xp_reward: et.xp_reward,
@@ -502,6 +759,9 @@ fn handle_save(
                     max_hp: combat.max_hp,
                     attack: combat.attack,
                     defense: combat.defense,
+                    speed: combat.speed,
+                    move_range_base: move_range.base,
+                    move_range_bonus: move_range.bonus,
                 });
             }
         }
@@ -518,7 +778,33 @@ fn handle_save(
             room_cleared: room_status.cleared.clone(),
             hero_tokens: hero_token_dtos,
             enemy_tokens: enemy_token_dtos,
+            logs: maybe_log_history.map(|lh| lh.logs.clone()).unwrap_or_default(),
+            modifiers: info.modifiers.clone(),
+            events_fired,
+            max_events,
+            biome: info.biome,
+            rescue_hero_indices,
+            rescue_gear_recovered,
         });
+    }
+
+    // Build rescue offer DTOs.
+    let mut rescue_offer_dtos = Vec::new();
+    if let Some(b) = board {
+        for ro in &b.rescue_offers {
+            let rescue_hero_indices: Vec<usize> = ro
+                .rescue_heroes
+                .iter()
+                .filter_map(|e| entity_to_index.get(e).copied())
+                .collect();
+            rescue_offer_dtos.push(RescueOfferSaveDto {
+                template_idx: ro.template_idx,
+                modifiers: ro.modifiers.clone(),
+                map: ro.map.clone(),
+                rescue_hero_indices,
+                expires_at_remaining: (ro.expires_at - time.elapsed_secs_f64()).max(0.0),
+            });
+        }
     }
 
     // 4. Get unix timestamp.
@@ -529,6 +815,7 @@ fn handle_save(
 
     // 5. Assemble SaveData.
     let save_data = SaveData {
+        version: CURRENT_SAVE_VERSION,
         last_save_timestamp: timestamp,
         gold: gold.0,
         reputation: reputation.0,
@@ -540,6 +827,7 @@ fn handle_save(
         next_arrival_timer: applicant_board.next_arrival_timer,
         training_timer: training_timer.0,
         missions: mission_dtos,
+        rescue_offers: rescue_offer_dtos,
     };
 
     // 6. Serialize to RON.
@@ -565,8 +853,23 @@ fn handle_save(
         }
     }
 
-    if let Err(e) = std::fs::write(&path, ron_string) {
-        warn!("Failed to write save file: {e}");
+    let tmp_path = path.with_extension("ron.tmp");
+    let bak_path = path.with_extension("ron.bak");
+
+    if let Err(e) = std::fs::write(&tmp_path, ron_string) {
+        warn!("Failed to write save file to temp path: {e}");
+        let _ = std::fs::remove_file(&tmp_path);
+        return;
+    }
+
+    if path.exists() {
+        if let Err(e) = std::fs::rename(&path, &bak_path) {
+            warn!("Failed to backup existing save: {e}");
+        }
+    }
+
+    if let Err(e) = std::fs::rename(&tmp_path, &path) {
+        warn!("Failed to replace save file: {e}");
         return;
     }
 
@@ -577,7 +880,55 @@ fn handle_save(
         title: "Game Saved".to_string(),
         body: "Game saved.".to_string(),
         kind: ToastKind::Info,
+        action: None,
     });
+}
+
+pub fn deserialize_and_migrate(ron_string: &str) -> Result<SaveData, String> {
+    let mut value: ron::Value = ron::from_str(ron_string)
+        .map_err(|e| format!("Failed to parse raw RON save: {e}"))?;
+
+    let mut version = 0;
+    if let ron::Value::Map(ref map) = value {
+        let key = ron::Value::String("version".to_string());
+        if let Some(v_val) = map.get(&key) {
+            version = serde::Deserialize::deserialize(v_val.clone())
+                .unwrap_or(0);
+        }
+    }
+
+    if version > CURRENT_SAVE_VERSION {
+        return Err(format!("Save file version ({version}) is newer than supported ({CURRENT_SAVE_VERSION})"));
+    }
+
+    while version < CURRENT_SAVE_VERSION {
+        let next_version = version + 1;
+        info!("Migrating save version from {version} to {next_version}");
+        match next_version {
+            1 => {
+                migrate_v0_to_v1(&mut value)?;
+            }
+            _ => {
+                return Err(format!("No migration defined to reach version {next_version}"));
+            }
+        }
+        version = next_version;
+    }
+
+    let save_data = SaveData::deserialize(value)
+        .map_err(|e| format!("Failed to deserialize migrated save: {e}"))?;
+
+    Ok(save_data)
+}
+
+fn migrate_v0_to_v1(value: &mut ron::Value) -> Result<(), String> {
+    if let ron::Value::Map(map) = value {
+        let key = ron::Value::String("version".to_string());
+        map.insert(key, ron::Value::Number(ron::value::Number::U8(1)));
+    } else {
+        return Err("Save file is not a valid map/struct".to_string());
+    }
+    Ok(())
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -594,9 +945,17 @@ pub fn has_save_file() -> bool {
 
 // ── DTOs ───────────────────────────────────────────────────────────
 
+pub const CURRENT_SAVE_VERSION: u32 = 1;
+
+fn default_save_version() -> u32 {
+    1
+}
+
 /// Top-level save data structure.
 #[derive(Serialize, Deserialize)]
 pub struct SaveData {
+    #[serde(default = "default_save_version")]
+    pub version: u32,
     pub last_save_timestamp: u64,
     pub gold: u32,
     pub reputation: u32,
@@ -608,6 +967,8 @@ pub struct SaveData {
     pub next_arrival_timer: f32,
     pub training_timer: f32,
     pub missions: Vec<MissionSaveDto>,
+    #[serde(default)]
+    pub rescue_offers: Vec<RescueOfferSaveDto>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -620,11 +981,25 @@ pub struct HeroStatsSave {
     pub charisma: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct HeroEquipmentSave {
     pub weapon_tier: u32,
+    #[serde(default)]
+    pub weapon_rarity: GearRarity,
+    #[serde(default)]
+    pub weapon_affix: Option<BehavioralAffix>,
+
     pub armor_tier: u32,
+    #[serde(default)]
+    pub armor_rarity: GearRarity,
+    #[serde(default)]
+    pub armor_affix: Option<BehavioralAffix>,
+
     pub accessory_tier: u32,
+    #[serde(default)]
+    pub accessory_rarity: GearRarity,
+    #[serde(default)]
+    pub accessory_affix: Option<BehavioralAffix>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -645,6 +1020,39 @@ pub struct HeroStatProgressSave {
     pub intelligence: f32,
     pub wisdom: f32,
     pub charisma: f32,
+}
+
+fn default_fatigue_current() -> f32 {
+    100.0
+}
+fn default_fatigue_max_base() -> f32 {
+    100.0
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct HeroHistorySave {
+    #[serde(default)]
+    pub missions_run: u32,
+    #[serde(default)]
+    pub kills: u32,
+    #[serde(default)]
+    pub near_deaths: u32,
+    #[serde(default)]
+    pub rescues_given: u32,
+    #[serde(default)]
+    pub rescues_received: u32,
+    #[serde(default)]
+    pub lifetime_gold: u32,
+    #[serde(default)]
+    pub timeline: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct HeroPortraitSave {
+    pub base_idx: u32,
+    pub hair_idx: u32,
+    pub hair_color: [f32; 4],
+    pub gear_idx: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -669,7 +1077,23 @@ pub struct HeroSaveDto {
     #[serde(default)]
     pub missing_remaining: Option<f64>,
     #[serde(default)]
+    pub dropped_equipment: Option<HeroEquipmentSave>,
+    #[serde(default)]
     pub injured_remaining: Option<f64>,
+    #[serde(default = "default_fatigue_current")]
+    pub fatigue_current: f32,
+    #[serde(default = "default_fatigue_max_base")]
+    pub fatigue_max_base: f32,
+    #[serde(default = "default_move_range_base")]
+    pub move_range_base: u32,
+    #[serde(default)]
+    pub move_range_bonus: u32,
+    #[serde(default)]
+    pub history: HeroHistorySave,
+    #[serde(default)]
+    pub epithet: Option<String>,
+    #[serde(default)]
+    pub portrait: Option<HeroPortraitSave>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -682,6 +1106,17 @@ pub struct ApplicantSaveDto {
     pub time_remaining: f32,
     #[serde(default)]
     pub growth: HeroGrowthSave,
+    #[serde(default)]
+    pub portrait: Option<HeroPortraitSave>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RescueOfferSaveDto {
+    pub template_idx: usize,
+    pub modifiers: Vec<crate::mission::data::MissionModifier>,
+    pub map: DungeonMap,
+    pub rescue_hero_indices: Vec<usize>,
+    pub expires_at_remaining: f64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -697,6 +1132,28 @@ pub struct MissionSaveDto {
     pub room_cleared: Vec<bool>,
     pub hero_tokens: Vec<HeroTokenDto>,
     pub enemy_tokens: Vec<EnemyTokenDto>,
+    #[serde(default)]
+    pub logs: Vec<MissionLogEntry>,
+    #[serde(default)]
+    pub modifiers: Vec<crate::mission::data::MissionModifier>,
+    #[serde(default)]
+    pub events_fired: u32,
+    #[serde(default)]
+    pub max_events: u32,
+    #[serde(default)]
+    pub biome: crate::mission::data::BiomeType,
+    #[serde(default)]
+    pub rescue_hero_indices: Option<Vec<usize>>,
+    #[serde(default)]
+    pub rescue_gear_recovered: Option<bool>,
+}
+
+fn default_token_speed() -> i32 {
+    10
+}
+
+fn default_move_range_base() -> u32 {
+    3
 }
 
 #[derive(Serialize, Deserialize)]
@@ -709,8 +1166,16 @@ pub struct HeroTokenDto {
     pub max_hp: i32,
     pub attack: i32,
     pub defense: i32,
+    #[serde(default = "default_token_speed")]
+    pub speed: i32,
+    #[serde(default = "default_move_range_base")]
+    pub move_range_base: u32,
+    #[serde(default)]
+    pub move_range_bonus: u32,
     pub path: Option<Vec<(u32, u32)>>,
     pub path_index: usize,
+    #[serde(default)]
+    pub abilities: Vec<crate::mission::entities::ActiveAbilityState>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -724,6 +1189,12 @@ pub struct EnemyTokenDto {
     pub max_hp: i32,
     pub attack: i32,
     pub defense: i32,
+    #[serde(default = "default_token_speed")]
+    pub speed: i32,
+    #[serde(default = "default_move_range_base")]
+    pub move_range_base: u32,
+    #[serde(default)]
+    pub move_range_bonus: u32,
 }
 
 // ── Growth backfill ───────────────────────────────────────────────
@@ -747,14 +1218,13 @@ fn restore_growth(
     class: HeroClass,
     class_db: &ClassDatabase,
 ) -> HeroGrowth {
-    if is_zero_growth(saved) {
-        if let Some(class_def) = class_db.get(class) {
+    if is_zero_growth(saved)
+        && let Some(class_def) = class_db.get(class) {
             let mut rng = rand::rng();
             return roll_growth(class_def, 0.5, &mut rng);
         }
         // Class not found — fall through to the zeroed value below as a
         // harmless last-resort default.
-    }
     HeroGrowth {
         strength: saved.strength,
         dexterity: saved.dexterity,
@@ -768,6 +1238,116 @@ fn restore_growth(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_save_migration_v0_to_v1() {
+        let v0_raw = r#"(
+            last_save_timestamp: 12345,
+            gold: 500,
+            reputation: 5,
+            banked_seconds: 10.0,
+            materials: {},
+            buildings: {},
+            heroes: [],
+            applicants: [],
+            next_arrival_timer: 1.0,
+            training_timer: 2.0,
+            missions: [],
+        )"#;
+
+        let migrated = deserialize_and_migrate(v0_raw).expect("v0 save should migrate to v1");
+        assert_eq!(migrated.version, 1);
+        assert_eq!(migrated.gold, 500);
+    }
+
+    #[test]
+    fn test_save_backup_and_recovery() {
+        use std::fs;
+
+        let temp_dir = std::env::temp_dir().join("guild_forge_test_backup");
+        let _ = fs::create_dir_all(&temp_dir);
+        let save_path = temp_dir.join("save.ron");
+        let bak_path = temp_dir.join("save.ron.bak");
+
+        let _ = fs::remove_file(&save_path);
+        let _ = fs::remove_file(&bak_path);
+
+        let original = SaveData {
+            version: CURRENT_SAVE_VERSION,
+            last_save_timestamp: 12345,
+            gold: 333,
+            reputation: 3,
+            banked_seconds: 0.0,
+            materials: HashMap::new(),
+            buildings: HashMap::new(),
+            heroes: vec![],
+            applicants: vec![],
+            next_arrival_timer: 0.0,
+            training_timer: 0.0,
+            missions: vec![],
+            rescue_offers: vec![],
+        };
+        let serialized = ron::ser::to_string_pretty(&original, ron::ser::PrettyConfig::default()).unwrap();
+        fs::write(&bak_path, &serialized).unwrap();
+        fs::write(&save_path, "corrupted save content").unwrap();
+
+        let mut loaded_data = None;
+
+        if save_path.exists() {
+            if let Ok(ron_string) = fs::read_to_string(&save_path) {
+                match deserialize_and_migrate(&ron_string) {
+                    Ok(data) => {
+                        loaded_data = Some(data);
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
+
+        if loaded_data.is_none() && bak_path.exists() {
+            if let Ok(ron_string) = fs::read_to_string(&bak_path) {
+                match deserialize_and_migrate(&ron_string) {
+                    Ok(data) => {
+                        loaded_data = Some(data);
+                    }
+                    Err(_) => {}
+                }
+            }
+        }
+
+        let save_data = loaded_data.expect("Should fall back to backup file");
+        assert_eq!(save_data.gold, 333);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_corrupt_save_fallback_no_crash() {
+        use std::fs;
+        let temp_dir = std::env::temp_dir().join("guild_forge_test_corrupt");
+        let _ = fs::create_dir_all(&temp_dir);
+        let save_path = temp_dir.join("save.ron");
+        let bak_path = temp_dir.join("save.ron.bak");
+
+        fs::write(&save_path, "corrupt").unwrap();
+        fs::write(&bak_path, "corrupt").unwrap();
+
+        let r1 = fs::read_to_string(&save_path).ok().and_then(|s| deserialize_and_migrate(&s).ok());
+        let r2 = fs::read_to_string(&bak_path).ok().and_then(|s| deserialize_and_migrate(&s).ok());
+
+        assert!(r1.is_none());
+        assert!(r2.is_none());
+
+        if r1.is_none() && r2.is_none() && save_path.exists() {
+            let corrupt_path = save_path.with_extension("ron.corrupt");
+            let _ = fs::rename(&save_path, &corrupt_path);
+            assert!(corrupt_path.exists());
+            assert!(!save_path.exists());
+            let _ = fs::remove_file(&corrupt_path);
+        }
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
 
     #[test]
     fn hero_save_dto_round_trips_with_growth() {
@@ -790,6 +1370,7 @@ mod tests {
                 weapon_tier: 0,
                 armor_tier: 0,
                 accessory_tier: 0,
+                ..Default::default()
             },
             on_mission: false,
             growth: HeroGrowthSave {
@@ -811,13 +1392,23 @@ mod tests {
             favorite: false,
             personally_managed: false,
             missing_remaining: None,
+            dropped_equipment: None,
             injured_remaining: None,
+            fatigue_current: 85.0,
+            fatigue_max_base: 100.0,
+            move_range_base: 3,
+            move_range_bonus: 0,
+            history: HeroHistorySave::default(),
+            epithet: None,
+            portrait: None,
         };
         let s = ron::ser::to_string(&dto).unwrap();
         let back: HeroSaveDto = ron::from_str(&s).unwrap();
         assert!((back.growth.strength - 1.1).abs() < 1e-5);
         assert!((back.growth.charisma - 0.2).abs() < 1e-5);
         assert!((back.progress.strength - 0.5).abs() < 1e-5);
+        assert_eq!(back.fatigue_current, 85.0);
+        assert_eq!(back.fatigue_max_base, 100.0);
     }
 
     #[test]
@@ -853,6 +1444,7 @@ mod tests {
             traits: vec![],
             equipment: HeroEquipmentSave {
                 weapon_tier: 0, armor_tier: 0, accessory_tier: 0,
+                ..Default::default()
             },
             on_mission: false,
             growth: HeroGrowthSave::default(),
@@ -860,7 +1452,15 @@ mod tests {
             favorite: true,
             personally_managed: true,
             missing_remaining: None,
+            dropped_equipment: None,
             injured_remaining: None,
+            fatigue_current: 100.0,
+            fatigue_max_base: 100.0,
+            move_range_base: 3,
+            move_range_bonus: 0,
+            history: HeroHistorySave::default(),
+            epithet: None,
+            portrait: None,
         };
         let s = ron::ser::to_string(&dto).unwrap();
         let back: HeroSaveDto = ron::from_str(&s).unwrap();
@@ -879,14 +1479,22 @@ mod tests {
             stats: HeroStatsSave { strength: 10, dexterity: 10, constitution: 10,
                 intelligence: 10, wisdom: 10, charisma: 10 },
             traits: vec![],
-            equipment: HeroEquipmentSave { weapon_tier: 0, armor_tier: 0, accessory_tier: 0 },
+            equipment: HeroEquipmentSave { weapon_tier: 0, armor_tier: 0, accessory_tier: 0, ..Default::default() },
             on_mission: false,
             growth: HeroGrowthSave::default(),
             progress: HeroStatProgressSave::default(),
             favorite: false,
             personally_managed: false,
             missing_remaining: Some(42.0),
+            dropped_equipment: None,
             injured_remaining: Some(200.0),
+            fatigue_current: 100.0,
+            fatigue_max_base: 100.0,
+            move_range_base: 3,
+            move_range_bonus: 0,
+            history: HeroHistorySave::default(),
+            epithet: None,
+            portrait: None,
         };
         let s = ron::to_string(&dto).unwrap();
         let back: HeroSaveDto = ron::from_str(&s).unwrap();
@@ -903,6 +1511,17 @@ mod tests {
         let back: HeroSaveDto = ron::from_str(old).unwrap();
         assert_eq!(back.missing_remaining, None);
         assert_eq!(back.injured_remaining, None);
+    }
+
+    #[test]
+    fn legacy_hero_save_dto_without_fatigue_defaults_100() {
+        // Old-format save (no fatigue fields) should deserialize with 100.0.
+        let old = r#"(name:"A",class:Warrior,level:1,xp:0,xp_to_next:100,
+            stats:(strength:10,dexterity:10,constitution:10,intelligence:10,wisdom:10,charisma:10),
+            traits:[],equipment:(weapon_tier:0,armor_tier:0,accessory_tier:0),on_mission:false)"#;
+        let back: HeroSaveDto = ron::from_str(old).unwrap();
+        assert_eq!(back.fatigue_current, 100.0);
+        assert_eq!(back.fatigue_max_base, 100.0);
     }
 
     #[test]
@@ -936,5 +1555,69 @@ mod tests {
             charisma: 0.0,
         };
         assert!(!is_zero_growth(&non_zero));
+    }
+
+    #[test]
+    fn hero_save_dto_round_trips_with_history() {
+        let dto = HeroSaveDto {
+            name: "H".into(),
+            class: HeroClass::Warrior,
+            level: 1,
+            xp: 0,
+            xp_to_next: 100,
+            stats: HeroStatsSave { strength: 10, dexterity: 10, constitution: 10,
+                intelligence: 10, wisdom: 10, charisma: 10 },
+            traits: vec![],
+            equipment: HeroEquipmentSave { weapon_tier: 0, armor_tier: 0, accessory_tier: 0, ..Default::default() },
+            on_mission: false,
+            growth: HeroGrowthSave::default(),
+            progress: HeroStatProgressSave::default(),
+            favorite: false,
+            personally_managed: false,
+            missing_remaining: None,
+            dropped_equipment: None,
+            injured_remaining: None,
+            fatigue_current: 100.0,
+            fatigue_max_base: 100.0,
+            move_range_base: 3,
+            move_range_bonus: 0,
+            history: HeroHistorySave {
+                missions_run: 5,
+                kills: 12,
+                near_deaths: 2,
+                rescues_given: 1,
+                rescues_received: 0,
+                lifetime_gold: 150,
+                timeline: vec!["Joined the guild".to_string(), "Defeated Boss Rat".to_string()],
+            },
+            epithet: Some("the Savior".to_string()),
+            portrait: None,
+        };
+        let s = ron::to_string(&dto).unwrap();
+        let back: HeroSaveDto = ron::from_str(&s).unwrap();
+        assert_eq!(back.epithet, Some("the Savior".to_string()));
+        assert_eq!(back.history.missions_run, 5);
+        assert_eq!(back.history.kills, 12);
+        assert_eq!(back.history.near_deaths, 2);
+        assert_eq!(back.history.rescues_given, 1);
+        assert_eq!(back.history.rescues_received, 0);
+        assert_eq!(back.history.lifetime_gold, 150);
+        assert_eq!(back.history.timeline.len(), 2);
+        assert_eq!(back.history.timeline[1], "Defeated Boss Rat");
+    }
+
+    #[test]
+    fn legacy_hero_save_dto_without_history_defaults() {
+        let old = r#"(name:"A",class:Warrior,level:1,xp:0,xp_to_next:100,
+            stats:(strength:10,dexterity:10,constitution:10,intelligence:10,wisdom:10,charisma:10),
+            traits:[],equipment:(weapon_tier:0,armor_tier:0,accessory_tier:0),on_mission:false)"#;
+        let back: HeroSaveDto = ron::from_str(old).unwrap();
+        assert_eq!(back.history.missions_run, 0);
+        assert_eq!(back.history.kills, 0);
+        assert_eq!(back.history.near_deaths, 0);
+        assert_eq!(back.history.rescues_given, 0);
+        assert_eq!(back.history.rescues_received, 0);
+        assert_eq!(back.history.lifetime_gold, 0);
+        assert!(back.history.timeline.is_empty());
     }
 }

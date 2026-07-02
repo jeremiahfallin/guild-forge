@@ -16,12 +16,18 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, tick_toasts);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum ToastAction {
+    MountRescue { rescue_offer_idx: usize },
+}
+
 /// Fire this event via `commands.trigger(ToastEvent { .. })` to show a toast.
 #[derive(Event, Debug, Clone)]
 pub struct ToastEvent {
     pub title: String,
     pub body: String,
     pub kind: ToastKind,
+    pub action: Option<ToastAction>,
 }
 
 /// Visual style of the toast.
@@ -80,11 +86,11 @@ fn on_toast_event(
         ToastKind::Info => Color::srgb(0.3, 0.5, 0.8),
     };
 
-    let toast = div()
+    let mut toast = div()
         .col()
         .w(px(320.0))
         .p(px(12.0))
-        .gap(px(4.0))
+        .gap(px(8.0)) // increased gap slightly for buttons
         .bg(Color::srgba(0.1, 0.1, 0.15, 0.9))
         .rounded(px(8.0))
         .insert((
@@ -102,8 +108,62 @@ fn on_toast_event(
         .child(text(&event.title).font_size(20.0).color(HEADER_TEXT))
         .child(text(&event.body).font_size(15.0).color(LABEL_TEXT));
 
+    if let Some(action) = event.action {
+        match action {
+            ToastAction::MountRescue { rescue_offer_idx } => {
+                let btn = div()
+                    .p(px(6.0))
+                    .bg(Color::srgb(0.8, 0.2, 0.2)) // Red action color
+                    .rounded(px(4.0))
+                    .items_center()
+                    .justify_center()
+                    .insert((
+                        MountRescueButton(rescue_offer_idx),
+                        bevy_declarative::InteractionPalette {
+                            none: Color::srgb(0.8, 0.2, 0.2),
+                            hovered: Color::srgb(0.95, 0.3, 0.3),
+                            pressed: Color::srgb(0.6, 0.15, 0.15),
+                        },
+                    ))
+                    .on_click(on_mount_rescue_click)
+                    .child(
+                        text("Mount Rescue")
+                            .font_size(14.0)
+                            .color(BUTTON_TEXT)
+                    );
+                toast = toast.child(btn);
+            }
+        }
+    }
+
     let toast_entity = toast.spawn(&mut commands).id();
     commands.entity(container).add_child(toast_entity);
+}
+
+#[derive(Component)]
+pub struct MountRescueButton(pub usize);
+
+fn on_mount_rescue_click(
+    click: On<Pointer<Click>>,
+    buttons: Query<&MountRescueButton>,
+    selected_opt: Option<ResMut<crate::screens::missions::SelectedMission>>,
+    mut commands: Commands,
+    mut next_tab: ResMut<NextState<crate::screens::GameTab>>,
+    mut next_screen: ResMut<NextState<crate::screens::Screen>>,
+) {
+    if let Ok(button) = buttons.get(click.event_target()) {
+        if let Some(mut selected) = selected_opt {
+            selected.index = Some(button.0);
+            selected.is_rescue = true;
+        } else {
+            commands.insert_resource(crate::screens::missions::SelectedMission {
+                index: Some(button.0),
+                is_rescue: true,
+            });
+        }
+        next_tab.set(crate::screens::GameTab::PartySelect);
+        next_screen.set(crate::screens::Screen::Gameplay);
+    }
 }
 
 fn tick_toasts(

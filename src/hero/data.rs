@@ -66,7 +66,9 @@ pub struct StatWeights {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ClassDef {
     pub id: HeroClass,
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub description: String,
     pub stat_weights: StatWeights,
     pub starting_abilities: Vec<String>,
@@ -79,6 +81,7 @@ pub struct TraitDef {
     pub name: String,
     pub description: String,
     pub stat_modifiers: StatWeights,
+    #[allow(dead_code)]
     pub tags: Vec<String>,
 }
 
@@ -110,5 +113,55 @@ impl ClassDatabase {
 impl TraitDatabase {
     pub fn get(&self, hero_trait: HeroTrait) -> Option<&TraitDef> {
         self.0.iter().find(|t| t.id == hero_trait)
+    }
+}
+
+/// The effect type of an ability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
+pub enum AbilityEffect {
+    Damage,
+    Heal,
+    Shield,
+    Buff,
+    Debuff,
+}
+
+/// The rule used by the AI to decide priority for using the ability.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Reflect)]
+pub enum AiPriorityRule {
+    Always,
+    HpBelowPct(f32),
+    MultipleEnemiesAdjacent(u32),
+    Flanking,
+    WarriorRallyingCry,
+    RogueAssassinate,
+    MageMeteor,
+    ClericMassHeal,
+    RangerVolley,
+}
+
+/// Definition of a class ability loaded from RON.
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
+pub struct AbilityDef {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub range: u32,
+    pub cooldown: u32,
+    pub effect: AbilityEffect,
+    pub ai_priority: AiPriorityRule,
+    #[serde(default)]
+    pub is_signature: bool,
+}
+
+/// Database of all class abilities, loaded at startup.
+#[derive(Resource)]
+#[allow(dead_code)]
+pub struct AbilityDatabase(pub Vec<AbilityDef>);
+
+#[allow(dead_code)]
+impl AbilityDatabase {
+    pub fn get(&self, id: &str) -> Option<&AbilityDef> {
+        self.0.iter().find(|a| a.id == id)
     }
 }
