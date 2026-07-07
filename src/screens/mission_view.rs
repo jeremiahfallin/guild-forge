@@ -37,6 +37,7 @@ pub(super) fn plugin(app: &mut App) {
             rebuild_view_on_viewed_change,
             bounce_to_missions_if_viewed_despawned,
             update_mission_feed_ui,
+            update_banner_ui,
             handle_visual_hits,
             update_floating_text,
             update_hit_flashes,
@@ -262,6 +263,7 @@ fn cleanup_mission_view(
     mut commands: Commands,
     dungeon_q: Query<Entity, With<DungeonRoot>>,
     ui_q: Query<Entity, With<MissionViewUi>>,
+    banner_q: Query<Entity, With<BannerUi>>,
     proxy_q: Query<Entity, With<RenderProxyOf>>,
     mut camera_q: Query<(&mut Transform, &mut Projection), With<Camera2d>>,
 ) {
@@ -269,6 +271,9 @@ fn cleanup_mission_view(
         commands.entity(entity).despawn();
     }
     for entity in &ui_q {
+        commands.entity(entity).despawn();
+    }
+    for entity in &banner_q {
         commands.entity(entity).despawn();
     }
     for entity in &proxy_q {
@@ -673,6 +678,81 @@ fn spawn_mission_view_ui(
                 .child(widgets::game_button("Abort Mission", abort_mission)),
         )
         .spawn_as_child_of(commands, root_entity);
+}
+
+/// Marker for the floating event-banner overlay (UX-3). Separate root from
+/// `MissionViewUi` — the feed rebuild despawns that wholesale every change.
+#[derive(Component)]
+struct BannerUi;
+
+fn update_banner_ui(
+    mut commands: Commands,
+    queue: Res<crate::ui::banner::BannerQueue>,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
+    existing: Query<Entity, With<BannerUi>>,
+) {
+    use crate::ui::banner::{BANNER_SLIDE_SECS, BannerKind, banner_alpha};
+
+    // One node per frame — despawn and rebuild (matches the feed's approach).
+    for entity in &existing {
+        commands.entity(entity).despawn();
+    }
+    let Some((req, elapsed)) = queue.active.as_ref() else { return };
+    let Ok(root_entity) = gameplay_root.single() else { return };
+
+    let alpha = banner_alpha(*elapsed);
+    let (accent, label_color) = match req.kind {
+        BannerKind::Boss => (
+            Color::srgba(0.75, 0.15, 0.1, alpha),
+            Color::srgba(1.0, 0.85, 0.8, alpha),
+        ),
+        BannerKind::RareDrop => (
+            Color::srgba(0.8, 0.55, 0.05, alpha),
+            Color::srgba(1.0, 0.95, 0.75, alpha),
+        ),
+        BannerKind::RescueClosing => (
+            Color::srgba(0.8, 0.45, 0.1, alpha),
+            Color::srgba(1.0, 0.9, 0.75, alpha),
+        ),
+    };
+    // Slide down from -20px to the resting 60px over the slide-in phase.
+    let slide = (elapsed / BANNER_SLIDE_SECS).min(1.0);
+    let top = -20.0 + 80.0 * slide;
+
+    let mut banner_box = bevy_declarative::element::div::div()
+        .col()
+        .items_center()
+        .p(px(14.0))
+        .bg(Color::srgba(0.08, 0.06, 0.05, 0.9 * alpha))
+        .rounded(px(6.0))
+        .insert((BorderColor::all(accent), Pickable::IGNORE));
+    banner_box.style_mut().border = UiRect::all(Val::Px(2.0));
+
+    banner_box = banner_box.child(
+        bevy_declarative::element::text::text(req.text.clone())
+            .font_size(26.0)
+            .color(label_color)
+            .insert(Pickable::IGNORE),
+    );
+    if let Some(ref subtitle) = req.subtitle {
+        banner_box = banner_box.child(
+            bevy_declarative::element::text::text(subtitle.clone())
+                .font_size(15.0)
+                .color(Color::srgba(0.85, 0.82, 0.78, alpha))
+                .insert(Pickable::IGNORE),
+        );
+    }
+
+    let mut wrapper = bevy_declarative::element::div::div()
+        .absolute()
+        .w_full()
+        .row()
+        .justify_center()
+        .insert((BannerUi, GlobalZIndex(50), Pickable::IGNORE));
+    wrapper.style_mut().top = Val::Px(top);
+    wrapper
+        .child(banner_box)
+        .spawn_as_child_of(&mut commands, root_entity);
 }
 
 fn update_mission_feed_ui(
