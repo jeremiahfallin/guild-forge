@@ -6,9 +6,10 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 use crate::equipment::GearRarity;
+use crate::hero::status::Missing;
 use crate::hero::{Hero, HeroInfo};
-use crate::mission::ViewedMission;
 use crate::mission::entities::{EnemyToken, GridPosition, HeroToken};
+use crate::mission::{RescueMission, ViewedMission};
 use crate::ui::feed::{MissionLogEvent, MissionLogPayload};
 use bevy::ecs::message::MessageReader;
 
@@ -140,9 +141,49 @@ pub(crate) fn detect_boss_banner(
     }
 }
 
+/// Game-seconds remaining on the Missing window below which the
+/// RESCUE WINDOW CLOSING banner fires (window is 120s — last quarter).
+pub const RESCUE_BANNER_THRESHOLD_SECS: f64 = 30.0;
+
 /// Fire RESCUE WINDOW CLOSING once when the viewed rescue mission's soonest
 /// Missing timer drops under the threshold.
-pub(crate) fn detect_rescue_banner() {}
+pub(crate) fn detect_rescue_banner(
+    mut commands: Commands,
+    viewed: Res<ViewedMission>,
+    missions: Query<(&RescueMission, Option<&BannersFired>)>,
+    missing_q: Query<&Missing>,
+    time: Res<Time<Virtual>>,
+    mut queue: ResMut<BannerQueue>,
+) {
+    let Ok((rescue, fired)) = missions.get(viewed.0) else {
+        return;
+    };
+    if fired.is_some_and(|f| f.rescue) {
+        return;
+    }
+    let now = time.elapsed_secs_f64();
+    let soonest = rescue
+        .rescue_heroes
+        .iter()
+        .filter_map(|&h| missing_q.get(h).ok())
+        .map(|m| m.expires_at - now)
+        .fold(f64::INFINITY, f64::min);
+    if soonest.is_finite() && soonest < RESCUE_BANNER_THRESHOLD_SECS {
+        queue.pending.push_back(BannerRequest {
+            text: "RESCUE WINDOW CLOSING".to_string(),
+            subtitle: None,
+            kind: BannerKind::RescueClosing,
+        });
+        commands
+            .entity(viewed.0)
+            .entry::<BannersFired>()
+            .and_modify(|mut f| f.rescue = true)
+            .or_insert(BannersFired {
+                rescue: true,
+                ..default()
+            });
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -300,6 +341,53 @@ mod tests {
         world.insert_resource(ViewedMission(mission));
 
         let _ = world.run_system_once(detect_boss_banner);
+
+        assert!(world.resource::<BannerQueue>().pending.is_empty());
+    }
+
+    use crate::hero::status::Missing;
+    use crate::mission::RescueMission;
+
+    fn spawn_rescue_fixture(world: &mut World, expires_at: f64) -> Entity {
+        world.init_resource::<Time<Virtual>>(); // elapsed starts at 0.0
+        let missing_hero = world
+            .spawn(Missing {
+                expires_at,
+                dropped_equipment: None,
+            })
+            .id();
+        let mission = world
+            .spawn(RescueMission {
+                rescue_heroes: vec![missing_hero],
+                gear_recovered: false,
+            })
+            .id();
+        world.insert_resource(ViewedMission(mission));
+        mission
+    }
+
+    #[test]
+    fn rescue_under_30s_enqueues_banner_once() {
+        let mut world = World::new();
+        world.init_resource::<BannerQueue>();
+        let _mission = spawn_rescue_fixture(&mut world, 20.0); // 20s left at t=0
+
+        let _ = world.run_system_once(detect_rescue_banner);
+        let _ = world.run_system_once(detect_rescue_banner);
+
+        let queue = world.resource::<BannerQueue>();
+        assert_eq!(queue.pending.len(), 1);
+        assert_eq!(queue.pending[0].kind, BannerKind::RescueClosing);
+        assert_eq!(queue.pending[0].text, "RESCUE WINDOW CLOSING");
+    }
+
+    #[test]
+    fn rescue_over_30s_does_not_enqueue() {
+        let mut world = World::new();
+        world.init_resource::<BannerQueue>();
+        let _mission = spawn_rescue_fixture(&mut world, 90.0);
+
+        let _ = world.run_system_once(detect_rescue_banner);
 
         assert!(world.resource::<BannerQueue>().pending.is_empty());
     }
