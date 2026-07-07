@@ -66,9 +66,10 @@
   Touches: `mission_view.rs`, `entities.rs` (proxy sync), `tileset.rs` · Design: vision §10.2 · Needs: — (shake part: CB-5)
   Done when: every hit is visible without reading the log.
 
-- [ ] **UX-3 · Event banners** — floating banners in the mission view ("BOSS ENCOUNTER", "RARE DROP!", "RESCUE WINDOW CLOSING"), driven by the UX-1 event stream.
-  Touches: feed module, `mission_view.rs` · Needs: UX-1
+- [x] **UX-3 · Event banners** *(✓ 2026-07-06)* — floating banners in the mission view ("BOSS ENCOUNTER", "RARE DROP!", "RESCUE WINDOW CLOSING"), driven by the UX-1 event stream.
+  Touches: feed module (`src/ui/banner.rs`), `mission_view.rs` · Needs: UX-1
   Done when: the three banner-worthy moments interrupt the eye reliably and clear themselves.
+  Design: `docs/plans/2026-07-06-event-banners-design.md` (boss fires on first combat overlap, Legendary-only drops, rescue threshold 30s).
 
 - [ ] **UX-4 · Audio states** — exploration/combat/boss music layers with crossfade plus ability SFX hooks. Code and state machine are LLM work; the actual tracks are human-led (appendix).
   Touches: `src/audio.rs` · Design: vision §10.5 · Needs: CB-2 (combat state signal)
