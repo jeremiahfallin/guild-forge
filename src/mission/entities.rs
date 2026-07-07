@@ -348,7 +348,7 @@ fn spawn_enemies_for_mission(
         }
 
         for _ in 0..count {
-            let spawn_in_boss_room = enemy_type == EnemyType::BossRat;
+            let spawn_in_boss_room = enemy_type.is_boss();
             let room_idx = if spawn_in_boss_room && boss_room_idx.is_some() {
                 boss_room_idx.unwrap()
             } else {

@@ -66,9 +66,10 @@
   Touches: `mission_view.rs`, `entities.rs` (proxy sync), `tileset.rs` · Design: vision §10.2 · Needs: — (shake part: CB-5)
   Done when: every hit is visible without reading the log.
 
-- [ ] **UX-3 · Event banners** — floating banners in the mission view ("BOSS ENCOUNTER", "RARE DROP!", "RESCUE WINDOW CLOSING"), driven by the UX-1 event stream.
-  Touches: feed module, `mission_view.rs` · Needs: UX-1
+- [x] **UX-3 · Event banners** *(✓ 2026-07-06)* — floating banners in the mission view ("BOSS ENCOUNTER", "RARE DROP!", "RESCUE WINDOW CLOSING"), driven by the UX-1 event stream.
+  Touches: feed module (`src/ui/banner.rs`), `mission_view.rs` · Needs: UX-1
   Done when: the three banner-worthy moments interrupt the eye reliably and clear themselves.
+  Design: `docs/plans/2026-07-06-event-banners-design.md` (boss fires on first combat overlap, Legendary-only drops, rescue threshold 30s).
 
 - [ ] **UX-4 · Audio states** — exploration/combat/boss music layers with crossfade plus ability SFX hooks. Code and state machine are LLM work; the actual tracks are human-led (appendix).
   Touches: `src/audio.rs` · Design: vision §10.5 · Needs: CB-2 (combat state signal)
@@ -132,10 +133,10 @@
 - [x] **RS-2 · Rescue beats** *(✓ 2026-06-15)* — the lost party's trail, campsite, and dropped gear appear as events in the rescue run; recovering gear closes the loss loop.
   Touches: `events.ron`, rescue generation · Design: vision §7 · Needs: RS-1, CT-2
 
-- [ ] **RS-3 · Rescue UX** — the wipe toast becomes actionable ("Mount rescue"), a priority card pins to the mission board, party select shows the countdown, and resolution writes chronicle entries for rescuers and rescued.
+- [x] **RS-3 · Rescue UX** *(✓ 2026-07-06)* — the wipe toast becomes actionable ("Mount rescue"), a priority card pins to the mission board, party select shows the countdown, and resolution writes chronicle entries for rescuers and rescued.
   Touches: `ui/toast.rs`, `missions.rs`, `party_select.rs` · Needs: RS-1; chronicle entries need HR-1
   Done when: the whole loop — wipe, alarm, rescue, reunion — plays without touching a menu you didn't expect.
-  Progress (2026-06-16): UX scaffolding done — actionable "Mount Rescue" toast (`ToastAction::MountRescue`, `ui/toast.rs`), rescue offers pinned atop the mission board with countdown + rescuee names (`missions.rs`), party-select countdown (`party_select.rs`). Remaining: rescue *resolution* writes no chronicle entries — `rescues_given`/`rescues_received` are never incremented on a successful rescue (only set in tests). Finish that bookkeeping (+ rescuer/rescued timeline lines) to close the chunk.
+  Note (2026-07-06): the 2026-06-16 "remaining" item (rescue resolution chronicle bookkeeping) landed with the M1/M2 sprint (a635358) — `check_mission_completion` in `src/mission/combat.rs` increments `rescues_given`/`rescues_received` and writes rescuer/rescued timeline lines, covered by `test_rescue_mission_success`.
 
 ## FT — First-Time Experience
 

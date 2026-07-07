@@ -20,6 +20,13 @@ pub enum EnemyType {
     SpiderSwarmer,
 }
 
+impl EnemyType {
+    /// Boss-tier enemies get the BOSS ENCOUNTER banner and boss-room spawns.
+    pub fn is_boss(&self) -> bool {
+        matches!(self, Self::BossRat)
+    }
+}
+
 impl std::fmt::Display for EnemyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
