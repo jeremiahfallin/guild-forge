@@ -43,7 +43,12 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<BannerQueue>();
     app.add_systems(
         Update,
-        (detect_drop_banners, detect_boss_banner, detect_rescue_banner)
+        (
+            detect_drop_banners,
+            detect_boss_banner,
+            detect_rescue_banner,
+            tick_banner_queue,
+        )
             .chain()
             .run_if(resource_exists::<ViewedMission>),
     );
@@ -144,6 +149,53 @@ pub(crate) fn detect_boss_banner(
 /// Game-seconds remaining on the Missing window below which the
 /// RESCUE WINDOW CLOSING banner fires (window is 120s — last quarter).
 pub const RESCUE_BANNER_THRESHOLD_SECS: f64 = 30.0;
+
+pub const BANNER_SLIDE_SECS: f32 = 0.3;
+pub const BANNER_HOLD_SECS: f32 = 2.5;
+pub const BANNER_FADE_SECS: f32 = 0.5;
+pub const BANNER_TOTAL_SECS: f32 = BANNER_SLIDE_SECS + BANNER_HOLD_SECS + BANNER_FADE_SECS;
+
+/// Opacity over the banner's lifetime: ramp up during slide-in, solid hold,
+/// ramp down during fade.
+pub fn banner_alpha(elapsed: f32) -> f32 {
+    if elapsed <= 0.0 {
+        0.0
+    } else if elapsed < BANNER_SLIDE_SECS {
+        elapsed / BANNER_SLIDE_SECS
+    } else if elapsed < BANNER_SLIDE_SECS + BANNER_HOLD_SECS {
+        1.0
+    } else if elapsed < BANNER_TOTAL_SECS {
+        1.0 - (elapsed - BANNER_SLIDE_SECS - BANNER_HOLD_SECS) / BANNER_FADE_SECS
+    } else {
+        0.0
+    }
+}
+
+/// Advance the active banner, promote pending ones, and reset the queue when
+/// the viewed mission changes.
+pub(crate) fn tick_banner_queue(
+    viewed: Res<ViewedMission>,
+    time: Res<Time>,
+    mut queue: ResMut<BannerQueue>,
+) {
+    if queue.mission != Some(viewed.0) {
+        queue.pending.clear();
+        queue.active = None;
+        queue.mission = Some(viewed.0);
+        return;
+    }
+    if let Some((_, ref mut elapsed)) = queue.active {
+        *elapsed += time.delta_secs();
+        if *elapsed >= BANNER_TOTAL_SECS {
+            queue.active = None;
+        }
+    }
+    if queue.active.is_none()
+        && let Some(next) = queue.pending.pop_front()
+    {
+        queue.active = Some((next, 0.0));
+    }
+}
 
 /// Fire RESCUE WINDOW CLOSING once when the viewed rescue mission's soonest
 /// Missing timer drops under the threshold.
@@ -390,6 +442,85 @@ mod tests {
         let _ = world.run_system_once(detect_rescue_banner);
 
         assert!(world.resource::<BannerQueue>().pending.is_empty());
+    }
+
+    #[test]
+    fn tick_promotes_pending_to_active_and_expires_it() {
+        let mut world = World::new();
+        world.init_resource::<Time>(); // real time, starts at 0
+        let mission = world.spawn_empty().id();
+        world.insert_resource(ViewedMission(mission));
+        let mut queue = BannerQueue {
+            mission: Some(mission), // steady state: queue already bound to view
+            ..default()
+        };
+        queue.pending.push_back(BannerRequest {
+            text: "BOSS ENCOUNTER".to_string(),
+            subtitle: None,
+            kind: BannerKind::Boss,
+        });
+        queue.pending.push_back(BannerRequest {
+            text: "RARE DROP!".to_string(),
+            subtitle: None,
+            kind: BannerKind::RareDrop,
+        });
+        world.insert_resource(queue);
+
+        let _ = world.run_system_once(tick_banner_queue);
+        assert_eq!(
+            world.resource::<BannerQueue>().active.as_ref().unwrap().0.kind,
+            BannerKind::Boss
+        );
+
+        // advance past the banner's total lifetime
+        world
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_secs_f32(BANNER_TOTAL_SECS + 0.1));
+        let _ = world.run_system_once(tick_banner_queue);
+        assert_eq!(
+            world.resource::<BannerQueue>().active.as_ref().unwrap().0.kind,
+            BannerKind::RareDrop,
+            "expired banner should be replaced by the next pending one"
+        );
+        assert!(world.resource::<BannerQueue>().pending.is_empty());
+    }
+
+    #[test]
+    fn view_change_clears_queue() {
+        let mut world = World::new();
+        world.init_resource::<Time>();
+        let mission_a = world.spawn_empty().id();
+        let mission_b = world.spawn_empty().id();
+        world.insert_resource(ViewedMission(mission_a));
+        let mut queue = BannerQueue {
+            mission: Some(mission_a),
+            ..default()
+        };
+        queue.pending.push_back(BannerRequest {
+            text: "BOSS ENCOUNTER".to_string(),
+            subtitle: None,
+            kind: BannerKind::Boss,
+        });
+        world.insert_resource(queue);
+
+        let _ = world.run_system_once(tick_banner_queue); // activates on mission_a
+        assert!(world.resource::<BannerQueue>().active.is_some());
+
+        world.insert_resource(ViewedMission(mission_b));
+        let _ = world.run_system_once(tick_banner_queue);
+
+        let queue = world.resource::<BannerQueue>();
+        assert!(queue.active.is_none(), "active banner must clear on view change");
+        assert!(queue.pending.is_empty());
+    }
+
+    #[test]
+    fn banner_alpha_phases() {
+        assert_eq!(banner_alpha(0.0), 0.0); // slide-in start
+        assert_eq!(banner_alpha(0.3), 1.0); // hold
+        assert_eq!(banner_alpha(2.0), 1.0); // still holding
+        assert!(banner_alpha(3.1) < 1.0); // fading
+        assert_eq!(banner_alpha(BANNER_TOTAL_SECS), 0.0);
     }
 
     #[test]
