@@ -132,10 +132,10 @@
 - [x] **RS-2 · Rescue beats** *(✓ 2026-06-15)* — the lost party's trail, campsite, and dropped gear appear as events in the rescue run; recovering gear closes the loss loop.
   Touches: `events.ron`, rescue generation · Design: vision §7 · Needs: RS-1, CT-2
 
-- [ ] **RS-3 · Rescue UX** — the wipe toast becomes actionable ("Mount rescue"), a priority card pins to the mission board, party select shows the countdown, and resolution writes chronicle entries for rescuers and rescued.
+- [x] **RS-3 · Rescue UX** *(✓ 2026-07-06)* — the wipe toast becomes actionable ("Mount rescue"), a priority card pins to the mission board, party select shows the countdown, and resolution writes chronicle entries for rescuers and rescued.
   Touches: `ui/toast.rs`, `missions.rs`, `party_select.rs` · Needs: RS-1; chronicle entries need HR-1
   Done when: the whole loop — wipe, alarm, rescue, reunion — plays without touching a menu you didn't expect.
-  Progress (2026-06-16): UX scaffolding done — actionable "Mount Rescue" toast (`ToastAction::MountRescue`, `ui/toast.rs`), rescue offers pinned atop the mission board with countdown + rescuee names (`missions.rs`), party-select countdown (`party_select.rs`). Remaining: rescue *resolution* writes no chronicle entries — `rescues_given`/`rescues_received` are never incremented on a successful rescue (only set in tests). Finish that bookkeeping (+ rescuer/rescued timeline lines) to close the chunk.
+  Note (2026-07-06): the 2026-06-16 "remaining" item (rescue resolution chronicle bookkeeping) landed with the M1/M2 sprint (a635358) — `check_mission_completion` in `src/mission/combat.rs` increments `rescues_given`/`rescues_received` and writes rescuer/rescued timeline lines, covered by `test_rescue_mission_success`.
 
 ## FT — First-Time Experience
 
