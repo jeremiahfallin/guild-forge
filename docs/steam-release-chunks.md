@@ -140,7 +140,7 @@
 
 ## FT — First-Time Experience
 
-- [ ] **FT-1 · Guided first mission** — a lightly scripted first session: recruit a starter, dispatch, watch with contextual prompts. Skippable.
+- [x] **FT-1 · Guided first mission** *(✓ 2026-07-10 — five-beat coach-mark panel in src/tutorial.rs (hire → pick contract → dispatch → watch → graduate), advances off observable state, Skip on every beat; fresh games now start with 2 heroes + 60g and a ≤50g first applicant so the recruit beat always works; tutorial_done/step persist in save.ron with default-done for old saves; full flow hand-verified incl. skip and reload. Known polish item: panel overlaps the top mission-board card at default window size. Design: docs/plans/2026-07-10-guided-first-mission-design.md)* — a lightly scripted first session: recruit a starter, dispatch, watch with contextual prompts. Skippable.
   Touches: screens flow, new tutorial module · Design: roadmap Phase 1 ("currently none") · Needs: stable core loop (post-CB-8 ideally)
 
 - [ ] **FT-2 · Demo gating + hook** — soft content cap (reputation/template gate) and an end-of-demo screen with a wishlist call-to-action.
