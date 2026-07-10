@@ -394,6 +394,8 @@ fn dispatch_mission(
     mut next_tab: ResMut<NextState<GameTab>>,
     board: Option<Res<crate::screens::missions::MissionBoard>>,
     class_db: Option<Res<crate::hero::data::ClassDatabase>>,
+    buildings: Res<crate::buildings::GuildBuildings>,
+    mission_q: Query<&MissionProgress, With<Mission>>,
 ) {
     let Some(selected_sm) = selected_mission.as_ref() else {
         warn!("No mission selected for dispatch");
@@ -409,6 +411,21 @@ fn dispatch_mission(
     let Some(equipment_db) = equipment_db else { return };
     if party.0.is_empty() {
         warn!("Cannot dispatch with empty party");
+        return;
+    }
+
+    let active = crate::mission::active_mission_count(&mission_q);
+    if !buildings.can_dispatch(active) {
+        let cap = buildings.mission_cap();
+        warn!("Dispatch refused: War Room at capacity ({active}/{cap})");
+        commands.trigger(crate::ui::toast::ToastEvent {
+            title: "War Room at capacity".into(),
+            body: format!(
+                "{active}/{cap} missions underway. Wait for one to finish or upgrade the War Room."
+            ),
+            kind: crate::ui::toast::ToastKind::Failure,
+            action: None,
+        });
         return;
     }
 
