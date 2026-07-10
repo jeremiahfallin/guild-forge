@@ -125,6 +125,16 @@ pub enum MissionProgress {
     Failed,
 }
 
+/// Missions currently underway — the number the War Room cap is checked
+/// against. Resolved missions despawn, but count only `InProgress` to be safe
+/// against same-frame resolution.
+pub fn active_mission_count(missions: &Query<&MissionProgress, With<Mission>>) -> usize {
+    missions
+        .iter()
+        .filter(|p| **p == MissionProgress::InProgress)
+        .count()
+}
+
 /// The heroes assigned to a mission.
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
@@ -226,4 +236,27 @@ pub(crate) fn update_simulation_tempo(
     };
 
     time_fixed.set_timestep(std::time::Duration::from_secs_f32(1.0 / target_hz));
+}
+
+#[cfg(test)]
+mod cap_tests {
+    use super::*;
+    use bevy::ecs::system::RunSystemOnce;
+
+    #[test]
+    fn active_mission_count_ignores_resolved() {
+        let mut world = World::new();
+        world.spawn((Mission, MissionProgress::InProgress));
+        world.spawn((Mission, MissionProgress::InProgress));
+        world.spawn((Mission, MissionProgress::Complete));
+        world.spawn((Mission, MissionProgress::Failed));
+        world.spawn(MissionProgress::InProgress); // no Mission marker - ignored
+
+        let count = world
+            .run_system_once(|q: Query<&MissionProgress, With<Mission>>| {
+                active_mission_count(&q)
+            })
+            .unwrap();
+        assert_eq!(count, 2);
+    }
 }

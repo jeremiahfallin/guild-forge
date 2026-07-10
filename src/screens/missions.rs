@@ -70,9 +70,18 @@ fn update_mission_board(
     mut board: ResMut<MissionBoard>,
     board_ui: Query<Entity, With<MissionBoardUi>>,
     hero_infos: Query<(&crate::hero::HeroInfo, Option<&crate::hero::Epithet>)>,
+    buildings: Res<crate::buildings::GuildBuildings>,
+    mission_q: Query<&crate::mission::MissionProgress, With<crate::mission::Mission>>,
+    mut last_active: Local<Option<usize>>,
 ) {
     let has_ui = !board_ui.is_empty();
     let mut should_rebuild = !has_ui;
+
+    let active = crate::mission::active_mission_count(&mission_q);
+    if *last_active != Some(active) {
+        *last_active = Some(active);
+        should_rebuild = true;
+    }
 
     if has_ui && !board.rescue_offers.is_empty() {
         *timer += time.delta_secs();
@@ -127,12 +136,24 @@ fn update_mission_board(
         .insert((DespawnOnExit(GameTab::Missions), MissionBoardUi));
 
     // Top bar
+    let cap = buildings.mission_cap();
+    let counter_color = if buildings.can_dispatch(active) {
+        LABEL_TEXT
+    } else {
+        Color::srgb(0.9, 0.35, 0.25)
+    };
     let top_bar = div()
         .row()
         .w_full()
+        .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Mission Board"));
+        .child(widgets::header("Mission Board"))
+        .child(
+            text(format!("Underway: {active}/{cap}"))
+                .font_size(22.0)
+                .color(counter_color),
+        );
 
     root = root.child(top_bar);
 

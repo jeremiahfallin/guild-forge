@@ -14,6 +14,7 @@ pub enum BuildingType {
     RecruitmentOffice,
     Workshop,
     Tavern,
+    WarRoom,
 }
 
 impl BuildingType {
@@ -24,6 +25,7 @@ impl BuildingType {
         BuildingType::RecruitmentOffice,
         BuildingType::Workshop,
         BuildingType::Tavern,
+        BuildingType::WarRoom,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -34,6 +36,7 @@ impl BuildingType {
             Self::RecruitmentOffice => "Recruitment Office",
             Self::Workshop => "Workshop",
             Self::Tavern => "Tavern",
+            Self::WarRoom => "War Room",
         }
     }
 
@@ -45,6 +48,7 @@ impl BuildingType {
             Self::RecruitmentOffice => "More applicants with better quality.",
             Self::Workshop => "Convert raw materials into refined ones.",
             Self::Tavern => "Accelerates hero stamina recovery when resting.",
+            Self::WarRoom => "Coordinate more expeditions in the field at once.",
         }
     }
 }
@@ -101,6 +105,15 @@ impl GuildBuildings {
     pub fn max_applicants(&self) -> u32 {
         3 + self.level(BuildingType::RecruitmentOffice)
     }
+
+    /// How many missions may run concurrently. War Room raises the ceiling.
+    pub fn mission_cap(&self) -> u32 {
+        3 + self.level(BuildingType::WarRoom)
+    }
+
+    pub fn can_dispatch(&self, active_missions: usize) -> bool {
+        active_missions < self.mission_cap() as usize
+    }
 }
 
 /// Event: request to upgrade a building.
@@ -155,4 +168,36 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<GuildBuildings>();
     app.add_observer(handle_upgrade_building);
     app.add_systems(Startup, load_building_database);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mission_cap_grows_with_war_room() {
+        let mut buildings = GuildBuildings::default();
+        assert_eq!(buildings.mission_cap(), 3);
+        buildings.0.insert(BuildingType::WarRoom, 2);
+        assert_eq!(buildings.mission_cap(), 5);
+    }
+
+    #[test]
+    fn can_dispatch_boundaries() {
+        let buildings = GuildBuildings::default(); // cap 3
+        assert!(buildings.can_dispatch(0));
+        assert!(buildings.can_dispatch(2));
+        assert!(!buildings.can_dispatch(3));
+        assert!(!buildings.can_dispatch(4));
+    }
+
+    #[test]
+    fn building_database_includes_war_room() {
+        let data: BuildingsData =
+            ron::from_str(include_str!("../assets/data/buildings.ron")).unwrap();
+        let db = BuildingDatabase(data.buildings);
+        let def = db.get(BuildingType::WarRoom).expect("War Room in buildings.ron");
+        assert_eq!(def.max_level, 3);
+        assert_eq!(def.level_costs.len(), 3);
+    }
 }
