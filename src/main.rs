@@ -15,6 +15,7 @@ mod hero;
 mod materials;
 mod menus;
 mod mission;
+mod music;
 mod recruiting;
 mod reputation;
 mod save;
