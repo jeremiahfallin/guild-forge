@@ -2,10 +2,15 @@
 //! pinned coach-mark panel. Beats advance off observable game state.
 
 use bevy::prelude::*;
+use bevy_declarative::element::div::div;
+use bevy_declarative::element::text::text;
+use bevy_declarative::style::styled::Styled;
+use bevy_declarative::style::values::px;
 
 use crate::hero::Hero;
 use crate::mission::{Mission, MissionProgress, active_mission_count};
 use crate::screens::{GameTab, Screen};
+use crate::theme::widgets;
 
 /// Prompt text per step. Index = step.
 pub const TUTORIAL_STEPS: [&str; 5] = [
@@ -55,8 +60,105 @@ pub(super) fn plugin(app: &mut App) {
     app.add_observer(handle_skip);
     app.add_systems(
         Update,
-        advance_tutorial.run_if(in_state(Screen::Gameplay).and(tutorial_active)),
+        (advance_tutorial.run_if(tutorial_active), render_tutorial_panel)
+            .chain()
+            .run_if(in_state(Screen::Gameplay)),
     );
+}
+
+/// Marker for the coach-mark overlay root.
+#[derive(Component)]
+struct TutorialPanelUi;
+
+/// Rebuild the pinned panel when the step changes; clear it once done.
+fn render_tutorial_panel(
+    mut commands: Commands,
+    state: Res<TutorialState>,
+    gameplay_root: Query<Entity, With<widgets::GameplayRoot>>,
+    panel_q: Query<Entity, With<TutorialPanelUi>>,
+    mut last_step: Local<Option<u32>>,
+) {
+    let Ok(root_entity) = gameplay_root.single() else {
+        return;
+    };
+
+    if state.done {
+        for e in &panel_q {
+            commands.entity(e).despawn();
+        }
+        *last_step = None;
+        return;
+    }
+    if *last_step == Some(state.step) && !panel_q.is_empty() {
+        return;
+    }
+    *last_step = Some(state.step);
+
+    for e in &panel_q {
+        commands.entity(e).despawn();
+    }
+
+    let step_text = TUTORIAL_STEPS
+        .get(state.step as usize)
+        .copied()
+        .unwrap_or("");
+    let is_last = state.step as usize == TUTORIAL_STEPS.len() - 1;
+    let accent = Color::srgba(0.8, 0.55, 0.05, 0.9);
+
+    let mut panel_box = div()
+        .col()
+        .w(px(560.0))
+        .gap(px(8.0))
+        .p(px(14.0))
+        .bg(Color::srgba(0.1, 0.12, 0.2, 0.95))
+        .rounded(px(8.0))
+        .insert(BorderColor::all(accent));
+    panel_box.style_mut().border = UiRect::all(Val::Px(1.0));
+
+    panel_box = panel_box
+        .child(
+            text(format!("Guide {}/{}", state.step + 1, TUTORIAL_STEPS.len()))
+                .font_size(13.0)
+                .color(accent),
+        )
+        .child(
+            text(step_text)
+                .font_size(17.0)
+                .color(Color::srgb(0.92, 0.92, 0.95)),
+        );
+
+    let button_label = if is_last { "Done" } else { "Skip Tutorial" };
+    panel_box = panel_box.child(
+        div().row().justify_end().child(
+            div()
+                .p(px(6.0))
+                .pad_x(px(12.0))
+                .bg(Color::srgba(0.25, 0.28, 0.4, 0.9))
+                .rounded(px(6.0))
+                .insert(Button)
+                .on_click(
+                    |_: On<Pointer<Click>>, mut commands: Commands| {
+                        commands.trigger(SkipTutorial);
+                    },
+                )
+                .child(
+                    text(button_label)
+                        .font_size(14.0)
+                        .color(Color::srgb(0.85, 0.85, 0.9)),
+                ),
+        ),
+    );
+
+    let mut wrapper = div()
+        .absolute()
+        .w_full()
+        .row()
+        .justify_center()
+        .insert((TutorialPanelUi, GlobalZIndex(40), Pickable::IGNORE));
+    wrapper.style_mut().top = Val::Px(52.0);
+    wrapper
+        .child(panel_box)
+        .spawn_as_child_of(&mut commands, root_entity);
 }
 
 pub fn tutorial_active(state: Res<TutorialState>) -> bool {
