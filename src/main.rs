@@ -19,6 +19,7 @@ mod recruiting;
 mod reputation;
 mod save;
 mod screens;
+mod settings;
 mod theme;
 mod time_bank;
 mod training;
