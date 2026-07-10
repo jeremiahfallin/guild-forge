@@ -20,8 +20,12 @@ pub(super) fn plugin(app: &mut App) {
         Update,
         (
             update_global_volume_label,
+            update_music_volume_label,
+            update_sfx_volume_label,
             update_ember_density_label,
             update_ember_warmth_label,
+            update_window_mode_label,
+            update_resolution_label,
         )
             .run_if(in_state(Menu::Settings)),
     );
@@ -40,11 +44,23 @@ fn settings_grid() -> Div {
     let mut volume_label = widgets::label("Master Volume");
     volume_label.style_mut().justify_self = JustifySelf::End;
 
+    let mut music_label = widgets::label("Music Volume");
+    music_label.style_mut().justify_self = JustifySelf::End;
+
+    let mut sfx_label = widgets::label("SFX Volume");
+    sfx_label.style_mut().justify_self = JustifySelf::End;
+
     let mut density_label = widgets::label("Ember Density");
     density_label.style_mut().justify_self = JustifySelf::End;
 
     let mut warmth_label = widgets::label("Ember Warmth");
     warmth_label.style_mut().justify_self = JustifySelf::End;
+
+    let mut mode_label = widgets::label("Window Mode");
+    mode_label.style_mut().justify_self = JustifySelf::End;
+
+    let mut resolution_label = widgets::label("Resolution");
+    resolution_label.style_mut().justify_self = JustifySelf::End;
 
     let mut grid = div().grid().gap_y(px(10.0)).gap_x(px(30.0));
     grid.style_mut().grid_template_columns = RepeatedGridTrack::px(2, 400.0);
@@ -52,10 +68,18 @@ fn settings_grid() -> Div {
     grid.insert(Name::new("Settings Grid"))
         .child(volume_label)
         .child(global_volume_widget())
+        .child(music_label)
+        .child(music_volume_widget())
+        .child(sfx_label)
+        .child(sfx_volume_widget())
         .child(density_label)
         .child(ember_density_widget())
         .child(warmth_label)
         .child(ember_warmth_widget())
+        .child(mode_label)
+        .child(window_mode_widget())
+        .child(resolution_label)
+        .child(resolution_widget())
 }
 
 fn global_volume_widget() -> Div {
@@ -109,8 +133,78 @@ fn ember_warmth_widget() -> Div {
         .child(widgets::game_button_small("+", raise_ember_warmth))
 }
 
+fn music_volume_widget() -> Div {
+    let mut container = div().row();
+    container.style_mut().justify_self = JustifySelf::Start;
+
+    container
+        .insert(Name::new("Music Volume Widget"))
+        .child(widgets::game_button_small("-", lower_music_volume))
+        .child(
+            div()
+                .insert(Name::new("Current Music Volume"))
+                .pad_x(px(10.0))
+                .justify_center()
+                .child(widgets::label("").insert(MusicVolumeLabel)),
+        )
+        .child(widgets::game_button_small("+", raise_music_volume))
+}
+
+fn sfx_volume_widget() -> Div {
+    let mut container = div().row();
+    container.style_mut().justify_self = JustifySelf::Start;
+
+    container
+        .insert(Name::new("SFX Volume Widget"))
+        .child(widgets::game_button_small("-", lower_sfx_volume))
+        .child(
+            div()
+                .insert(Name::new("Current SFX Volume"))
+                .pad_x(px(10.0))
+                .justify_center()
+                .child(widgets::label("").insert(SfxVolumeLabel)),
+        )
+        .child(widgets::game_button_small("+", raise_sfx_volume))
+}
+
+fn window_mode_widget() -> Div {
+    let mut container = div().row();
+    container.style_mut().justify_self = JustifySelf::Start;
+
+    container
+        .insert(Name::new("Window Mode Widget"))
+        .child(widgets::game_button_small("<", toggle_window_mode))
+        .child(
+            div()
+                .insert(Name::new("Current Window Mode"))
+                .pad_x(px(10.0))
+                .justify_center()
+                .child(widgets::label("").insert(WindowModeLabel)),
+        )
+        .child(widgets::game_button_small(">", toggle_window_mode))
+}
+
+fn resolution_widget() -> Div {
+    let mut container = div().row();
+    container.style_mut().justify_self = JustifySelf::Start;
+
+    container
+        .insert(Name::new("Resolution Widget"))
+        .child(widgets::game_button_small("<", cycle_resolution_prev))
+        .child(
+            div()
+                .insert(Name::new("Current Resolution"))
+                .pad_x(px(10.0))
+                .justify_center()
+                .child(widgets::label("").insert(ResolutionLabel)),
+        )
+        .child(widgets::game_button_small(">", cycle_resolution_next))
+}
+
 const MIN_VOLUME: f32 = 0.0;
 const MAX_VOLUME: f32 = 3.0;
+const MIN_BUS_VOLUME: f32 = 0.0;
+const MAX_BUS_VOLUME: f32 = 2.0;
 
 fn lower_global_volume(_: On<Pointer<Click>>, mut global_volume: ResMut<GlobalVolume>) {
     let linear = (global_volume.volume.to_linear() - 0.1).max(MIN_VOLUME);
@@ -120,6 +214,63 @@ fn lower_global_volume(_: On<Pointer<Click>>, mut global_volume: ResMut<GlobalVo
 fn raise_global_volume(_: On<Pointer<Click>>, mut global_volume: ResMut<GlobalVolume>) {
     let linear = (global_volume.volume.to_linear() + 0.1).min(MAX_VOLUME);
     global_volume.volume = Volume::Linear(linear);
+}
+
+fn lower_music_volume(_: On<Pointer<Click>>, mut v: ResMut<crate::audio::MusicVolume>) {
+    v.0 = (v.0 - 0.1).max(MIN_BUS_VOLUME);
+}
+
+fn raise_music_volume(_: On<Pointer<Click>>, mut v: ResMut<crate::audio::MusicVolume>) {
+    v.0 = (v.0 + 0.1).min(MAX_BUS_VOLUME);
+}
+
+fn lower_sfx_volume(_: On<Pointer<Click>>, mut v: ResMut<crate::audio::SfxVolume>) {
+    v.0 = (v.0 - 0.1).max(MIN_BUS_VOLUME);
+}
+
+fn raise_sfx_volume(_: On<Pointer<Click>>, mut v: ResMut<crate::audio::SfxVolume>) {
+    v.0 = (v.0 + 0.1).min(MAX_BUS_VOLUME);
+}
+
+fn toggle_window_mode(
+    _: On<Pointer<Click>>,
+    mut settings: ResMut<crate::settings::GameSettings>,
+    mut window_q: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+) {
+    settings.fullscreen = !settings.fullscreen;
+    if let Ok(mut window) = window_q.single_mut() {
+        crate::settings::apply_window_settings(&settings, &mut window);
+    }
+}
+
+fn cycle_resolution_prev(
+    _: On<Pointer<Click>>,
+    settings: ResMut<crate::settings::GameSettings>,
+    window_q: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+) {
+    cycle_resolution(settings, window_q, false);
+}
+
+fn cycle_resolution_next(
+    _: On<Pointer<Click>>,
+    settings: ResMut<crate::settings::GameSettings>,
+    window_q: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+) {
+    cycle_resolution(settings, window_q, true);
+}
+
+fn cycle_resolution(
+    mut settings: ResMut<crate::settings::GameSettings>,
+    mut window_q: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+    forward: bool,
+) {
+    settings.windowed_resolution =
+        crate::settings::cycle_resolution(settings.windowed_resolution, forward);
+    if !settings.fullscreen
+        && let Ok(mut window) = window_q.single_mut()
+    {
+        crate::settings::apply_window_settings(&settings, &mut window);
+    }
 }
 
 fn lower_ember_density(_: On<Pointer<Click>>, mut settings: ResMut<crate::screens::EmberSettings>) {
@@ -144,6 +295,22 @@ struct GlobalVolumeLabel;
 
 #[derive(Component, Reflect)]
 #[reflect(Component)]
+struct MusicVolumeLabel;
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+struct SfxVolumeLabel;
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+struct WindowModeLabel;
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+struct ResolutionLabel;
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
 struct EmberDensityLabel;
 
 #[derive(Component, Reflect)]
@@ -156,6 +323,39 @@ fn update_global_volume_label(
 ) {
     let percent = 100.0 * global_volume.volume.to_linear();
     label.0 = format!("{percent:3.0}%");
+}
+
+fn update_music_volume_label(
+    v: Res<crate::audio::MusicVolume>,
+    mut label: Single<&mut Text, With<MusicVolumeLabel>>,
+) {
+    label.0 = format!("{:3.0}%", v.0 * 100.0);
+}
+
+fn update_sfx_volume_label(
+    v: Res<crate::audio::SfxVolume>,
+    mut label: Single<&mut Text, With<SfxVolumeLabel>>,
+) {
+    label.0 = format!("{:3.0}%", v.0 * 100.0);
+}
+
+fn update_window_mode_label(
+    settings: Res<crate::settings::GameSettings>,
+    mut label: Single<&mut Text, With<WindowModeLabel>>,
+) {
+    label.0 = if settings.fullscreen {
+        "Fullscreen".into()
+    } else {
+        "Windowed".into()
+    };
+}
+
+fn update_resolution_label(
+    settings: Res<crate::settings::GameSettings>,
+    mut label: Single<&mut Text, With<ResolutionLabel>>,
+) {
+    let (w, h) = settings.windowed_resolution;
+    label.0 = format!("{w} × {h}");
 }
 
 fn update_ember_density_label(
