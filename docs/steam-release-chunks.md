@@ -161,9 +161,9 @@
 - [ ] **TI-4 · Settings completeness** — resolution/fullscreen, separate music/SFX volume buses, key rebinding if feasible.
   Touches: `src/menus/settings.rs`, `audio.rs` · Design: roadmap Phase 1 · Needs: —
 
-- [ ] **TI-5 · Concurrent-mission cap** — introduce the cap (~3 for the demo; today dispatch is unbounded), surface it in party select/mission board, leave a hook for War-Room-tier growth.
+- [x] **TI-5 · Concurrent-mission cap** *(✓ 2026-07-09 — War Room building gates it: cap = 3 + level, max level 3 → 6; enforced in dispatch_mission, surfaced as board "Underway: n/cap" counter + "War Room full" dispatch state; design: docs/plans/2026-07-09-mission-cap-design.md)* — introduce the cap (~3 for the demo; today dispatch is unbounded), surface it in party select/mission board, leave a hook for War-Room-tier growth.
   Touches: `party_select.rs`, `missions.rs`, `buildings.rs` · Design: scale doc, roadmap Phase 1 · Needs: —
-  Decision inside: which building/tier gates the cap.
+  Decision inside: which building/tier gates the cap → resolved: new War Room building.
 
 - [ ] **TI-6 · String externalization** — move user-facing strings to a lookup table now; EFIGS localization is an EA-era decision but retrofitting strings is the painful part. Mechanical, high-volume, ideal LLM work. The earlier the cheaper — slot any time after the fun-proof milestone.
   Touches: every screen, feed templates · Design: roadmap Phase 5 note · Needs: UX-1 (so feed templates externalize once)
