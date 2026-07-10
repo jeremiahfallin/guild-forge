@@ -57,9 +57,12 @@ pub(super) fn plugin(app: &mut App) {
 /// Promote legendary `GearDrop` log events on the viewed mission to banners.
 pub(crate) fn detect_drop_banners(
     mut events: MessageReader<MissionLogEvent>,
-    viewed: Res<ViewedMission>,
+    viewed: Option<Res<ViewedMission>>,
     mut queue: ResMut<BannerQueue>,
 ) {
+    // Option: ViewedMission can vanish mid-frame when the watched mission
+    // resolves — after the chain's run_if already passed.
+    let Some(viewed) = viewed else { return };
     for event in events.read() {
         if event.mission_entity != viewed.0 {
             continue;
@@ -90,13 +93,14 @@ pub struct BannersFired {
 /// sim into combat tempo (`update_simulation_tempo`).
 pub(crate) fn detect_boss_banner(
     mut commands: Commands,
-    viewed: Res<ViewedMission>,
+    viewed: Option<Res<ViewedMission>>,
     missions: Query<(&Children, Option<&BannersFired>)>,
     hero_tokens: Query<(&GridPosition, &HeroToken), Without<EnemyToken>>,
     enemy_tokens: Query<(&GridPosition, &EnemyToken), Without<HeroToken>>,
     hero_data: Query<&HeroInfo, With<Hero>>,
     mut queue: ResMut<BannerQueue>,
 ) {
+    let Some(viewed) = viewed else { return };
     let Ok((children, fired)) = missions.get(viewed.0) else {
         return;
     };
@@ -169,10 +173,11 @@ pub fn banner_alpha(elapsed: f32) -> f32 {
 /// Advance the active banner, promote pending ones, and reset the queue when
 /// the viewed mission changes.
 pub(crate) fn tick_banner_queue(
-    viewed: Res<ViewedMission>,
+    viewed: Option<Res<ViewedMission>>,
     time: Res<Time>,
     mut queue: ResMut<BannerQueue>,
 ) {
+    let Some(viewed) = viewed else { return };
     if queue.mission != Some(viewed.0) {
         queue.pending.clear();
         queue.active = None;
@@ -196,12 +201,13 @@ pub(crate) fn tick_banner_queue(
 /// Missing timer drops under the threshold.
 pub(crate) fn detect_rescue_banner(
     mut commands: Commands,
-    viewed: Res<ViewedMission>,
+    viewed: Option<Res<ViewedMission>>,
     missions: Query<(&RescueMission, Option<&BannersFired>)>,
     missing_q: Query<&Missing>,
     time: Res<Time<Virtual>>,
     mut queue: ResMut<BannerQueue>,
 ) {
+    let Some(viewed) = viewed else { return };
     let Ok((rescue, fired)) = missions.get(viewed.0) else {
         return;
     };
@@ -253,6 +259,23 @@ mod tests {
                 },
             });
         });
+    }
+
+    #[test]
+    fn banner_systems_survive_missing_viewed_mission() {
+        // Regression: mission completion removes ViewedMission mid-frame,
+        // after the chain's run_if already passed — a bare Res<ViewedMission>
+        // then fails param validation, which panics at runtime in Bevy 0.18.
+        let mut world = World::new();
+        world.init_resource::<BannerQueue>();
+        world.init_resource::<Messages<MissionLogEvent>>();
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(Time::<Virtual>::default());
+
+        assert!(world.run_system_once(detect_drop_banners).is_ok());
+        assert!(world.run_system_once(detect_boss_banner).is_ok());
+        assert!(world.run_system_once(detect_rescue_banner).is_ok());
+        assert!(world.run_system_once(tick_banner_queue).is_ok());
     }
 
     #[test]
