@@ -5,16 +5,22 @@
 use bevy::audio::Volume;
 use bevy::prelude::*;
 
-use crate::audio::{Music, MusicVolume, effective_volume};
+use crate::audio::{Music, MusicVolume, effective_volume, sound_effect};
 use crate::menus::Menu;
+use crate::ui::feed::{MissionLogEvent, MissionLogPayload};
+use bevy::ecs::message::MessageReader;
 use crate::mission::entities::{EnemyToken, GridPosition, HeroToken};
 use crate::mission::{Mission, ViewedMission, combat_overlap, hero_action_range};
 use crate::screens::{GameTab, Screen};
 
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<CurrentMusicState>();
-    app.add_systems(Startup, spawn_music_layers);
+    app.add_systems(Startup, (spawn_music_layers, load_sfx_assets));
     app.add_systems(Update, (derive_music_state, crossfade_music).chain());
+    app.add_systems(
+        Update,
+        mission_sfx_bridge.run_if(in_state(GameTab::MissionView)),
+    );
 }
 
 /// The state the crossfade is currently steering toward.
@@ -167,6 +173,66 @@ fn crossfade_music(
     }
 }
 
+/// Max mission SFX spawned per frame — a busy turn shouldn't machine-gun the mixer.
+const MAX_SFX_PER_FRAME: usize = 4;
+
+/// Which placeholder pool a log event maps to. Unmapped kinds stay silent
+/// until real assets land (human-led).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SfxKind {
+    AbilityCast,
+    Death,
+}
+
+pub fn sfx_for(payload: &MissionLogPayload) -> Option<SfxKind> {
+    match payload {
+        MissionLogPayload::Ability { .. } => Some(SfxKind::AbilityCast),
+        MissionLogPayload::Death { .. } => Some(SfxKind::Death),
+        _ => None,
+    }
+}
+
+/// Placeholder pool: the four step sounds, rotated.
+#[derive(Resource)]
+struct SfxAssets(Vec<Handle<AudioSource>>);
+
+fn load_sfx_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(SfxAssets(
+        (1..=4)
+            .map(|i| asset_server.load(format!("audio/sound_effects/step{i}.ogg")))
+            .collect(),
+    ));
+}
+
+/// Play placeholder sounds for mapped log events on the viewed mission.
+fn mission_sfx_bridge(
+    mut commands: Commands,
+    mut events: MessageReader<MissionLogEvent>,
+    viewed: Option<Res<ViewedMission>>,
+    assets: Option<Res<SfxAssets>>,
+    mut rotation: Local<usize>,
+) {
+    let (Some(viewed), Some(assets)) = (viewed, assets) else {
+        events.clear();
+        return;
+    };
+    let mut spawned = 0;
+    for event in events.read() {
+        if spawned >= MAX_SFX_PER_FRAME {
+            break;
+        }
+        if event.mission_entity != viewed.0 {
+            continue;
+        }
+        if sfx_for(&event.payload).is_some() {
+            let handle = assets.0[*rotation % assets.0.len()].clone();
+            *rotation = rotation.wrapping_add(1);
+            commands.spawn((Name::new("Mission SFX"), sound_effect(handle)));
+            spawned += 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +253,31 @@ mod tests {
         assert_eq!(approach(0.9, 1.0, 0.25), 1.0); // clamps at target
         assert_eq!(approach(1.0, 0.0, 0.25), 0.75); // fades down too
         assert_eq!(approach(0.5, 0.5, 0.25), 0.5); // stable at target
+    }
+
+    #[test]
+    fn sfx_mapping_covers_placeholder_events() {
+        use crate::ui::feed::MissionLogPayload;
+        let ability = MissionLogPayload::Ability {
+            attacker: "A".into(),
+            defender: "B".into(),
+            ability_name: "Fireball".into(),
+            amount: 3,
+            is_hit: true,
+            is_crit: false,
+            effect_type: "damage".into(),
+        };
+        assert_eq!(sfx_for(&ability), Some(SfxKind::AbilityCast));
+        let death = MissionLogPayload::Death {
+            name: "C".into(),
+            is_enemy: false,
+        };
+        assert_eq!(sfx_for(&death), Some(SfxKind::Death));
+        let room = MissionLogPayload::RoomEntry {
+            hero_name: "A".into(),
+            room_name: "R".into(),
+        };
+        assert_eq!(sfx_for(&room), None);
     }
 
     const ALL_STATES: &[MusicState] = &[
