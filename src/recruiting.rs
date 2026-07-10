@@ -199,6 +199,18 @@ fn seed_applicant_board(
         info!("Seeded applicant: {} ({})", applicant.name, applicant.class);
         board.applicants.push(applicant);
     }
+
+    if let Some(first) = board.applicants.first_mut() {
+        first.hire_cost = clamp_starter_cost(first.hire_cost);
+    }
+}
+
+/// Fresh games start with 60 gold (FT-1); the first seeded applicant must be
+/// hireable with it so the tutorial's recruit beat can always complete.
+pub const STARTER_APPLICANT_MAX_COST: u32 = 50;
+
+pub fn clamp_starter_cost(cost: u32) -> u32 {
+    cost.min(STARTER_APPLICANT_MAX_COST)
 }
 
 /// Event: request to hire an applicant by index on the board.
@@ -293,4 +305,16 @@ pub(super) fn plugin(app: &mut App) {
     app.add_observer(handle_hire_applicant);
     app.add_systems(OnEnter(Screen::Gameplay), seed_applicant_board);
     app.add_systems(Update, tick_applicant_board);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_seeded_applicant_is_affordable() {
+        assert_eq!(clamp_starter_cost(120), 50);
+        assert_eq!(clamp_starter_cost(50), 50);
+        assert_eq!(clamp_starter_cost(35), 35);
+    }
 }

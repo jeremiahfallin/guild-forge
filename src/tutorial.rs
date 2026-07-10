@@ -15,21 +15,11 @@ pub const TUTORIAL_STEPS: [&str; 5] = [
 /// Guided-first-mission progress. `step`/`done` persist in the save;
 /// `saw_active_mission` is session-local bookkeeping for beat 3.
 /// Primitives only in the persisted form (see memory: ron-value-lossy-enums).
-#[derive(Resource, Debug, Clone, PartialEq)]
+#[derive(Resource, Debug, Clone, PartialEq, Default)]
 pub struct TutorialState {
     pub step: u32,
     pub done: bool,
     pub saw_active_mission: bool,
-}
-
-impl Default for TutorialState {
-    fn default() -> Self {
-        Self {
-            step: 0,
-            done: false,
-            saw_active_mission: false,
-        }
-    }
 }
 
 /// Decide the step from observable state. Advances at most one beat per call;

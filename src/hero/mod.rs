@@ -141,24 +141,27 @@ fn load_hero_databases(mut commands: Commands) {
     info!("Hero databases loaded");
 }
 
-/// Spawn 3 starter heroes when entering gameplay for the first time.
+/// Spawn 2 starter heroes and 60 gold when entering gameplay for the first
+/// time. The third hero is the tutorial's recruit beat (FT-1).
 fn spawn_starter_heroes(
     mut commands: Commands,
     existing_heroes: Query<(), With<Hero>>,
     class_db: Res<ClassDatabase>,
     trait_db: Res<TraitDatabase>,
     name_db: Res<NameDatabase>,
+    mut gold: ResMut<crate::economy::Gold>,
 ) {
     if !existing_heroes.is_empty() || crate::save::has_save_file() {
         return;
     }
 
     let mut rng = rand::rng();
-    for _ in 0..3 {
+    for _ in 0..2 {
         spawn_random_hero(&mut commands, &class_db, &trait_db, &name_db, &mut rng);
     }
+    gold.0 = 60; // FT-1: enough to hire the clamped starter applicant
 
-    info!("Spawned 3 starter heroes");
+    info!("Spawned 2 starter heroes with 60g");
 }
 
 /// Generate and spawn a random hero entity.
