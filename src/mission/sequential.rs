@@ -68,6 +68,7 @@ pub fn calculate_hero_token_stats(
 /// Build or update the sequential turn queue for the mission.
 /// If all characters have acted (or the queue is empty), starts a new round.
 pub fn build_or_update_turn_queue(
+    mut commands: Commands,
     missions_query: Query<(Entity, &Children), With<Mission>>,
     mut turn_queue_query: Query<&mut MissionTurnQueue>,
     combat_stats_query: Query<&CombatStats>,
@@ -77,6 +78,11 @@ pub fn build_or_update_turn_queue(
 ) {
     for (mission_entity, children) in &missions_query {
         let Ok(mut turn_queue) = turn_queue_query.get_mut(mission_entity) else {
+            // Dispatch spawns missions without a queue (only the save-load
+            // path added one) — self-heal so fresh missions tick.
+            commands
+                .entity(mission_entity)
+                .insert(MissionTurnQueue::default());
             continue;
         };
 
@@ -2118,6 +2124,30 @@ mod tests {
     use crate::mission::dungeon::{generate_dungeon, RoomType};
     use crate::mission::entities::ActiveAbilityState;
     use crate::mission::MissionDungeon;
+
+    #[test]
+    fn freshly_dispatched_mission_gets_a_turn_queue() {
+        // Regression: dispatch_mission spawns missions WITHOUT MissionTurnQueue
+        // (only the save-load path added it), so fresh missions never ticked.
+        // build_or_update_turn_queue must self-heal the missing component.
+        let mut world = World::new();
+
+        let mission_ent = world.spawn(Mission).id(); // no MissionTurnQueue — like dispatch
+        let c1 = world
+            .spawn(CombatStats { hp: 10, max_hp: 10, attack: 5, defense: 5, speed: 10 })
+            .id();
+        world.entity_mut(mission_ent).add_child(c1);
+
+        // First run inserts the component; second run populates the queue.
+        let _ = world.run_system_once(build_or_update_turn_queue);
+        assert!(
+            world.get::<MissionTurnQueue>(mission_ent).is_some(),
+            "turn queue component should be inserted for queue-less missions"
+        );
+        let _ = world.run_system_once(build_or_update_turn_queue);
+        let queue = world.get::<MissionTurnQueue>(mission_ent).unwrap();
+        assert_eq!(queue.queue.len(), 1);
+    }
 
     #[test]
     fn test_initiative_sorting() {
