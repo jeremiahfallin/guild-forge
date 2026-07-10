@@ -158,7 +158,7 @@
 - [x] **TI-3 · Crash reporting** *(✓ 2026-06-12 — panic hook writing a log, version + recent log ring, RFD popup dialog)* — panic hook writing a log (version + recent log ring) plus a dialog pointing to Discord/issues.
   Touches: `main.rs`, `src/crash_reporting.rs` · Design: roadmap §9 · Needs: —
 
-- [ ] **TI-4 · Settings completeness** — resolution/fullscreen, separate music/SFX volume buses, key rebinding if feasible.
+- [x] **TI-4 · Settings completeness** *(✓ 2026-07-09 — Music/SFX buses (master × bus × playback via Music/SoundEffect markers), windowed↔borderless-fullscreen toggle + resolution presets, all persisted to <data_dir>/guild-forge/settings.ron with debounced save; key rebinding skipped: game is mouse-driven, revisit if keyboard shortcuts grow; design: docs/plans/2026-07-09-settings-completeness-design.md)* — resolution/fullscreen, separate music/SFX volume buses, key rebinding if feasible.
   Touches: `src/menus/settings.rs`, `audio.rs` · Design: roadmap Phase 1 · Needs: —
 
 - [x] **TI-5 · Concurrent-mission cap** *(✓ 2026-07-09 — War Room building gates it: cap = 3 + level, max level 3 → 6; enforced in dispatch_mission, surfaced as board "Underway: n/cap" counter + "War Room full" dispatch state; design: docs/plans/2026-07-09-mission-cap-design.md)* — introduce the cap (~3 for the demo; today dispatch is unbounded), surface it in party select/mission board, leave a hook for War-Room-tier growth.

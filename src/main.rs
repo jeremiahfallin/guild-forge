@@ -19,6 +19,7 @@ mod recruiting;
 mod reputation;
 mod save;
 mod screens;
+mod settings;
 mod theme;
 mod time_bank;
 mod training;
@@ -80,6 +81,7 @@ impl Plugin for AppPlugin {
             reputation::plugin,
             save::plugin,
             screens::plugin,
+            settings::plugin,
             theme::plugin,
             time_bank::plugin,
             training::plugin,
