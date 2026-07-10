@@ -135,6 +135,16 @@ pub fn active_mission_count(missions: &Query<&MissionProgress, With<Mission>>) -
         .count()
 }
 
+/// Sim components every live mission must carry. Dispatch and the save-load
+/// path both attach these — a mission missing them doesn't tick (no turn
+/// queue) or narrate (log events dropped).
+pub fn mission_sim_bundle() -> impl Bundle {
+    (
+        entities::MissionTurnQueue::default(),
+        crate::ui::feed::MissionLogHistory::default(),
+    )
+}
+
 /// Action range in tiles for combat-overlap checks (encounter enrollment,
 /// tempo, music, boss banner). Single source of truth.
 pub fn hero_action_range(class: &crate::hero::data::HeroClass) -> u32 {
@@ -242,6 +252,61 @@ pub(crate) fn update_simulation_tempo(
     };
 
     time_fixed.set_timestep(std::time::Duration::from_secs_f32(1.0 / target_hz));
+}
+
+#[cfg(test)]
+mod sim_bundle_tests {
+    use super::*;
+    use crate::ui::feed::{
+        MissionLogEvent, MissionLogHistory, MissionLogPayload, NarrativeTemplates,
+        process_log_events,
+    };
+    use bevy::ecs::message::{MessageWriter, Messages};
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn stub_templates() -> NarrativeTemplates {
+        let one = || vec!["x".to_string()];
+        NarrativeTemplates {
+            attack_hit: one(),
+            attack_crit: one(),
+            attack_miss: one(),
+            heal: one(),
+            death_hero: one(),
+            death_enemy: one(),
+            room_entry: one(),
+            mission_complete: one(),
+            mission_failed: one(),
+        }
+    }
+
+    /// Regression: dispatch_mission spawned missions without MissionTurnQueue
+    /// (frozen sim) and without MissionLogHistory (all narration dropped) —
+    /// only the save-load path attached them. The shared bundle closes the gap.
+    #[test]
+    fn sim_bundle_lets_missions_tick_and_narrate() {
+        let mut world = World::new();
+        world.insert_resource(stub_templates());
+        world.init_resource::<Messages<MissionLogEvent>>();
+
+        let mission = world.spawn((Mission, mission_sim_bundle())).id();
+        assert!(
+            world.get::<entities::MissionTurnQueue>(mission).is_some(),
+            "bundle must include the turn queue"
+        );
+
+        let _ = world.run_system_once(
+            move |mut writer: MessageWriter<MissionLogEvent>| {
+                writer.write(MissionLogEvent {
+                    mission_entity: mission,
+                    payload: MissionLogPayload::Failure,
+                });
+            },
+        );
+        let _ = world.run_system_once(process_log_events);
+
+        let history = world.get::<MissionLogHistory>(mission).unwrap();
+        assert_eq!(history.logs.len(), 1, "events on a fresh mission must be recorded");
+    }
 }
 
 #[cfg(test)]
