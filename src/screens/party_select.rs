@@ -483,6 +483,7 @@ fn dispatch_mission(
             MissionParty(party.0.clone()),
             MissionDungeon(map.clone()),
             RoomStatus::new_for_dungeon(&map),
+            crate::mission::mission_sim_bundle(),
         ))
         .id();
 

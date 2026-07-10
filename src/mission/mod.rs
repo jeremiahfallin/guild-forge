@@ -135,6 +135,38 @@ pub fn active_mission_count(missions: &Query<&MissionProgress, With<Mission>>) -
         .count()
 }
 
+/// Sim components every live mission must carry. Dispatch and the save-load
+/// path both attach these — a mission missing them doesn't tick (no turn
+/// queue) or narrate (log events dropped).
+pub fn mission_sim_bundle() -> impl Bundle {
+    (
+        entities::MissionTurnQueue::default(),
+        crate::ui::feed::MissionLogHistory::default(),
+    )
+}
+
+/// Action range in tiles for combat-overlap checks (encounter enrollment,
+/// tempo, music, boss banner). Single source of truth.
+pub fn hero_action_range(class: &crate::hero::data::HeroClass) -> u32 {
+    match class {
+        crate::hero::data::HeroClass::Ranger => 6,
+        crate::hero::data::HeroClass::Mage => 5,
+        _ => 1,
+    }
+}
+
+/// True when any hero's action range reaches any enemy (Manhattan distance).
+pub fn combat_overlap(
+    heroes: &[(entities::GridPosition, u32)],
+    enemies: &[entities::GridPosition],
+) -> bool {
+    heroes.iter().any(|(h_gp, h_range)| {
+        enemies
+            .iter()
+            .any(|e_gp| h_gp.x.abs_diff(e_gp.x) + h_gp.y.abs_diff(e_gp.y) <= *h_range)
+    })
+}
+
 /// The heroes assigned to a mission.
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
@@ -199,12 +231,7 @@ pub(crate) fn update_simulation_tempo(
             for &child in children {
                 if let Ok((gp, hero_token)) = hero_tokens.get(child)
                     && let Ok(info) = hero_data.get(hero_token.0) {
-                        let range = match info.class {
-                            crate::hero::data::HeroClass::Ranger => 6,
-                            crate::hero::data::HeroClass::Mage => 5,
-                            _ => 1,
-                        };
-                        heroes_list.push((*gp, range));
+                        heroes_list.push((*gp, hero_action_range(&info.class)));
                     }
             }
 
@@ -215,18 +242,7 @@ pub(crate) fn update_simulation_tempo(
                 }
             }
 
-            for (h_gp, h_range) in &heroes_list {
-                for e_gp in &enemies_list {
-                    let dist = h_gp.x.abs_diff(e_gp.x) + h_gp.y.abs_diff(e_gp.y);
-                    if dist <= *h_range {
-                        in_combat = true;
-                        break;
-                    }
-                }
-                if in_combat {
-                    break;
-                }
-            }
+            in_combat = combat_overlap(&heroes_list, &enemies_list);
         }
 
     let target_hz = if in_combat {
@@ -236,6 +252,87 @@ pub(crate) fn update_simulation_tempo(
     };
 
     time_fixed.set_timestep(std::time::Duration::from_secs_f32(1.0 / target_hz));
+}
+
+#[cfg(test)]
+mod sim_bundle_tests {
+    use super::*;
+    use crate::ui::feed::{
+        MissionLogEvent, MissionLogHistory, MissionLogPayload, NarrativeTemplates,
+        process_log_events,
+    };
+    use bevy::ecs::message::{MessageWriter, Messages};
+    use bevy::ecs::system::RunSystemOnce;
+
+    fn stub_templates() -> NarrativeTemplates {
+        let one = || vec!["x".to_string()];
+        NarrativeTemplates {
+            attack_hit: one(),
+            attack_crit: one(),
+            attack_miss: one(),
+            heal: one(),
+            death_hero: one(),
+            death_enemy: one(),
+            room_entry: one(),
+            mission_complete: one(),
+            mission_failed: one(),
+        }
+    }
+
+    /// Regression: dispatch_mission spawned missions without MissionTurnQueue
+    /// (frozen sim) and without MissionLogHistory (all narration dropped) —
+    /// only the save-load path attached them. The shared bundle closes the gap.
+    #[test]
+    fn sim_bundle_lets_missions_tick_and_narrate() {
+        let mut world = World::new();
+        world.insert_resource(stub_templates());
+        world.init_resource::<Messages<MissionLogEvent>>();
+
+        let mission = world.spawn((Mission, mission_sim_bundle())).id();
+        assert!(
+            world.get::<entities::MissionTurnQueue>(mission).is_some(),
+            "bundle must include the turn queue"
+        );
+
+        let _ = world.run_system_once(
+            move |mut writer: MessageWriter<MissionLogEvent>| {
+                writer.write(MissionLogEvent {
+                    mission_entity: mission,
+                    payload: MissionLogPayload::Failure,
+                });
+            },
+        );
+        let _ = world.run_system_once(process_log_events);
+
+        let history = world.get::<MissionLogHistory>(mission).unwrap();
+        assert_eq!(history.logs.len(), 1, "events on a fresh mission must be recorded");
+    }
+}
+
+#[cfg(test)]
+mod overlap_tests {
+    use super::*;
+    use crate::hero::data::HeroClass;
+    use entities::GridPosition;
+
+    #[test]
+    fn action_ranges_by_class() {
+        assert_eq!(hero_action_range(&HeroClass::Ranger), 6);
+        assert_eq!(hero_action_range(&HeroClass::Mage), 5);
+        assert_eq!(hero_action_range(&HeroClass::Warrior), 1);
+    }
+
+    #[test]
+    fn combat_overlap_boundary() {
+        let heroes = [(GridPosition { x: 0, y: 0 }, 2)];
+        // Manhattan distance exactly == range: overlap
+        assert!(combat_overlap(&heroes, &[GridPosition { x: 1, y: 1 }]));
+        // One further: no overlap
+        assert!(!combat_overlap(&heroes, &[GridPosition { x: 2, y: 1 }]));
+        // Empty lists: no combat
+        assert!(!combat_overlap(&heroes, &[]));
+        assert!(!combat_overlap(&[], &[GridPosition { x: 0, y: 0 }]));
+    }
 }
 
 #[cfg(test)]

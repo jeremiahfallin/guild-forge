@@ -15,6 +15,7 @@ mod hero;
 mod materials;
 mod menus;
 mod mission;
+mod music;
 mod recruiting;
 mod reputation;
 mod save;
@@ -75,6 +76,7 @@ impl Plugin for AppPlugin {
             materials::plugin,
             mission::plugin,
             menus::plugin,
+            music::plugin,
         ));
         app.add_plugins((
             recruiting::plugin,

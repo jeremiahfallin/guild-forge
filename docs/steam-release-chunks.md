@@ -71,7 +71,7 @@
   Done when: the three banner-worthy moments interrupt the eye reliably and clear themselves.
   Design: `docs/plans/2026-07-06-event-banners-design.md` (boss fires on first combat overlap, Legendary-only drops, rescue threshold 30s).
 
-- [ ] **UX-4 · Audio states** — exploration/combat/boss music layers with crossfade plus ability SFX hooks. Code and state machine are LLM work; the actual tracks are human-led (appendix).
+- [x] **UX-4 · Audio states** *(✓ 2026-07-09 — guild/exploration/combat/boss states in src/music.rs, 0.8s crossfade over four persistent layers riding the TI-4 buses, MissionLogEvent→SFX bridge; verified live incl. Boss on a temp BossRat-in-goblin-cave hack (BossRat only spawns in orc_stronghold). Placeholder tracks; real music stays human-led. Session also fixed three latent bugs the frozen sim had been masking: dispatched missions had no MissionTurnQueue (never ticked) and no MissionLogHistory (feed silent) — both now via mission_sim_bundle() — and banner systems panicked when a watched mission resolved. Design: docs/plans/2026-07-09-audio-states-design.md)* — exploration/combat/boss music layers with crossfade plus ability SFX hooks. Code and state machine are LLM work; the actual tracks are human-led (appendix).
   Touches: `src/audio.rs` · Design: vision §10.5 · Needs: CB-2 (combat state signal)
   Done when: with placeholder assets, entering combat audibly shifts and the boss layer triggers.
 
