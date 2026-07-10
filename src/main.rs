@@ -24,6 +24,7 @@ mod settings;
 mod theme;
 mod time_bank;
 mod training;
+mod tutorial;
 mod ui;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -87,6 +88,7 @@ impl Plugin for AppPlugin {
             theme::plugin,
             time_bank::plugin,
             training::plugin,
+            tutorial::plugin,
             ui::plugin,
         ));
 
