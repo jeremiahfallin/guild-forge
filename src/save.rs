@@ -884,18 +884,23 @@ fn handle_save(
     });
 }
 
-pub fn deserialize_and_migrate(ron_string: &str) -> Result<SaveData, String> {
-    let mut value: ron::Value = ron::from_str(ron_string)
-        .map_err(|e| format!("Failed to parse raw RON save: {e}"))?;
+/// Reads only the `version` field of a save file; every other field is
+/// skipped. Missing `version` means a v0 (pre-versioning) save.
+#[derive(Deserialize)]
+struct SaveVersionProbe {
+    #[serde(default)]
+    version: u32,
+}
 
-    let mut version = 0;
-    if let ron::Value::Map(ref map) = value {
-        let key = ron::Value::String("version".to_string());
-        if let Some(v_val) = map.get(&key) {
-            version = serde::Deserialize::deserialize(v_val.clone())
-                .unwrap_or(0);
-        }
-    }
+pub fn deserialize_and_migrate(ron_string: &str) -> Result<SaveData, String> {
+    // Deserialize the version first, then the full SaveData directly from the
+    // source string. Never round-trip the data through `ron::Value`: RON's
+    // Value type is lossy — unit enum variants (HeroClass, Tile, ...) parse
+    // to plain unit values and lose their variant names, so a save containing
+    // any hero fails to deserialize back and gets flagged corrupt on load.
+    let probe: SaveVersionProbe = ron::from_str(ron_string)
+        .map_err(|e| format!("Failed to parse raw RON save: {e}"))?;
+    let mut version = probe.version;
 
     if version > CURRENT_SAVE_VERSION {
         return Err(format!("Save file version ({version}) is newer than supported ({CURRENT_SAVE_VERSION})"));
@@ -905,9 +910,11 @@ pub fn deserialize_and_migrate(ron_string: &str) -> Result<SaveData, String> {
         let next_version = version + 1;
         info!("Migrating save version from {version} to {next_version}");
         match next_version {
-            1 => {
-                migrate_v0_to_v1(&mut value)?;
-            }
+            // v0 -> v1 only stamps the version number; `SaveData`'s serde
+            // defaults already accept the v0 layout, so no rewrite is needed.
+            // Future structural migrations must rewrite the RON *string* (or
+            // a dedicated DTO), not a `ron::Value` tree — see above.
+            1 => {}
             _ => {
                 return Err(format!("No migration defined to reach version {next_version}"));
             }
@@ -915,20 +922,10 @@ pub fn deserialize_and_migrate(ron_string: &str) -> Result<SaveData, String> {
         version = next_version;
     }
 
-    let save_data = SaveData::deserialize(value)
+    let save_data: SaveData = ron::from_str(ron_string)
         .map_err(|e| format!("Failed to deserialize migrated save: {e}"))?;
 
     Ok(save_data)
-}
-
-fn migrate_v0_to_v1(value: &mut ron::Value) -> Result<(), String> {
-    if let ron::Value::Map(map) = value {
-        let key = ron::Value::String("version".to_string());
-        map.insert(key, ron::Value::Number(ron::value::Number::U8(1)));
-    } else {
-        return Err("Save file is not a valid map/struct".to_string());
-    }
-    Ok(())
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -1604,6 +1601,152 @@ mod tests {
         assert_eq!(back.history.lifetime_gold, 150);
         assert_eq!(back.history.timeline.len(), 2);
         assert_eq!(back.history.timeline[1], "Defeated Boss Rat");
+    }
+
+    /// Regression test: a save taken while a mission is dispatched must
+    /// survive the exact round-trip the game performs — serialized with
+    /// `ron::ser::to_string_pretty` in `handle_save`, then read back through
+    /// `deserialize_and_migrate` in `load_save`. If this fails, the save is
+    /// flagged corrupt on relaunch and the player loads into an empty guild.
+    #[test]
+    fn full_save_with_dispatched_mission_round_trips_through_migration() {
+        use crate::mission::dungeon::{Room, RoomType, Tile};
+
+        let hero = |name: &str, on_mission: bool| HeroSaveDto {
+            name: name.into(),
+            class: HeroClass::Warrior,
+            level: 2,
+            xp: 10,
+            xp_to_next: 150,
+            stats: HeroStatsSave {
+                strength: 12, dexterity: 10, constitution: 11,
+                intelligence: 9, wisdom: 10, charisma: 8,
+            },
+            traits: vec![],
+            equipment: HeroEquipmentSave {
+                weapon_tier: 1, armor_tier: 1, accessory_tier: 0,
+                ..Default::default()
+            },
+            on_mission,
+            growth: HeroGrowthSave {
+                strength: 1.0, dexterity: 0.5, constitution: 0.8,
+                intelligence: 0.2, wisdom: 0.3, charisma: 0.1,
+            },
+            progress: HeroStatProgressSave::default(),
+            favorite: false,
+            personally_managed: false,
+            missing_remaining: None,
+            dropped_equipment: None,
+            injured_remaining: None,
+            fatigue_current: 92.5,
+            fatigue_max_base: 100.0,
+            move_range_base: 3,
+            move_range_bonus: 0,
+            history: HeroHistorySave::default(),
+            epithet: None,
+            portrait: Some(HeroPortraitSave {
+                base_idx: 1,
+                hair_idx: 2,
+                hair_color: [0.5, 0.3, 0.1, 1.0],
+                gear_idx: 0,
+            }),
+        };
+
+        let mission = MissionSaveDto {
+            template_id: "goblin_cave".into(),
+            name: "Goblin Cave".into(),
+            difficulty: 1,
+            progress: MissionProgress::InProgress,
+            rng_seed: 0,
+            party_hero_indices: vec![2],
+            dungeon_map: DungeonMap {
+                width: 3,
+                height: 2,
+                tiles: vec![
+                    Tile::Wall, Tile::Floor, Tile::Door,
+                    Tile::Corridor, Tile::Floor, Tile::Wall,
+                ],
+                rooms: vec![Room { x: 1, y: 0, w: 1, h: 1, room_type: RoomType::Entrance }],
+            },
+            room_visited: vec![true],
+            room_cleared: vec![false],
+            hero_tokens: vec![HeroTokenDto {
+                roster_index: 2,
+                grid_x: 1,
+                grid_y: 0,
+                in_room: Some(0),
+                hp: 20,
+                max_hp: 25,
+                attack: 5,
+                defense: 3,
+                speed: 10,
+                move_range_base: 3,
+                move_range_bonus: 0,
+                path: Some(vec![(1, 0), (1, 1)]),
+                path_index: 0,
+                abilities: vec![crate::mission::entities::ActiveAbilityState {
+                    ability_id: "power_strike".into(),
+                    remaining_cooldown: 1,
+                }],
+            }],
+            enemy_tokens: vec![EnemyTokenDto {
+                enemy_type: EnemyType::Goblin,
+                xp_reward: 10,
+                grid_x: 2,
+                grid_y: 1,
+                in_room: Some(0),
+                hp: 8,
+                max_hp: 8,
+                attack: 3,
+                defense: 1,
+                speed: 10,
+                move_range_base: 3,
+                move_range_bonus: 0,
+            }],
+            logs: vec![MissionLogEntry {
+                text: "Sella entered the Entrance".into(),
+                kind: crate::ui::feed::LogKind::RoomEntry,
+                hero_name: Some("Sella".into()),
+            }],
+            modifiers: vec![crate::mission::data::MissionModifier::Foggy],
+            events_fired: 1,
+            max_events: 3,
+            biome: crate::mission::data::BiomeType::Dungeon,
+            rescue_hero_indices: None,
+            rescue_gear_recovered: None,
+        };
+
+        let save_data = SaveData {
+            version: CURRENT_SAVE_VERSION,
+            last_save_timestamp: 1_783_660_000,
+            gold: 250,
+            reputation: 4,
+            banked_seconds: 12.5,
+            materials: HashMap::from([(MaterialType::IronOre, 3)]),
+            buildings: HashMap::new(),
+            heroes: vec![hero("Aldric", false), hero("Brenna", false), hero("Sella", true)],
+            applicants: vec![],
+            next_arrival_timer: 30.0,
+            training_timer: 5.0,
+            missions: vec![mission],
+            rescue_offers: vec![],
+        };
+
+        // Exactly what handle_save writes to disk.
+        let ron_string =
+            ron::ser::to_string_pretty(&save_data, ron::ser::PrettyConfig::default())
+                .expect("save should serialize");
+
+        // Exactly what load_save runs on relaunch.
+        let loaded = deserialize_and_migrate(&ron_string)
+            .expect("a save with a dispatched mission should load back");
+
+        assert_eq!(loaded.heroes.len(), 3);
+        assert!(loaded.heroes[2].on_mission);
+        assert_eq!(loaded.missions.len(), 1);
+        assert_eq!(loaded.missions[0].party_hero_indices, vec![2]);
+        assert_eq!(loaded.missions[0].hero_tokens.len(), 1);
+        assert_eq!(loaded.missions[0].hero_tokens[0].roster_index, 2);
     }
 
     #[test]
