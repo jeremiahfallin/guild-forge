@@ -148,6 +148,11 @@ fn load_save(
     commands.insert_resource(Materials(save_data.materials));
     commands.insert_resource(GuildBuildings(save_data.buildings));
     commands.insert_resource(TrainingTimer(save_data.training_timer));
+    commands.insert_resource(crate::tutorial::TutorialState {
+        step: save_data.tutorial_step,
+        done: save_data.tutorial_done,
+        saw_active_mission: false,
+    });
 
     // ── Restore applicant board ────────────────────────────────────
     let applicants: Vec<Applicant> = save_data
@@ -503,6 +508,7 @@ fn handle_save(
     training_timer: Res<TrainingTimer>,
     applicant_board: Res<ApplicantBoard>,
     offline_bank: Res<OfflineTimeBank>,
+    tutorial: Res<crate::tutorial::TutorialState>,
     time: Res<Time<Virtual>>,
     heroes: Query<
         (
@@ -828,6 +834,8 @@ fn handle_save(
         training_timer: training_timer.0,
         missions: mission_dtos,
         rescue_offers: rescue_offer_dtos,
+        tutorial_done: tutorial.done,
+        tutorial_step: tutorial.step,
     };
 
     // 6. Serialize to RON.
@@ -966,6 +974,15 @@ pub struct SaveData {
     pub missions: Vec<MissionSaveDto>,
     #[serde(default)]
     pub rescue_offers: Vec<RescueOfferSaveDto>,
+    /// FT-1 tutorial. Defaults TRUE so saves predating the field skip it.
+    #[serde(default = "default_tutorial_done")]
+    pub tutorial_done: bool,
+    #[serde(default)]
+    pub tutorial_step: u32,
+}
+
+fn default_tutorial_done() -> bool {
+    true
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1258,6 +1275,30 @@ mod tests {
     }
 
     #[test]
+    fn tutorial_fields_default_done_for_old_saves() {
+        // A pre-FT-1 save has no tutorial fields — it must deserialize as done
+        // so existing players never see the tutorial.
+        let old_save = r#"(
+            version: 1,
+            last_save_timestamp: 12345,
+            gold: 500,
+            reputation: 5,
+            banked_seconds: 10.0,
+            materials: {},
+            buildings: {},
+            heroes: [],
+            applicants: [],
+            next_arrival_timer: 1.0,
+            training_timer: 2.0,
+            missions: [],
+        )"#;
+
+        let parsed = deserialize_and_migrate(old_save).expect("old save parses");
+        assert!(parsed.tutorial_done);
+        assert_eq!(parsed.tutorial_step, 0);
+    }
+
+    #[test]
     fn test_save_backup_and_recovery() {
         use std::fs;
 
@@ -1283,6 +1324,8 @@ mod tests {
             training_timer: 0.0,
             missions: vec![],
             rescue_offers: vec![],
+            tutorial_done: true,
+            tutorial_step: 0,
         };
         let serialized = ron::ser::to_string_pretty(&original, ron::ser::PrettyConfig::default()).unwrap();
         fs::write(&bak_path, &serialized).unwrap();
@@ -1730,6 +1773,8 @@ mod tests {
             training_timer: 5.0,
             missions: vec![mission],
             rescue_offers: vec![],
+            tutorial_done: true,
+            tutorial_step: 0,
         };
 
         // Exactly what handle_save writes to disk.

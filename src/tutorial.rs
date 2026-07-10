@@ -3,6 +3,10 @@
 
 use bevy::prelude::*;
 
+use crate::hero::Hero;
+use crate::mission::{Mission, MissionProgress, active_mission_count};
+use crate::screens::{GameTab, Screen};
+
 /// Prompt text per step. Index = step.
 pub const TUTORIAL_STEPS: [&str; 5] = [
     "Welcome, guildmaster! You have two heroes and 60 gold. Hire a third at the Recruiting office.",
@@ -42,8 +46,44 @@ pub fn target_step(
     }
 }
 
+/// Marker event: the Skip Tutorial / Done button.
+#[derive(Event)]
+pub struct SkipTutorial;
+
 pub(super) fn plugin(app: &mut App) {
     app.init_resource::<TutorialState>();
+    app.add_observer(handle_skip);
+    app.add_systems(
+        Update,
+        advance_tutorial.run_if(in_state(Screen::Gameplay).and(tutorial_active)),
+    );
+}
+
+pub fn tutorial_active(state: Res<TutorialState>) -> bool {
+    !state.done
+}
+
+fn handle_skip(_: On<SkipTutorial>, mut state: ResMut<TutorialState>) {
+    state.done = true;
+    info!("Tutorial finished/skipped at step {}", state.step);
+}
+
+fn advance_tutorial(
+    mut state: ResMut<TutorialState>,
+    heroes: Query<(), With<Hero>>,
+    tab: Option<Res<State<GameTab>>>,
+    missions: Query<&MissionProgress, With<Mission>>,
+) {
+    let active = active_mission_count(&missions);
+    if active > 0 && state.step >= 2 && !state.saw_active_mission {
+        state.saw_active_mission = true;
+    }
+    let in_party_select = tab.is_some_and(|t| t.get() == &GameTab::PartySelect);
+    let next = target_step(&state, heroes.iter().count(), in_party_select, active);
+    if next != state.step {
+        info!("Tutorial step {} -> {next}", state.step);
+        state.step = next;
+    }
 }
 
 #[cfg(test)]
