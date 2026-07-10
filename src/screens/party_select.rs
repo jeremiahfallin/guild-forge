@@ -148,6 +148,9 @@ fn refresh_party_select(
     heroes: Query<(Entity, &HeroInfo), (With<Hero>, Without<OnMission>, Without<crate::hero::status::Missing>)>,
     hero_info: Query<&HeroInfo, With<Hero>>,
     board: Option<Res<crate::screens::missions::MissionBoard>>,
+    buildings: Res<crate::buildings::GuildBuildings>,
+    mission_q: Query<&MissionProgress, With<Mission>>,
+    mut last_active: Local<Option<usize>>,
 ) {
     let has_ui = !ui_q.is_empty();
     let is_rescue = selected_mission
@@ -156,6 +159,12 @@ fn refresh_party_select(
         .unwrap_or(false);
 
     let mut should_rebuild = !has_ui || selected_party.is_changed();
+
+    let active = crate::mission::active_mission_count(&mission_q);
+    if *last_active != Some(active) {
+        *last_active = Some(active);
+        should_rebuild = true;
+    }
 
     if has_ui && is_rescue {
         *timer += time.delta_secs();
@@ -322,7 +331,15 @@ fn refresh_party_select(
         .justify_center()
         .p(px(16.0));
 
-    let bottom = if selected_party.0.is_empty() {
+    let cap = buildings.mission_cap();
+    let at_cap = !buildings.can_dispatch(active);
+
+    let bottom = if at_cap || selected_party.0.is_empty() {
+        let msg = if at_cap {
+            format!("War Room full ({active}/{cap})")
+        } else {
+            "Select at least 1 hero".to_string()
+        };
         bottom.child(
             div()
                 .w(px(380.0))
@@ -332,7 +349,7 @@ fn refresh_party_select(
                 .bg(Color::srgba(0.3, 0.3, 0.3, 0.5))
                 .border_radius(BorderRadius::MAX)
                 .child(
-                    text("Select at least 1 hero")
+                    text(msg)
                         .font_size(28.0)
                         .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
                 ),
