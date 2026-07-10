@@ -109,12 +109,7 @@ pub(crate) fn detect_boss_banner(
     for &child in children {
         if let Ok((gp, token)) = hero_tokens.get(child) {
             if let Ok(info) = hero_data.get(token.0) {
-                let range = match info.class {
-                    crate::hero::data::HeroClass::Ranger => 6,
-                    crate::hero::data::HeroClass::Mage => 5,
-                    _ => 1,
-                };
-                heroes.push((*gp, range));
+                heroes.push((*gp, crate::mission::hero_action_range(&info.class)));
             }
         } else if let Ok((gp, token)) = enemy_tokens.get(child)
             && token.enemy_type.is_boss()
