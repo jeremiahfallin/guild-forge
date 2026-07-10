@@ -54,5 +54,14 @@
                 (gold: 400, materials: [(ArcaneWood, 3), (CuredLeather, 3)]),
             ],
         ),
+        (
+            id: WarRoom,
+            max_level: 3,
+            level_costs: [
+                (gold: 150, materials: [(Wood, 6), (IronOre, 4)]),
+                (gold: 450, materials: [(Lumber, 5), (SteelIngot, 4)]),
+                (gold: 900, materials: [(ArcaneWood, 4), (EnchantedSteel, 3)]),
+            ],
+        ),
     ],
 )
