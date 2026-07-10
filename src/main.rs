@@ -81,6 +81,7 @@ impl Plugin for AppPlugin {
             reputation::plugin,
             save::plugin,
             screens::plugin,
+            settings::plugin,
             theme::plugin,
             time_bank::plugin,
             training::plugin,
