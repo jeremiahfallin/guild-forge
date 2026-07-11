@@ -7,6 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
+    localization::{tr, trf},
     mission::data::{MissionTemplateDatabase, MissionModifier},
     mission::dungeon::DungeonMap,
     screens::GameTab,
@@ -148,9 +149,9 @@ fn update_mission_board(
         .justify_between()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Mission Board"))
+        .child(widgets::header(tr("missions.header")))
         .child(
-            text(format!("Underway: {active}/{cap}"))
+            text(trf("missions.underway", &[("active", &active.to_string()), ("cap", &cap.to_string())]))
                 .font_size(22.0)
                 .color(counter_color),
         );
@@ -187,12 +188,12 @@ fn update_mission_board(
                 .row()
                 .gap(px(16.0))
                 .child(
-                    text(format!("Rescue Window: {countdown_str}"))
+                    text(trf("missions.rescue_window", &[("time", &countdown_str)]))
                         .font_size(16.0)
                         .color(Color::srgb(1.0, 0.4, 0.4)),
                 )
                 .child(
-                    text(format!("Rescuing: {rescued_names_str}"))
+                    text(trf("missions.rescuing", &[("names", &rescued_names_str)]))
                         .font_size(16.0)
                         .color(Color::srgb(0.9, 0.7, 0.7)),
                 );
@@ -219,7 +220,7 @@ fn update_mission_board(
 
             let mut name_row = div().row().items_center().gap(px(8.0))
                 .child(
-                    text("⚠️ RESCUE REQUIRED:")
+                    text(tr("missions.rescue_required"))
                         .font_size(18.0)
                         .color(Color::srgb(1.0, 0.3, 0.3))
                 )
@@ -275,9 +276,12 @@ fn update_mission_board(
                 continue;
             }
             let difficulty_stars = "★".repeat(template.difficulty as usize);
-            let gold_range = format!(
-                "Gold: {}-{}",
-                template.gold_reward.min, template.gold_reward.max
+            let gold_range = trf(
+                "missions.gold_range",
+                &[
+                    ("min", &template.gold_reward.min.to_string()),
+                    ("max", &template.gold_reward.max.to_string()),
+                ],
             );
 
             // Material drops summary
@@ -286,9 +290,9 @@ fn update_mission_board(
                 .iter()
                 .map(|(mat, min, max)| {
                     if min == max {
-                        format!("{} {}", min, mat.name())
+                        trf("missions.drop_exact", &[("count", &min.to_string()), ("name", mat.name())])
                     } else {
-                        format!("{}-{} {}", min, max, mat.name())
+                        trf("missions.drop_range", &[("min", &min.to_string()), ("max", &max.to_string()), ("name", mat.name())])
                     }
                 })
                 .collect::<Vec<_>>()
@@ -298,7 +302,7 @@ fn update_mission_board(
                 .row()
                 .gap(px(16.0))
                 .child(
-                    text(format!("Difficulty: {difficulty_stars}"))
+                    text(trf("missions.difficulty", &[("stars", &difficulty_stars)]))
                         .font_size(16.0)
                         .color(Color::srgb(0.9, 0.7, 0.2)),
                 )
@@ -309,7 +313,7 @@ fn update_mission_board(
                 );
             if template.reputation_required > 0 {
                 info_row = info_row.child(
-                    text(format!("Req: {} rep", template.reputation_required))
+                    text(trf("missions.rep_required", &[("rep", &template.reputation_required.to_string())]))
                         .font_size(16.0)
                         .color(Color::srgb(0.6, 0.8, 0.9)),
                 );
@@ -319,7 +323,7 @@ fn update_mission_board(
                 .row()
                 .gap(px(4.0))
                 .child(
-                    text("Drops:")
+                    text(tr("missions.drops"))
                         .font_size(14.0)
                         .color(Color::srgb(0.6, 0.7, 0.6)),
                 )
@@ -389,7 +393,7 @@ fn update_mission_board(
 
         root = root.child(list);
     } else {
-        root = root.child(widgets::label("Loading missions..."));
+        root = root.child(widgets::label(tr("missions.loading")));
     }
 
     root.spawn_as_child_of(&mut commands, root_entity);

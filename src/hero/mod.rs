@@ -417,7 +417,7 @@ pub fn track_hero_history_system(
                         if let Some(roster_ent) = find_hero_by_name(&heroes, killer_name) {
                             if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
                                 hist.kills += 1;
-                                if name == "Boss Rat" {
+                                if *name == crate::mission::data::EnemyType::BossRat.to_string() {
                                     if let Ok((_, info, _)) = missions.get(event.mission_entity) {
                                         hist.add_timeline_entry(trf("timeline.boss_defeated_in", &[("boss", name), ("mission", &info.name)]));
                                     } else {

@@ -8,6 +8,7 @@ use bevy_declarative::style::values::{pct, px};
 use rand::Rng;
 
 use crate::{
+    localization::{tr, trf},
     hero::{Hero, HeroInfo, HeroStats},
     mission::{
         Mission, MissionDungeon, MissionInfo, MissionParty, MissionProgress, OnMission,
@@ -75,7 +76,7 @@ fn build_available_panel(
         .insert((Name::new("Available Heroes"), ScrollPosition::default()));
 
     panel = panel.child(
-        text("Available Heroes")
+        text(tr("party.available_heroes"))
             .font_size(24.0)
             .color(HEADER_TEXT),
     );
@@ -117,7 +118,7 @@ fn build_available_panel(
                         text(&info.name).font_size(20.0).color(text_color),
                     )
                     .child(
-                        text(format!("Lv.{} {}", info.level, info.class))
+                        text(trf("common.hero_level_class", &[("level", &info.level.to_string()), ("class", &info.class.to_string())]))
                             .font_size(14.0)
                             .color(LABEL_TEXT),
                     ),
@@ -127,7 +128,7 @@ fn build_available_panel(
 
     if heroes.is_empty() {
         panel = panel.child(
-            text("No heroes available")
+            text(tr("party.no_heroes"))
                 .font_size(16.0)
                 .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
         );
@@ -203,14 +204,14 @@ fn refresh_party_select(
         })
         .and_then(|template_idx| templates.as_ref().and_then(|t| t.0.get(template_idx)))
         .map(|t| t.name.as_str())
-        .unwrap_or("Unknown Mission");
+        .unwrap_or(tr("party.unknown_mission"));
 
     let mut root = widgets::content_area("Party Select")
         .insert((DespawnOnExit(GameTab::PartySelect), PartySelectUi));
 
     // Top bar
     let mut title_row = div().row().items_center().gap(px(12.0))
-        .child(widgets::header(format!("Select Party — {mission_name}")));
+        .child(widgets::header(trf("party.header", &[("mission", mission_name)])));
 
     if let Some(selected_sm) = selected_mission.as_ref() {
         if selected_sm.is_rescue {
@@ -220,13 +221,13 @@ fn refresh_party_select(
                         let remaining_secs = (offer.expires_at - time.elapsed_secs_f64()).max(0.0);
                         let countdown_str = crate::hero::status::format_countdown(remaining_secs);
                         title_row = title_row.child(
-                            text(format!("({} remaining)", countdown_str))
+                            text(trf("party.remaining", &[("time", &countdown_str)]))
                                 .font_size(24.0)
                                 .color(Color::srgb(1.0, 0.4, 0.4))
                         );
                     } else {
                         title_row = title_row.child(
-                            text("(Expired)")
+                            text(tr("party.expired"))
                                 .font_size(24.0)
                                 .color(Color::srgb(1.0, 0.4, 0.4))
                         );
@@ -292,7 +293,7 @@ fn refresh_party_select(
                                 text(&info.name).font_size(20.0).color(HEADER_TEXT),
                             )
                             .child(
-                                text(format!("Lv.{} {}", info.level, info.class))
+                                text(trf("common.hero_level_class", &[("level", &info.level.to_string()), ("class", &info.class.to_string())]))
                                     .font_size(14.0)
                                     .color(LABEL_TEXT),
                             ),
@@ -308,7 +309,7 @@ fn refresh_party_select(
 
     if selected_party.0.is_empty() {
         party_panel = party_panel.child(
-            text("Click heroes on the left to add them")
+            text(tr("party.click_to_add"))
                 .font_size(16.0)
                 .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
         );
@@ -336,9 +337,9 @@ fn refresh_party_select(
 
     let bottom = if at_cap || selected_party.0.is_empty() {
         let msg = if at_cap {
-            format!("War Room full ({active}/{cap})")
+            trf("party.war_room_full", &[("active", &active.to_string()), ("cap", &cap.to_string())])
         } else {
-            "Select at least 1 hero".to_string()
+            tr("party.select_one").to_string()
         };
         bottom.child(
             div()
@@ -356,7 +357,7 @@ fn refresh_party_select(
         )
     } else {
         bottom.child(widgets::game_button(
-            format!("Dispatch! ({})", selected_party.0.len()),
+            trf("party.dispatch", &[("count", &selected_party.0.len().to_string())]),
             dispatch_mission,
         ))
     };

@@ -47,6 +47,17 @@
     "class.rogue": "Rogue",
     "class.warrior": "Warrior",
 
+    // ── enemies ──
+    "enemy.boss_rat": "Boss Rat",
+    "enemy.giant_rat": "Giant Rat",
+    "enemy.goblin": "Goblin",
+    "enemy.goblin_archer": "Goblin Archer",
+    "enemy.goblin_shaman": "Goblin Shaman",
+    "enemy.orc": "Orc",
+    "enemy.skeleton": "Skeleton",
+    "enemy.slime": "Slime",
+    "enemy.spider_swarmer": "Spider Swarmer",
+
     // ── epithets (persisted on heroes in saves) ──
     "epithet.goldfinder": "Goldfinder",
     "epithet.hundred_mission": "Hundred-Mission",
@@ -122,6 +133,47 @@
     "material.rough_gems": "Rough Gems",
     "material.steel_ingot": "Steel Ingot",
     "material.wood": "Wood",
+
+    // ── mission board ──
+    "missions.difficulty": "Difficulty: {stars}",
+    "missions.drop_exact": "{count} {name}",
+    "missions.drop_range": "{min}-{max} {name}",
+    "missions.drops": "Drops:",
+    "missions.gold_range": "Gold: {min}-{max}",
+    "missions.header": "Mission Board",
+    "missions.loading": "Loading missions...",
+    "missions.rep_required": "Req: {rep} rep",
+    "missions.rescue_required": "⚠️ RESCUE REQUIRED:",
+    "missions.rescue_window": "Rescue Window: {time}",
+    "missions.rescuing": "Rescuing: {names}",
+    "missions.underway": "Underway: {active}/{cap}",
+
+    // ── mission view ──
+    "mission_view.abort": "Abort Mission",
+    "mission_view.float_crit": "{amount} Critical!",
+    "mission_view.float_heal": "+{amount}",
+    "mission_view.float_miss": "Miss",
+    "mission_view.float_shield": "+{amount} Shield",
+    "mission_view.log_header": "Mission Log",
+
+    // ── mission modifiers ──
+    "modifier.bountiful": "Bountiful",
+    "modifier.cursed_ground": "Cursed Ground",
+    "modifier.foggy": "Foggy",
+    "modifier.infested": "Infested",
+    "modifier.trapped": "Trapped",
+
+    // ── party select ──
+    "party.available_heroes": "Available Heroes",
+    "party.click_to_add": "Click heroes on the left to add them",
+    "party.dispatch": "Dispatch! ({count})",
+    "party.expired": "(Expired)",
+    "party.header": "Select Party — {mission}",
+    "party.no_heroes": "No heroes available",
+    "party.remaining": "({time} remaining)",
+    "party.select_one": "Select at least 1 hero",
+    "party.unknown_mission": "Unknown Mission",
+    "party.war_room_full": "War Room full ({active}/{cap})",
 
     // ── veteran perks ──
     "perk.death_defier": "Death Defier",
