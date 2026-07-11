@@ -22,6 +22,24 @@
     "banner.rare_drop": "RARE DROP!",
     "banner.rescue_closing": "RESCUE WINDOW CLOSING",
 
+    // ── shared/common ──
+    "common.hero_level_class": "Lv.{level} {class}",
+    "common.unknown": "Unknown",
+
+    // ── armory screen ──
+    "armory.cost_material": ", {amount} {name}",
+    "armory.craft": "Craft",
+    "armory.equipment_header": "{name} - Equipment",
+    "armory.header": "Armory",
+    "armory.hero_not_found": "Hero not found",
+    "armory.heroes": "Heroes",
+    "armory.level_req": " [Armory Lv {level} req]",
+    "armory.max_tier": "Max Tier",
+    "armory.next_tier": "Next: {name} ({gold}g",
+    "armory.no_gear": "None",
+    "armory.select_prompt": "Select a hero to view equipment",
+    "armory.tier_n": "Tier {tier}",
+
     // ── classes ──
     "class.cleric": "Cleric",
     "class.mage": "Mage",
@@ -74,6 +92,18 @@
     "feed.fallback.room_entry": "{hero} leads the party into the {room}.",
     "feed.trap_triggered": "Trap! {hero} triggers a pressure plate and takes {damage} damage!",
 
+    // ── guild screen ──
+    "guild.convert": "Convert",
+    "guild.cost_material": " + {amount} {name}",
+    "guild.header": "Guild Hall",
+    "guild.level": "Lv {cur} / {max}",
+    "guild.max_level": "Max Level",
+    "guild.next_cost": "Next: {gold}g",
+    "guild.recipe": "{in_count} {in_name} -> {out_count} {out_name}",
+    "guild.stockpile": "Stockpile",
+    "guild.upgrade": "Upgrade",
+    "guild.workshop_conversions": "Workshop Conversions",
+
     // ── materials ──
     "material.arcane_wood": "Arcane Wood",
     "material.converted_body": "{in_count} {in_name} \u{2192} {out_count} {out_name}",
@@ -113,8 +143,54 @@
     "rarity.uncommon": "Uncommon",
 
     // ── recruiting ──
+    "recruit.cost_leaves": "Cost: {cost}g      Leaves in: {time}",
+    "recruit.header": "Applicant Board",
+    "recruit.hire": "Hire",
     "recruit.hired_body": "{class} — hired for {cost}g",
     "recruit.hired_toast": "{name} joined the guild!",
+    "recruit.name_class": "{name} - {class}",
+    "recruit.no_applicants": "No applicants available. Check back later!",
+    "recruit.roster_count": "Heroes: {count} / {cap}",
+    "recruit.stat_line": "STR {str}  DEX {dex}  CON {con}  INT {int}  WIS {wis}  CHA {cha}",
+    "recruit.traits": "Traits: {traits}",
+
+    // ── roster screen ──
+    "roster.badge_favorite": "★ Favorite",
+    "roster.badge_managed": "⚑ Personally Managed",
+    "roster.career_history": "Career History",
+    "roster.exhausted": "EXHAUSTED!",
+    "roster.header": "Roster",
+    "roster.hero_not_found": "Hero not found",
+    "roster.heroes": "Heroes",
+    "roster.hist.kills": "Kills",
+    "roster.hist.lifetime_gold": "Lifetime Gold",
+    "roster.hist.missions_run": "Missions Run",
+    "roster.hist.near_deaths": "Near-Deaths",
+    "roster.hist.rescues_given": "Rescues Given",
+    "roster.hist.rescues_received": "Rescues Recv",
+    "roster.level_class_long": "Level {level} {class}",
+    "roster.no_history": "No recorded history.",
+    "roster.no_perks": "None (Earned via career milestones)",
+    "roster.none": "None",
+    "roster.select_prompt": "Select a hero to view details",
+    "roster.stamina": "Stamina",
+    "roster.stamina_pct": "Stamina: {pct}%",
+    "roster.stats": "Stats",
+    "roster.status_injured": "Lv.{level} {class} — INJURED {time}",
+    "roster.status_missing": "Lv.{level} {class} — MISSING {time}",
+    "roster.status_on_mission": "Lv.{level} {class} (On Mission)",
+    "roster.timeline": "Timeline",
+    "roster.traits": "Traits",
+    "roster.veteran_perks": "Veteran Perks",
+    "roster.xp": "XP: {xp} / {next}",
+
+    // ── stat abbreviations ──
+    "stat.cha": "CHA",
+    "stat.con": "CON",
+    "stat.dex": "DEX",
+    "stat.int": "INT",
+    "stat.str": "STR",
+    "stat.wis": "WIS",
 
     // ── sidebar ──
     "sidebar.active_missions": "Active Missions",
@@ -154,6 +230,7 @@
 
     // ── time formatting ──
     "time.hours_minutes": "{h}h {m}m",
+    "time.minutes": "{m}m",
     "time.minutes_seconds": "{m}m {s}s",
 
     // ── toasts ──

@@ -7,6 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
+    localization::{tr, trf},
     buildings::GuildBuildings,
     hero::Hero,
     recruiting::{ApplicantBoard, HireApplicant},
@@ -86,9 +87,9 @@ fn build_recruiting_ui(
         .items_center()
         .justify_between()
         .p(px(16.0))
-        .child(widgets::header("Applicant Board"))
+        .child(widgets::header(tr("recruit.header")))
         .child(
-            text(format!("Heroes: {} / {}", hero_count, roster_cap))
+            text(trf("recruit.roster_count", &[("count", &hero_count.to_string()), ("cap", &roster_cap.to_string())]))
                 .font_size(24.0)
                 .color(LABEL_TEXT),
         );
@@ -105,7 +106,7 @@ fn build_recruiting_ui(
 
     if board.applicants.is_empty() {
         content = content.child(
-            text("No applicants available. Check back later!")
+            text(tr("recruit.no_applicants"))
                 .font_size(20.0)
                 .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
         );
@@ -113,7 +114,7 @@ fn build_recruiting_ui(
 
     for (idx, applicant) in board.applicants.iter().enumerate() {
         let traits_str = if applicant.traits.is_empty() {
-            "None".to_string()
+            tr("roster.none").to_string()
         } else {
             applicant
                 .traits
@@ -124,14 +125,16 @@ fn build_recruiting_ui(
         };
 
         let stats = &applicant.stats;
-        let stats_str = format!(
-            "STR {}  DEX {}  CON {}  INT {}  WIS {}  CHA {}",
-            stats.strength,
-            stats.dexterity,
-            stats.constitution,
-            stats.intelligence,
-            stats.wisdom,
-            stats.charisma,
+        let stats_str = trf(
+            "recruit.stat_line",
+            &[
+                ("str", &stats.strength.to_string()),
+                ("dex", &stats.dexterity.to_string()),
+                ("con", &stats.constitution.to_string()),
+                ("int", &stats.intelligence.to_string()),
+                ("wis", &stats.wisdom.to_string()),
+                ("cha", &stats.charisma.to_string()),
+            ],
         );
 
         let time_str = format_time(applicant.time_remaining);
@@ -143,14 +146,14 @@ fn build_recruiting_ui(
 
         // Name and class
         details_col = details_col.child(
-            text(format!("{} - {}", applicant.name, applicant.class))
+            text(trf("recruit.name_class", &[("name", &applicant.name), ("class", &applicant.class.to_string())]))
                 .font_size(22.0)
                 .color(HEADER_TEXT),
         );
 
         // Traits
         details_col = details_col.child(
-            text(format!("Traits: {}", traits_str))
+            text(trf("recruit.traits", &[("traits", &traits_str)]))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
         );
@@ -170,7 +173,7 @@ fn build_recruiting_ui(
                 .items_center()
                 .justify_between()
                 .child(
-                    text(format!("Cost: {}g      Leaves in: {}", applicant.hire_cost, time_str))
+                    text(trf("recruit.cost_leaves", &[("cost", &applicant.hire_cost.to_string()), ("time", &time_str)]))
                         .font_size(16.0)
                         .color(LABEL_TEXT),
                 )
@@ -189,7 +192,7 @@ fn build_recruiting_ui(
                         .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_hire_click)
                         .child(
-                            text("Hire")
+                            text(tr("recruit.hire"))
                                 .font_size(18.0)
                                 .color(BUTTON_TEXT)
                                 .insert(Pickable::IGNORE),
@@ -235,9 +238,9 @@ fn format_time(seconds: f32) -> String {
     let hours = total_minutes / 60;
     let minutes = total_minutes % 60;
     if hours > 0 {
-        format!("{}h {}m", hours, minutes)
+        trf("time.hours_minutes", &[("h", &hours.to_string()), ("m", &minutes.to_string())])
     } else {
-        format!("{}m", minutes)
+        trf("time.minutes", &[("m", &minutes.to_string())])
     }
 }
 
