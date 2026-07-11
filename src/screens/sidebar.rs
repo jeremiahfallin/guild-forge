@@ -7,6 +7,7 @@ use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::{tr, trf};
 use crate::{
     economy::Gold,
     hero::{Favorite, Hero},
@@ -106,21 +107,21 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32, glo
                         })
                 )
                 .child(
-                    text("Guild Forge")
+                    text(tr("sidebar.title"))
                         .font_size(24.0)
                         .color(HEADER_TEXT),
                 )
         )
         // Gold
         .child(
-            text(format!("Gold: {gold_amount}"))
+            text(trf("sidebar.gold", &[("gold", &gold_amount.to_string())]))
                 .font_size(18.0)
                 .color(Color::srgb(0.9, 0.8, 0.2))
                 .insert(SidebarGoldText),
         )
         // Reputation
         .child(
-            text(format!("Rep: {rep_amount}"))
+            text(trf("sidebar.rep", &[("rep", &rep_amount.to_string())]))
                 .font_size(16.0)
                 .color(Color::srgb(0.6, 0.8, 0.9))
                 .insert(SidebarRepText),
@@ -136,7 +137,7 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32, glo
                 .child(speed_btn(2.0, speed))
                 .child(speed_btn(3.0, speed))
                 .child(
-                    text(format!("Bank: {}", format_banked_time(banked)))
+                    text(trf("sidebar.bank", &[("time", &format_banked_time(banked))]))
                         .font_size(14.0)
                         .color(Color::srgb(0.7, 0.8, 0.9))
                         .insert(SidebarBankText),
@@ -150,11 +151,11 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32, glo
                 .bg(Color::srgba(0.4, 0.4, 0.5, 0.5)),
         )
         // Nav buttons
-        .child(nav_button("Roster", GameTab::Roster))
-        .child(nav_button("Missions", GameTab::Missions))
-        .child(nav_button("Guild", GameTab::Guild))
-        .child(nav_button("Armory", GameTab::Armory))
-        .child(nav_button("Recruiting", GameTab::Recruiting))
+        .child(nav_button(tr("sidebar.nav.roster"), GameTab::Roster))
+        .child(nav_button(tr("sidebar.nav.missions"), GameTab::Missions))
+        .child(nav_button(tr("sidebar.nav.guild"), GameTab::Guild))
+        .child(nav_button(tr("sidebar.nav.armory"), GameTab::Armory))
+        .child(nav_button(tr("sidebar.nav.recruiting"), GameTab::Recruiting))
         // Divider
         .child(
             div()
@@ -164,7 +165,7 @@ fn build_sidebar(gold_amount: u32, rep_amount: u32, banked: f32, speed: f32, glo
         )
         // Active Missions header
         .child(
-            text("Active Missions")
+            text(tr("sidebar.active_missions"))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
         );
@@ -264,7 +265,7 @@ fn update_gold_display(
     mut texts: Query<&mut Text, With<SidebarGoldText>>,
 ) {
     for mut t in &mut texts {
-        **t = format!("Gold: {}", gold.0);
+        **t = trf("sidebar.gold", &[("gold", &gold.0.to_string())]);
     }
 }
 
@@ -273,7 +274,7 @@ fn update_rep_display(
     mut texts: Query<&mut Text, With<SidebarRepText>>,
 ) {
     for mut t in &mut texts {
-        **t = format!("Rep: {} (Tier {})", rep.0, rep.tier());
+        **t = trf("sidebar.rep_tier", &[("rep", &rep.0.to_string()), ("tier", &rep.tier().to_string())]);
     }
 }
 
@@ -282,7 +283,7 @@ fn update_bank_display(
     mut texts: Query<&mut Text, With<SidebarBankText>>,
 ) {
     for mut t in &mut texts {
-        **t = format!("Bank: {}", format_banked_time(bank.banked_seconds));
+        **t = trf("sidebar.bank", &[("time", &format_banked_time(bank.banked_seconds))]);
     }
 }
 
@@ -354,9 +355,9 @@ fn update_mission_list(
         let has_favorite = party.0.iter().any(|h| favorite_heroes.get(*h).is_ok());
 
         let status_text = match progress {
-            MissionProgress::InProgress => "In Progress",
-            MissionProgress::Complete => "Complete",
-            MissionProgress::Failed => "Failed",
+            MissionProgress::InProgress => tr("sidebar.status.in_progress"),
+            MissionProgress::Complete => tr("sidebar.status.complete"),
+            MissionProgress::Failed => tr("sidebar.status.failed"),
         };
 
         let base_bg = match progress {

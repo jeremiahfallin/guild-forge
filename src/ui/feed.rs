@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::ecs::message::{Message, MessageReader};
 use serde::{Deserialize, Serialize};
 use rand::seq::IndexedRandom;
+use crate::localization::{tr, trf};
 use crate::equipment::{GearRarity, BehavioralAffix};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect, Serialize, Deserialize, Default)]
@@ -155,7 +156,7 @@ fn format_payload(
                 let template = template_list
                     .choose(rng)
                     .map(|s| s.as_str())
-                    .unwrap_or("{attacker} strikes {defender} for {damage} damage!");
+                    .unwrap_or(tr("feed.fallback.attack_hit"));
                 let text = template
                     .replace("{attacker}", attacker)
                     .replace("{defender}", defender)
@@ -166,7 +167,7 @@ fn format_payload(
                     .attack_miss
                     .choose(rng)
                     .map(|s| s.as_str())
-                    .unwrap_or("{attacker} swings at {defender} but misses!");
+                    .unwrap_or(tr("feed.fallback.attack_miss"));
                 let text = template
                     .replace("{attacker}", attacker)
                     .replace("{defender}", defender);
@@ -182,7 +183,7 @@ fn format_payload(
                 .heal
                 .choose(rng)
                 .map(|s| s.as_str())
-                .unwrap_or("{healer} heals {target} for {amount} HP!");
+                .unwrap_or(tr("feed.fallback.heal"));
             let text = template
                 .replace("{healer}", healer)
                 .replace("{target}", target)
@@ -198,7 +199,7 @@ fn format_payload(
             let template = template_list
                 .choose(rng)
                 .map(|s| s.as_str())
-                .unwrap_or("{name} has fallen!");
+                .unwrap_or(tr("feed.fallback.death"));
             let text = template.replace("{name}", name);
             (text, LogKind::Death)
         }
@@ -210,7 +211,7 @@ fn format_payload(
                 .room_entry
                 .choose(rng)
                 .map(|s| s.as_str())
-                .unwrap_or("{hero} leads the party into the {room}.");
+                .unwrap_or(tr("feed.fallback.room_entry"));
             let text = template
                 .replace("{hero}", hero_name)
                 .replace("{room}", room_name);
@@ -221,7 +222,7 @@ fn format_payload(
                 .mission_complete
                 .choose(rng)
                 .map(|s| s.as_str())
-                .unwrap_or("Mission complete! Earned {gold} gold and {xp} XP!");
+                .unwrap_or(tr("feed.fallback.mission_complete"));
             let text = template
                 .replace("{gold}", &gold.to_string())
                 .replace("{xp}", &xp.to_string());
@@ -232,7 +233,7 @@ fn format_payload(
                 .mission_failed
                 .choose(rng)
                 .map(|s| s.as_str())
-                .unwrap_or("Mission failed! All heroes have fallen.");
+                .unwrap_or(tr("feed.fallback.mission_failed"));
             (template.to_string(), LogKind::Failure)
         }
         MissionLogPayload::Ability {
@@ -245,41 +246,41 @@ fn format_payload(
             effect_type,
         } => {
             if ability_name == "Boss Slam" && *amount == 0 {
-                (format!("{} starts winding up a massive Boss Slam!", attacker), LogKind::Combat)
+                (trf("feed.boss_slam_windup", &[("attacker", attacker)]), LogKind::Combat)
             } else if ability_name == "Boss Summon" {
-                (format!("{} screeches and summons giant rats!", attacker), LogKind::Combat)
+                (trf("feed.boss_summon", &[("attacker", attacker)]), LogKind::Combat)
             } else if ability_name == "Boss Enrage" {
-                (format!("{} grows ENRAGED! Its power doubles!", attacker), LogKind::Combat)
+                (trf("feed.boss_enrage", &[("attacker", attacker)]), LogKind::Combat)
             } else if effect_type == "Damage" || effect_type == "Debuff" {
                 if *is_hit {
                     let text = if *is_crit {
-                        format!("Critical hit! {} hits {} with {} for {} damage!", attacker, defender, ability_name, amount)
+                        trf("feed.ability_crit", &[("attacker", attacker), ("defender", defender), ("ability", ability_name), ("amount", &amount.to_string())])
                     } else {
-                        format!("{} strikes {} with {} for {} damage!", attacker, defender, ability_name, amount)
+                        trf("feed.ability_hit", &[("attacker", attacker), ("defender", defender), ("ability", ability_name), ("amount", &amount.to_string())])
                     };
                     (text, LogKind::Combat)
                 } else {
-                    let text = format!("{} uses {} on {} but misses!", attacker, ability_name, defender);
+                    let text = trf("feed.ability_miss", &[("attacker", attacker), ("ability", ability_name), ("defender", defender)]);
                     (text, LogKind::Combat)
                 }
             } else if effect_type == "Heal" {
-                let text = format!("{} casts {} on {} — healing for {} HP!", attacker, ability_name, defender, amount);
+                let text = trf("feed.ability_heal", &[("attacker", attacker), ("ability", ability_name), ("defender", defender), ("amount", &amount.to_string())]);
                 (text, LogKind::Heal)
             } else { // Shield / Buff
-                let text = format!("{} invokes {} — shielding for {} points!", attacker, ability_name, amount);
+                let text = trf("feed.ability_shield", &[("attacker", attacker), ("ability", ability_name), ("amount", &amount.to_string())]);
                 (text, LogKind::Heal)
             }
         }
         MissionLogPayload::ChestOpened { hero_name, gold } => {
-            let text = format!("{} opens a chest and finds {} gold!", hero_name, gold);
+            let text = trf("feed.chest_opened", &[("hero", hero_name), ("gold", &gold.to_string())]);
             (text, LogKind::Completion)
         }
         MissionLogPayload::TrapTriggered { hero_name, damage } => {
-            let text = format!("Trap! {} triggers a pressure plate and takes {} damage!", hero_name, damage);
+            let text = trf("feed.trap_triggered", &[("hero", hero_name), ("damage", &damage.to_string())]);
             (text, LogKind::Combat)
         }
         MissionLogPayload::EventTriggered { event_name, hero_name, description, outcome_text } => {
-            let text = format!("[{}] {} spots {} — {} {}", event_name, hero_name, description, hero_name, outcome_text);
+            let text = trf("feed.event_triggered", &[("event", event_name), ("hero", hero_name), ("desc", description), ("outcome", outcome_text)]);
             (text, LogKind::Info)
         }
         MissionLogPayload::GearDrop {
@@ -290,17 +291,17 @@ fn format_payload(
             stats_desc,
         } => {
             let affix_str = match affix {
-                Some(BehavioralAffix::Lifesteal) => " [Lifesteal]",
-                Some(BehavioralAffix::Initiative) => " [+Initiative]",
-                Some(BehavioralAffix::CleaveOnHit) => " [Cleave]",
+                Some(BehavioralAffix::Lifesteal) => tr("feed.affix.lifesteal"),
+                Some(BehavioralAffix::Initiative) => tr("feed.affix.initiative"),
+                Some(BehavioralAffix::CleaveOnHit) => tr("feed.affix.cleave"),
                 None => "",
             };
             let text = match rarity {
-                GearRarity::Legendary => format!("★ LEGENDARY DROP! {} found the Legendary {} ({}{})! ★", hero_name, item_name, stats_desc, affix_str),
-                GearRarity::Epic => format!("{} found an Epic {} ({}{})!", hero_name, item_name, stats_desc, affix_str),
-                GearRarity::Rare => format!("{} found a Rare {} ({}{})!", hero_name, item_name, stats_desc, affix_str),
-                GearRarity::Uncommon => format!("{} found an Uncommon {} ({}{})!", hero_name, item_name, stats_desc, affix_str),
-                GearRarity::Common => format!("{} found a Common {} ({})!", hero_name, item_name, stats_desc),
+                GearRarity::Legendary => trf("feed.drop.legendary", &[("hero", hero_name), ("item", item_name), ("stats", stats_desc), ("affix", affix_str)]),
+                GearRarity::Epic => trf("feed.drop.epic", &[("hero", hero_name), ("item", item_name), ("stats", stats_desc), ("affix", affix_str)]),
+                GearRarity::Rare => trf("feed.drop.rare", &[("hero", hero_name), ("item", item_name), ("stats", stats_desc), ("affix", affix_str)]),
+                GearRarity::Uncommon => trf("feed.drop.uncommon", &[("hero", hero_name), ("item", item_name), ("stats", stats_desc), ("affix", affix_str)]),
+                GearRarity::Common => trf("feed.drop.common", &[("hero", hero_name), ("item", item_name), ("stats", stats_desc)]),
             };
             let kind = match rarity {
                 GearRarity::Legendary => LogKind::Legendary,

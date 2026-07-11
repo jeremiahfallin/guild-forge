@@ -17,6 +17,11 @@
     "building.workshop": "Workshop",
     "building.workshop.desc": "Convert raw materials into refined ones.",
 
+    // ── banners ──
+    "banner.boss": "BOSS ENCOUNTER",
+    "banner.rare_drop": "RARE DROP!",
+    "banner.rescue_closing": "RESCUE WINDOW CLOSING",
+
     // ── classes ──
     "class.cleric": "Cleric",
     "class.mage": "Mage",
@@ -39,6 +44,35 @@
     "equipment.crafted_body": "Equipped to {hero}",
     "equipment.crafted_toast": "Crafted {name}!",
     "equipment.weapon": "Weapon",
+
+    // ── mission feed (one-off lines; multi-variant narration lives in
+    //    assets/data/narrative_templates.ron) ──
+    "feed.ability_crit": "Critical hit! {attacker} hits {defender} with {ability} for {amount} damage!",
+    "feed.ability_heal": "{attacker} casts {ability} on {defender} — healing for {amount} HP!",
+    "feed.ability_hit": "{attacker} strikes {defender} with {ability} for {amount} damage!",
+    "feed.ability_miss": "{attacker} uses {ability} on {defender} but misses!",
+    "feed.ability_shield": "{attacker} invokes {ability} — shielding for {amount} points!",
+    "feed.affix.cleave": " [Cleave]",
+    "feed.affix.initiative": " [+Initiative]",
+    "feed.affix.lifesteal": " [Lifesteal]",
+    "feed.boss_enrage": "{attacker} grows ENRAGED! Its power doubles!",
+    "feed.boss_slam_windup": "{attacker} starts winding up a massive Boss Slam!",
+    "feed.boss_summon": "{attacker} screeches and summons giant rats!",
+    "feed.chest_opened": "{hero} opens a chest and finds {gold} gold!",
+    "feed.drop.common": "{hero} found a Common {item} ({stats})!",
+    "feed.drop.epic": "{hero} found an Epic {item} ({stats}{affix})!",
+    "feed.drop.legendary": "★ LEGENDARY DROP! {hero} found the Legendary {item} ({stats}{affix})! ★",
+    "feed.drop.rare": "{hero} found a Rare {item} ({stats}{affix})!",
+    "feed.drop.uncommon": "{hero} found an Uncommon {item} ({stats}{affix})!",
+    "feed.event_triggered": "[{event}] {hero} spots {desc} — {hero} {outcome}",
+    "feed.fallback.attack_hit": "{attacker} strikes {defender} for {damage} damage!",
+    "feed.fallback.attack_miss": "{attacker} swings at {defender} but misses!",
+    "feed.fallback.death": "{name} has fallen!",
+    "feed.fallback.heal": "{healer} heals {target} for {amount} HP!",
+    "feed.fallback.mission_complete": "Mission complete! Earned {gold} gold and {xp} XP!",
+    "feed.fallback.mission_failed": "Mission failed! All heroes have fallen.",
+    "feed.fallback.room_entry": "{hero} leads the party into the {room}.",
+    "feed.trap_triggered": "Trap! {hero} triggers a pressure plate and takes {damage} damage!",
 
     // ── materials ──
     "material.arcane_wood": "Arcane Wood",
@@ -82,6 +116,22 @@
     "recruit.hired_body": "{class} — hired for {cost}g",
     "recruit.hired_toast": "{name} joined the guild!",
 
+    // ── sidebar ──
+    "sidebar.active_missions": "Active Missions",
+    "sidebar.bank": "Bank: {time}",
+    "sidebar.gold": "Gold: {gold}",
+    "sidebar.nav.armory": "Armory",
+    "sidebar.nav.guild": "Guild",
+    "sidebar.nav.missions": "Missions",
+    "sidebar.nav.recruiting": "Recruiting",
+    "sidebar.nav.roster": "Roster",
+    "sidebar.rep": "Rep: {rep}",
+    "sidebar.rep_tier": "Rep: {rep} (Tier {tier})",
+    "sidebar.status.complete": "Complete",
+    "sidebar.status.failed": "Failed",
+    "sidebar.status.in_progress": "In Progress",
+    "sidebar.title": "Guild Forge",
+
     // ── hero status ──
     "status.returned_body": "Injured — stats reduced while they recover.",
     "status.returned_toast": "{name} has returned",
@@ -101,6 +151,13 @@
     "timeline.signature": "Landed signature move: {ability}",
     "timeline.sole_survivor": "Survived the {mission} wipe — sole survivor",
     "timeline.went_missing": "Went missing in mission: {mission}",
+
+    // ── time formatting ──
+    "time.hours_minutes": "{h}h {m}m",
+    "time.minutes_seconds": "{m}m {s}s",
+
+    // ── toasts ──
+    "toast.mount_rescue": "Mount Rescue",
 
     // ── personality traits ──
     "trait.brave": "Brave",

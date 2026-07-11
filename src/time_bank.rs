@@ -33,9 +33,9 @@ pub fn format_banked_time(seconds: f32) -> String {
     let secs = total_secs % 60;
 
     if hours > 0 {
-        format!("{}h {}m", hours, minutes)
+        crate::localization::trf("time.hours_minutes", &[("h", &hours.to_string()), ("m", &minutes.to_string())])
     } else {
-        format!("{}m {}s", minutes, secs)
+        crate::localization::trf("time.minutes_seconds", &[("m", &minutes.to_string()), ("s", &secs.to_string())])
     }
 }
 
