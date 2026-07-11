@@ -244,7 +244,7 @@ fn refresh_party_select(
         .items_center()
         .p(px(16.0))
         .child(title_row)
-        .child(widgets::game_button("Cancel", go_back_to_missions));
+        .child(widgets::game_button(tr("party.cancel"), go_back_to_missions));
 
     // Available heroes panel
     let available_panel = build_available_panel(&heroes, &selected_party.0);
@@ -263,10 +263,12 @@ fn refresh_party_select(
         .insert((Name::new("Selected Party"), ScrollPosition::default()));
 
     party_panel = party_panel.child(
-        text(format!(
-            "Selected Party ({}/{})",
-            selected_party.0.len(),
-            MAX_PARTY_SIZE
+        text(trf(
+            "party.selected_party",
+            &[
+                ("count", &selected_party.0.len().to_string()),
+                ("max", &MAX_PARTY_SIZE.to_string()),
+            ],
         ))
         .font_size(24.0)
         .color(HEADER_TEXT),
@@ -437,9 +439,10 @@ fn dispatch_mission(
         let cap = buildings.mission_cap();
         warn!("Dispatch refused: War Room at capacity ({active}/{cap})");
         commands.trigger(crate::ui::toast::ToastEvent {
-            title: "War Room at capacity".into(),
-            body: format!(
-                "{active}/{cap} missions underway. Wait for one to finish or upgrade the War Room."
+            title: tr("party.war_room_toast").into(),
+            body: trf(
+                "party.war_room_toast_body",
+                &[("active", &active.to_string()), ("cap", &cap.to_string())],
             ),
             kind: crate::ui::toast::ToastKind::Failure,
             action: None,

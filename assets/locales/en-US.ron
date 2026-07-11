@@ -27,6 +27,19 @@
     "common.hero_level_class": "Lv.{level} {class}",
     "common.unknown": "Unknown",
 
+    // ── combat resolution toasts ──
+    "combat.casualty_many": " — {count} casualties",
+    "combat.casualty_one": " — 1 casualty",
+    "combat.level_up_many": " — {count} level ups!",
+    "combat.level_up_one": " — 1 level up!",
+    "combat.many_missing_toast": "{names} are missing!",
+    "combat.mission_complete_toast": "{mission} — Complete!",
+    "combat.mission_failed_toast": "{mission} — Failed!",
+    "combat.one_missing_toast": "{name} is missing!",
+    "combat.party_wiped_body": "Party wiped — heroes are missing.",
+    "combat.rep_reward": ", +{rep} rep",
+    "combat.rewards_body": "+{gold}g, +{xp}xp",
+
     // ── credits menu ──
     "credits.assets": "Assets",
     "credits.created_by": "Created by",
@@ -49,6 +62,8 @@
 
     // ── save/load ──
     "save.banked_time": "Banked time: {time}",
+    "save.saved_body": "Game saved.",
+    "save.saved_toast": "Game Saved",
     "save.welcome_back": "Welcome Back!",
 
     // ── settings menu ──
@@ -212,7 +227,11 @@
 
     // ── party select ──
     "party.available_heroes": "Available Heroes",
+    "party.cancel": "Cancel",
     "party.click_to_add": "Click heroes on the left to add them",
+    "party.selected_party": "Selected Party ({count}/{max})",
+    "party.war_room_toast": "War Room at capacity",
+    "party.war_room_toast_body": "{active}/{cap} missions underway. Wait for one to finish or upgrade the War Room.",
     "party.dispatch": "Dispatch! ({count})",
     "party.expired": "(Expired)",
     "party.header": "Select Party — {mission}",
@@ -326,6 +345,7 @@
     "timeline.signature": "Landed signature move: {ability}",
     "timeline.sole_survivor": "Survived the {mission} wipe — sole survivor",
     "timeline.went_missing": "Went missing in mission: {mission}",
+    "timeline.went_missing_short": "Went missing in {mission}",
 
     // ── time formatting ──
     "time.hours_minutes": "{h}h {m}m",

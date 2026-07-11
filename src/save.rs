@@ -885,8 +885,8 @@ fn handle_save(
 
     // 8. Fire toast.
     commands.trigger(ToastEvent {
-        title: "Game Saved".to_string(),
-        body: "Game saved.".to_string(),
+        title: crate::localization::tr("save.saved_toast").to_string(),
+        body: crate::localization::tr("save.saved_body").to_string(),
         kind: ToastKind::Info,
         action: None,
     });
