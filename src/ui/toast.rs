@@ -9,6 +9,7 @@ use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::tr;
 use crate::theme::palette::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -127,7 +128,7 @@ fn on_toast_event(
                     ))
                     .on_click(on_mount_rescue_click)
                     .child(
-                        text("Mount Rescue")
+                        text(tr("toast.mount_rescue"))
                             .font_size(14.0)
                             .color(BUTTON_TEXT)
                     );

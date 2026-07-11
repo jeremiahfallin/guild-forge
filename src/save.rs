@@ -255,7 +255,7 @@ fn load_save(
                 rescues_received: dto.history.rescues_received,
                 lifetime_gold: dto.history.lifetime_gold,
                 timeline: if dto.history.timeline.is_empty() {
-                    vec!["Joined the guild".to_string()]
+                    vec![crate::localization::tr("timeline.joined").to_string()]
                 } else {
                     dto.history.timeline.clone()
                 },
@@ -485,8 +485,8 @@ fn load_save(
     // Fire toast with banked time info.
     let formatted = crate::time_bank::format_banked_time(new_banked);
     commands.trigger(ToastEvent {
-        title: "Welcome Back!".to_string(),
-        body: format!("Banked time: {formatted}"),
+        title: crate::localization::tr("save.welcome_back").to_string(),
+        body: crate::localization::trf("save.banked_time", &[("time", &formatted)]),
         kind: ToastKind::Info,
         action: None,
     });
@@ -885,8 +885,8 @@ fn handle_save(
 
     // 8. Fire toast.
     commands.trigger(ToastEvent {
-        title: "Game Saved".to_string(),
-        body: "Game saved.".to_string(),
+        title: crate::localization::tr("save.saved_toast").to_string(),
+        body: crate::localization::tr("save.saved_body").to_string(),
         kind: ToastKind::Info,
         action: None,
     });

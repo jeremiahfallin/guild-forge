@@ -1,5 +1,6 @@
 //! Mission and enemy data definitions loaded from RON files.
 
+use crate::localization::tr;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -30,15 +31,15 @@ impl EnemyType {
 impl std::fmt::Display for EnemyType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Goblin => write!(f, "Goblin"),
-            Self::Skeleton => write!(f, "Skeleton"),
-            Self::Slime => write!(f, "Slime"),
-            Self::Orc => write!(f, "Orc"),
-            Self::BossRat => write!(f, "Boss Rat"),
-            Self::GiantRat => write!(f, "Giant Rat"),
-            Self::GoblinArcher => write!(f, "Goblin Archer"),
-            Self::GoblinShaman => write!(f, "Goblin Shaman"),
-            Self::SpiderSwarmer => write!(f, "Spider Swarmer"),
+            Self::Goblin => write!(f, "{}", tr("enemy.goblin")),
+            Self::Skeleton => write!(f, "{}", tr("enemy.skeleton")),
+            Self::Slime => write!(f, "{}", tr("enemy.slime")),
+            Self::Orc => write!(f, "{}", tr("enemy.orc")),
+            Self::BossRat => write!(f, "{}", tr("enemy.boss_rat")),
+            Self::GiantRat => write!(f, "{}", tr("enemy.giant_rat")),
+            Self::GoblinArcher => write!(f, "{}", tr("enemy.goblin_archer")),
+            Self::GoblinShaman => write!(f, "{}", tr("enemy.goblin_shaman")),
+            Self::SpiderSwarmer => write!(f, "{}", tr("enemy.spider_swarmer")),
         }
     }
 }
@@ -93,11 +94,11 @@ pub enum MissionModifier {
 impl std::fmt::Display for MissionModifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Foggy => write!(f, "Foggy"),
-            Self::Infested => write!(f, "Infested"),
-            Self::CursedGround => write!(f, "Cursed Ground"),
-            Self::Bountiful => write!(f, "Bountiful"),
-            Self::Trapped => write!(f, "Trapped"),
+            Self::Foggy => write!(f, "{}", tr("modifier.foggy")),
+            Self::Infested => write!(f, "{}", tr("modifier.infested")),
+            Self::CursedGround => write!(f, "{}", tr("modifier.cursed_ground")),
+            Self::Bountiful => write!(f, "{}", tr("modifier.bountiful")),
+            Self::Trapped => write!(f, "{}", tr("modifier.trapped")),
         }
     }
 }

@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy::ecs::message::MessageWriter;
 use rand::Rng;
 
+use crate::localization::{tr, trf};
 use crate::economy::Gold;
 use crate::hero::status::{Missing, MISSING_DURATION_SECS};
 use crate::hero::Favorite;
@@ -768,13 +769,19 @@ pub fn check_mission_completion(
                 .filter_map(|e| hero_infos.get(*e).ok().map(|(hi, _, _, _, _, ep, _)| format_hero_name(&hi.name, ep)))
                 .collect();
             let title = match favorited_names.len() {
-                0 => format!("{} — Failed!", info.name),
-                1 => format!("{} is missing!", favorited_names[0]),
-                2 => format!("{} & {} are missing!", favorited_names[0], favorited_names[1]),
+                0 => trf("combat.mission_failed_toast", &[("mission", &info.name)]),
+                1 => trf("combat.one_missing_toast", &[("name", &favorited_names[0])]),
+                2 => trf(
+                    "combat.many_missing_toast",
+                    &[("names", &format!("{} & {}", favorited_names[0], favorited_names[1]))],
+                ),
                 _ => {
                     // n>=3: Oxford-style "A, B & C"
                     let (last, rest) = favorited_names.split_last().unwrap();
-                    format!("{} & {} are missing!", rest.join(", "), last)
+                    trf(
+                        "combat.many_missing_toast",
+                        &[("names", &format!("{} & {}", rest.join(", "), last))],
+                    )
                 }
             };
             let mut rescue_heroes = party.0.clone();
@@ -812,7 +819,7 @@ pub fn check_mission_completion(
                     });
 
                 if let Ok(mut hist) = histories.get_mut(hero_entity) {
-                    hist.add_timeline_entry(format!("Went missing in {}", info.name));
+                    hist.add_timeline_entry(trf("timeline.went_missing_short", &[("mission", &info.name)]));
                 }
             }
 
@@ -834,7 +841,7 @@ pub fn check_mission_completion(
 
             commands.trigger(ToastEvent {
                 title,
-                body: "Party wiped — heroes are missing.".to_string(),
+                body: tr("combat.party_wiped_body").to_string(),
                 kind: ToastKind::Failure,
                 action: rescue_offer_idx.map(|idx| crate::ui::toast::ToastAction::MountRescue { rescue_offer_idx: idx }),
             });
@@ -918,28 +925,28 @@ pub fn check_mission_completion(
             }
         }
 
-        let mut body = format!("+{gold_earned}g, +{total_xp}xp");
+        let mut body = trf("combat.rewards_body", &[("gold", &gold_earned.to_string()), ("xp", &total_xp.to_string())]);
         if casualties > 0 {
-            body.push_str(&format!(
-                " — {} casualt{}",
-                casualties,
-                if casualties == 1 { "y" } else { "ies" }
-            ));
+            body.push_str(&if casualties == 1 {
+                tr("combat.casualty_one").to_string()
+            } else {
+                trf("combat.casualty_many", &[("count", &casualties.to_string())])
+            });
         }
         if level_ups > 0 {
-            body.push_str(&format!(
-                " — {} level up{}!",
-                level_ups,
-                if level_ups == 1 { "" } else { "s" }
-            ));
+            body.push_str(&if level_ups == 1 {
+                tr("combat.level_up_one").to_string()
+            } else {
+                trf("combat.level_up_many", &[("count", &level_ups.to_string())])
+            });
         }
         if let Some(template) = &template
             && template.reputation_reward > 0 {
-                body.push_str(&format!(", +{} rep", template.reputation_reward));
+                body.push_str(&trf("combat.rep_reward", &[("rep", &template.reputation_reward.to_string())]));
             }
 
         commands.trigger(ToastEvent {
-            title: format!("{} — Complete!", info.name),
+            title: trf("combat.mission_complete_toast", &[("mission", &info.name)]),
             body,
             kind: ToastKind::Success,
             action: None,

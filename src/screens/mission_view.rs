@@ -8,6 +8,7 @@ use rand::Rng;
 
 use bevy_declarative::style::styled::Styled;
 
+use crate::localization::{tr, trf};
 use crate::{
     mission::{
         Mission, MissionDungeon, MissionInfo, MissionParty, ViewedMission,
@@ -597,7 +598,7 @@ fn spawn_mission_view_ui(
     feed_container.style_mut().top = Val::Px(20.0);
 
     feed_container = feed_container.child(
-        bevy_declarative::element::text::text("Mission Log")
+        bevy_declarative::element::text::text(tr("mission_view.log_header"))
             .font_size(18.0)
             .color(HEADER_TEXT)
             .insert(Pickable::IGNORE),
@@ -675,7 +676,7 @@ fn spawn_mission_view_ui(
                     bottom: bevy::ui::Val::Px(20.0),
                     ..default()
                 })
-                .child(widgets::game_button("Abort Mission", abort_mission)),
+                .child(widgets::game_button(tr("mission_view.abort"), abort_mission)),
         )
         .spawn_as_child_of(commands, root_entity);
 }
@@ -832,17 +833,17 @@ fn handle_visual_hits(
             let text_pos = transform.translation + Vec3::new(0.0, 16.0, 10.0);
 
             let text_val = match hit.effect_type.as_str() {
-                "Heal" => format!("+{}", hit.amount),
-                "Shield" => format!("+{} Shield", hit.amount),
+                "Heal" => trf("mission_view.float_heal", &[("amount", &hit.amount.to_string())]),
+                "Shield" => trf("mission_view.float_shield", &[("amount", &hit.amount.to_string())]),
                 _ => {
                     if hit.is_hit {
                         if hit.is_crit {
-                            format!("{} Critical!", hit.amount)
+                            trf("mission_view.float_crit", &[("amount", &hit.amount.to_string())])
                         } else {
                             format!("{}", hit.amount)
                         }
                     } else {
-                        "Miss".to_string()
+                        tr("mission_view.float_miss").to_string()
                     }
                 }
             };

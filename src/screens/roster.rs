@@ -7,6 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::{pct, px};
 
 use crate::{
+    localization::{tr, trf},
     hero::{
         Favorite, Hero, HeroInfo, HeroStats, HeroTraits, PersonallyManaged, Fatigue, data::*,
         status::{Injured, Missing, format_countdown},
@@ -88,7 +89,7 @@ fn spawn_roster(
         .w_full()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Roster"));
+        .child(widgets::header(tr("roster.header")));
 
     // Main content: two-panel layout
     let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64(), 0.0);
@@ -149,7 +150,7 @@ fn build_hero_list(
         .insert((Name::new("Hero List"), RosterListScroll, ScrollPosition(Vec2::new(0.0, saved_scroll_y))));
 
     list = list.child(
-        text("Heroes")
+        text(tr("roster.heroes"))
             .font_size(28.0)
             .color(HEADER_TEXT),
     );
@@ -208,23 +209,27 @@ fn build_hero_list(
         };
 
         let class_text = if let Some(m) = missing {
-            format!(
-                "Lv.{} {} — MISSING {}",
-                info.level,
-                info.class,
-                format_countdown(m.expires_at - now)
+            trf(
+                "roster.status_missing",
+                &[
+                    ("level", &info.level.to_string()),
+                    ("class", &info.class.to_string()),
+                    ("time", &format_countdown(m.expires_at - now)),
+                ],
             )
         } else if let Some(inj) = injured {
-            format!(
-                "Lv.{} {} — INJURED {}",
-                info.level,
-                info.class,
-                format_countdown(inj.expires_at - now)
+            trf(
+                "roster.status_injured",
+                &[
+                    ("level", &info.level.to_string()),
+                    ("class", &info.class.to_string()),
+                    ("time", &format_countdown(inj.expires_at - now)),
+                ],
             )
         } else if is_on_mission {
-            format!("Lv.{} {} (On Mission)", info.level, info.class)
+            trf("roster.status_on_mission", &[("level", &info.level.to_string()), ("class", &info.class.to_string())])
         } else {
-            format!("Lv.{} {}", info.level, info.class)
+            trf("common.hero_level_class", &[("level", &info.level.to_string()), ("class", &info.class.to_string())])
         };
 
         // DejaVu Sans (loaded as default UI font) covers ★ ☆ ⚑ ⚐ and more.
@@ -299,7 +304,7 @@ fn build_hero_list(
                             .items_center()
                             .gap(px(6.0))
                             .child(
-                                text(format!("Stamina: {:.0}%", stamina_pct))
+                                text(trf("roster.stamina_pct", &[("pct", &format!("{stamina_pct:.0}"))]))
                                     .font_size(12.0)
                                     .color(LABEL_TEXT)
                                     .w(px(85.0)),
@@ -407,7 +412,7 @@ fn build_detail_panel(
 
     let Some(entity) = selected.0 else {
         return panel.child(
-            text("Select a hero to view details")
+            text(tr("roster.select_prompt"))
                 .font_size(24.0)
                 .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
         );
@@ -415,7 +420,7 @@ fn build_detail_panel(
 
     let Ok((info, stats, traits, is_favorite, is_managed, fatigue, history, epithet, portrait_img)) = hero_query.get(entity) else {
         return panel.child(
-            text("Hero not found")
+            text(tr("roster.hero_not_found"))
                 .font_size(24.0)
                 .color(Color::srgba(0.8, 0.3, 0.3, 1.0)),
         );
@@ -447,19 +452,19 @@ fn build_detail_panel(
             text(format_hero_name(&info.name, epithet)).font_size(36.0).color(HEADER_TEXT),
         )
         .child(
-            text(format!("Level {} {}", info.level, info.class))
+            text(trf("roster.level_class_long", &[("level", &info.level.to_string()), ("class", &info.class.to_string())]))
                 .font_size(20.0)
                 .color(LABEL_TEXT),
         )
         .child(
-            text(format!("XP: {} / {}", info.xp, info.xp_to_next))
+            text(trf("roster.xp", &[("xp", &info.xp.to_string()), ("next", &info.xp_to_next.to_string())]))
                 .font_size(16.0)
                 .color(LABEL_TEXT),
         )
         .child({
             let status_parts: Vec<&str> = [
-                is_favorite.then_some("★ Favorite"),
-                is_managed.then_some("⚑ Personally Managed"),
+                is_favorite.then_some(tr("roster.badge_favorite")),
+                is_managed.then_some(tr("roster.badge_managed")),
             ]
             .into_iter()
             .flatten()
@@ -491,7 +496,7 @@ fn build_detail_panel(
         .col()
         .gap(px(6.0))
         .child(
-            text("Stamina").font_size(24.0).color(HEADER_TEXT),
+            text(tr("roster.stamina")).font_size(24.0).color(HEADER_TEXT),
         )
         .child(
             div()
@@ -520,7 +525,7 @@ fn build_detail_panel(
                 )
                 .child(
                     if is_exhausted {
-                        text("EXHAUSTED!").font_size(14.0).color(Color::srgb(0.9, 0.2, 0.2))
+                        text(tr("roster.exhausted")).font_size(14.0).color(Color::srgb(0.9, 0.2, 0.2))
                     } else {
                         text("").font_size(14.0)
                     }
@@ -556,17 +561,17 @@ fn build_history_section(history: Option<&HeroHistory>) -> Div {
         .col()
         .gap(px(12.0))
         .child(
-            text("Career History").font_size(24.0).color(HEADER_TEXT),
+            text(tr("roster.career_history")).font_size(24.0).color(HEADER_TEXT),
         );
 
     // Grid of stats
     let stats_list = vec![
-        ("Missions Run", history.missions_run.to_string()),
-        ("Kills", history.kills.to_string()),
-        ("Near-Deaths", history.near_deaths.to_string()),
-        ("Lifetime Gold", history.lifetime_gold.to_string()),
-        ("Rescues Given", history.rescues_given.to_string()),
-        ("Rescues Recv", history.rescues_received.to_string()),
+        (tr("roster.hist.missions_run"), history.missions_run.to_string()),
+        (tr("roster.hist.kills"), history.kills.to_string()),
+        (tr("roster.hist.near_deaths"), history.near_deaths.to_string()),
+        (tr("roster.hist.lifetime_gold"), history.lifetime_gold.to_string()),
+        (tr("roster.hist.rescues_given"), history.rescues_given.to_string()),
+        (tr("roster.hist.rescues_received"), history.rescues_received.to_string()),
     ];
 
     let mut stats_grid = div().col().gap(px(6.0));
@@ -600,13 +605,13 @@ fn build_history_section(history: Option<&HeroHistory>) -> Div {
     let mut timeline_col = div().col().gap(px(6.0));
     
     timeline_col = timeline_col.child(
-        text("Timeline").font_size(18.0).color(HEADER_TEXT)
+        text(tr("roster.timeline")).font_size(18.0).color(HEADER_TEXT)
     );
 
     let mut list_col = div().col().gap(px(6.0));
     if history.timeline.is_empty() {
         list_col = list_col.child(
-            text("No recorded history.")
+            text(tr("roster.no_history"))
                 .font_size(14.0)
                 .color(Color::srgba(0.5, 0.5, 0.5, 0.8))
         );
@@ -638,19 +643,19 @@ fn build_history_section(history: Option<&HeroHistory>) -> Div {
 
 fn build_stats_section(stats: &HeroStats) -> Div {
     let stat_data = [
-        ("STR", stats.strength),
-        ("DEX", stats.dexterity),
-        ("CON", stats.constitution),
-        ("INT", stats.intelligence),
-        ("WIS", stats.wisdom),
-        ("CHA", stats.charisma),
+        (tr("stat.str"), stats.strength),
+        (tr("stat.dex"), stats.dexterity),
+        (tr("stat.con"), stats.constitution),
+        (tr("stat.int"), stats.intelligence),
+        (tr("stat.wis"), stats.wisdom),
+        (tr("stat.cha"), stats.charisma),
     ];
 
     let mut section = div()
         .col()
         .gap(px(6.0))
         .child(
-            text("Stats").font_size(24.0).color(HEADER_TEXT),
+            text(tr("roster.stats")).font_size(24.0).color(HEADER_TEXT),
         );
 
     for (name, value) in stat_data {
@@ -695,12 +700,12 @@ fn build_traits_section(hero_traits: &[HeroTrait], trait_db: &TraitDatabase) -> 
         .col()
         .gap(px(6.0))
         .child(
-            text("Traits").font_size(24.0).color(HEADER_TEXT),
+            text(tr("roster.traits")).font_size(24.0).color(HEADER_TEXT),
         );
 
     if hero_traits.is_empty() {
         return section.child(
-            text("None")
+            text(tr("roster.none"))
                 .font_size(16.0)
                 .color(Color::srgba(0.5, 0.5, 0.5, 0.8)),
         );
@@ -710,7 +715,7 @@ fn build_traits_section(hero_traits: &[HeroTrait], trait_db: &TraitDatabase) -> 
         let (name, description) = trait_db
             .get(*hero_trait)
             .map(|def| (def.name.as_str(), def.description.as_str()))
-            .unwrap_or(("Unknown", ""));
+            .unwrap_or((tr("common.unknown"), ""));
 
         section = section.child(
             div()
@@ -744,7 +749,7 @@ fn build_perks_section(history: Option<&HeroHistory>) -> Div {
         .col()
         .gap(px(6.0))
         .child(
-            text("Veteran Perks").font_size(24.0).color(HEADER_TEXT),
+            text(tr("roster.veteran_perks")).font_size(24.0).color(HEADER_TEXT),
         );
 
     let earned = history
@@ -753,7 +758,7 @@ fn build_perks_section(history: Option<&HeroHistory>) -> Div {
 
     if earned.is_empty() {
         return section.child(
-            text("None (Earned via career milestones)")
+            text(tr("roster.no_perks"))
                 .font_size(16.0)
                 .color(Color::srgba(0.5, 0.5, 0.5, 0.8)),
         );
@@ -858,7 +863,7 @@ fn refresh_roster_on_selection_change(
         .w_full()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Roster"));
+        .child(widgets::header(tr("roster.header")));
 
     let hero_list = build_hero_list(&heroes, &selected, time.elapsed_secs_f64(), saved_list_y);
     let detail = build_detail_panel(&selected, &hero_query, &trait_db, saved_detail_y);

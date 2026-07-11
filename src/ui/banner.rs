@@ -7,6 +7,7 @@ use std::collections::VecDeque;
 
 use crate::equipment::GearRarity;
 use crate::hero::status::Missing;
+use crate::localization::tr;
 use crate::hero::{Hero, HeroInfo};
 use crate::mission::entities::{EnemyToken, GridPosition, HeroToken};
 use crate::mission::{RescueMission, ViewedMission};
@@ -73,7 +74,7 @@ pub(crate) fn detect_drop_banners(
             && *rarity == GearRarity::Legendary
         {
             queue.pending.push_back(BannerRequest {
-                text: "RARE DROP!".to_string(),
+                text: tr("banner.rare_drop").to_string(),
                 subtitle: Some(item_name.clone()),
                 kind: BannerKind::RareDrop,
             });
@@ -127,7 +128,7 @@ pub(crate) fn detect_boss_banner(
             let dist = h_gp.x.abs_diff(b_gp.x) + h_gp.y.abs_diff(b_gp.y);
             if dist <= *h_range {
                 queue.pending.push_back(BannerRequest {
-                    text: "BOSS ENCOUNTER".to_string(),
+                    text: tr("banner.boss").to_string(),
                     subtitle: Some(boss_type.to_string()),
                     kind: BannerKind::Boss,
                 });
@@ -223,7 +224,7 @@ pub(crate) fn detect_rescue_banner(
         .fold(f64::INFINITY, f64::min);
     if soonest.is_finite() && soonest < RESCUE_BANNER_THRESHOLD_SECS {
         queue.pending.push_back(BannerRequest {
-            text: "RESCUE WINDOW CLOSING".to_string(),
+            text: tr("banner.rescue_closing").to_string(),
             subtitle: None,
             kind: BannerKind::RescueClosing,
         });

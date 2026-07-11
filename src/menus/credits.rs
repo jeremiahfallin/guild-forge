@@ -5,6 +5,7 @@ use bevy_declarative::element::div::{Div, div};
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::tr;
 use crate::{asset_tracking::LoadResource, audio::music, menus::Menu, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
@@ -21,11 +22,11 @@ pub(super) fn plugin(app: &mut App) {
 fn spawn_credits_menu(mut commands: Commands) {
     widgets::ui_root("Credits Menu")
         .insert((GlobalZIndex(2), DespawnOnExit(Menu::Credits)))
-        .child(widgets::header("Created by"))
+        .child(widgets::header(tr("credits.created_by")))
         .child(created_by())
-        .child(widgets::header("Assets"))
+        .child(widgets::header(tr("credits.assets")))
         .child(assets())
-        .child(widgets::game_button("Back", go_back_on_click))
+        .child(widgets::game_button(tr("common.back"), go_back_on_click))
         .spawn(&mut commands);
 }
 

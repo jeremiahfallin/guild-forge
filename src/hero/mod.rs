@@ -15,6 +15,7 @@ pub use portrait::HeroPortrait;
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::localization::trf;
 use crate::screens::Screen;
 use data::*;
 
@@ -380,7 +381,7 @@ pub fn track_hero_history_system(
                         if let Some(ability_def) = ability_db.get(ability_name) {
                             if ability_def.is_signature {
                                 if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
-                                    hist.add_timeline_entry(format!("Landed signature move: {}", ability_def.name));
+                                    hist.add_timeline_entry(trf("timeline.signature", &[("ability", &ability_def.name)]));
                                 }
                             }
                         }
@@ -391,21 +392,21 @@ pub fn track_hero_history_system(
                 if let Some(roster_ent) = find_hero_by_name(&heroes, hero_name) {
                     if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
                         hist.lifetime_gold += gold;
-                        hist.add_timeline_entry(format!("Found {} gold in a loot chest", gold));
+                        hist.add_timeline_entry(trf("timeline.chest_gold", &[("gold", &gold.to_string())]));
                     }
                 }
             }
             crate::ui::feed::MissionLogPayload::EventTriggered { event_name, hero_name, outcome_text, .. } => {
                 if let Some(roster_ent) = find_hero_by_name(&heroes, hero_name) {
                     if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
-                        hist.add_timeline_entry(format!("Event: {} — {}", event_name, outcome_text));
+                        hist.add_timeline_entry(trf("timeline.event", &[("event", event_name), ("outcome", outcome_text)]));
                     }
                 }
             }
             crate::ui::feed::MissionLogPayload::GearDrop { hero_name, item_name, rarity, .. } => {
                 if let Some(roster_ent) = find_hero_by_name(&heroes, hero_name) {
                     if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
-                        hist.add_timeline_entry(format!("Found a {:?} {}", rarity, item_name));
+                        hist.add_timeline_entry(trf("timeline.gear_drop", &[("rarity", rarity.name()), ("item", item_name)]));
                     }
                 }
             }
@@ -416,14 +417,14 @@ pub fn track_hero_history_system(
                         if let Some(roster_ent) = find_hero_by_name(&heroes, killer_name) {
                             if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
                                 hist.kills += 1;
-                                if name == "Boss Rat" {
+                                if *name == crate::mission::data::EnemyType::BossRat.to_string() {
                                     if let Ok((_, info, _)) = missions.get(event.mission_entity) {
-                                        hist.add_timeline_entry(format!("Defeated the boss Boss Rat in {}", info.name));
+                                        hist.add_timeline_entry(trf("timeline.boss_defeated_in", &[("boss", name), ("mission", &info.name)]));
                                     } else {
-                                        hist.add_timeline_entry("Defeated the boss Boss Rat".to_string());
+                                        hist.add_timeline_entry(trf("timeline.boss_defeated", &[("boss", name)]));
                                     }
                                 } else {
-                                    hist.add_timeline_entry(format!("Defeated {}", name));
+                                    hist.add_timeline_entry(trf("timeline.defeated", &[("name", name)]));
                                 }
                             }
                         }
@@ -451,20 +452,20 @@ pub fn track_hero_history_system(
                                 hist.lifetime_gold += gold;
                                 
                                 if survivors.len() == 1 && party.0.len() > 1 {
-                                    hist.add_timeline_entry(format!("Survived the {} wipe — sole survivor", info.name));
+                                    hist.add_timeline_entry(trf("timeline.sole_survivor", &[("mission", &info.name)]));
                                 } else {
-                                    hist.add_timeline_entry(format!("Completed mission: {}", info.name));
+                                    hist.add_timeline_entry(trf("timeline.mission_complete", &[("mission", &info.name)]));
                                 }
 
                                 // Check near-death
                                 if let Some(low_hps) = low_hp_track.get(&event.mission_entity) {
                                     if low_hps.contains(&roster_ent) {
                                         hist.near_deaths += 1;
-                                        hist.add_timeline_entry(format!("Survived a near-death experience in {}", info.name));
+                                        hist.add_timeline_entry(trf("timeline.near_death", &[("mission", &info.name)]));
                                     }
                                 }
                             } else {
-                                hist.add_timeline_entry(format!("Went missing in mission: {}", info.name));
+                                hist.add_timeline_entry(trf("timeline.went_missing", &[("mission", &info.name)]));
                             }
                         }
                     }
@@ -477,7 +478,7 @@ pub fn track_hero_history_system(
                     for &roster_ent in party.0.iter() {
                         if let Ok((_, _, mut hist, _)) = heroes.get_mut(roster_ent) {
                             hist.missions_run += 1;
-                            hist.add_timeline_entry(format!("Went missing in mission: {}", info.name));
+                            hist.add_timeline_entry(trf("timeline.went_missing", &[("mission", &info.name)]));
                         }
                     }
                 }
@@ -493,7 +494,7 @@ pub fn track_hero_history_system(
             let has_new = epithet.0.as_ref() != Some(&new_title);
             if has_new {
                 epithet.0 = Some(new_title.clone());
-                hist.add_timeline_entry(format!("Earned the title: {}", new_title));
+                hist.add_timeline_entry(trf("timeline.earned_title", &[("title", &new_title)]));
                 
                 // Update Name component of any active battlefield HeroToken
                 for (token, mut token_name, _) in hero_tokens.iter_mut() {

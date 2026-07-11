@@ -7,6 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
+    localization::{tr, trf},
     buildings::{BuildingType, GuildBuildings},
     economy::Gold,
     equipment::{CraftGear, EquipmentDatabase, GearSlot, HeroEquipment},
@@ -89,7 +90,7 @@ fn build_armory_ui(
         .w_full()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Armory"));
+        .child(widgets::header(tr("armory.header")));
 
     let hero_list = build_hero_list(heroes, selected);
     let detail = build_gear_panel(selected, equipment_db, hero_equip_query, buildings);
@@ -122,7 +123,7 @@ fn build_hero_list(
         .insert((Name::new("Armory Hero List"), ScrollPosition::default()));
 
     list = list.child(
-        text("Heroes")
+        text(tr("armory.heroes"))
             .font_size(28.0)
             .color(HEADER_TEXT),
     );
@@ -174,7 +175,7 @@ fn build_hero_list(
                         .color(HEADER_TEXT),
                 )
                 .child(
-                    text(format!("Lv.{} {}", info.level, info.class))
+                    text(trf("common.hero_level_class", &[("level", &info.level.to_string()), ("class", &info.class.to_string())]))
                         .font_size(16.0)
                         .color(LABEL_TEXT),
                 ),
@@ -207,7 +208,7 @@ fn build_gear_panel(
 
     let Some(entity) = selected.0 else {
         return panel.child(
-            text("Select a hero to view equipment")
+            text(tr("armory.select_prompt"))
                 .font_size(24.0)
                 .color(Color::srgba(0.6, 0.6, 0.6, 0.8)),
         );
@@ -215,7 +216,7 @@ fn build_gear_panel(
 
     let Ok((info, equipment, epithet, portrait_img)) = hero_equip_query.get(entity) else {
         return panel.child(
-            text("Hero not found")
+            text(tr("armory.hero_not_found"))
                 .font_size(24.0)
                 .color(Color::srgba(0.8, 0.3, 0.3, 1.0)),
         );
@@ -237,7 +238,7 @@ fn build_gear_panel(
         );
     }
     header_row = header_row.child(
-        text(format!("{} - Equipment", format_hero_name(&info.name, epithet)))
+        text(trf("armory.equipment_header", &[("name", &format_hero_name(&info.name, epithet))]))
             .font_size(28.0)
             .color(HEADER_TEXT),
     );
@@ -258,14 +259,14 @@ fn build_gear_panel(
 
         // Current gear name
         let current_name = if current_tier == 0 {
-            "None".to_string()
+            tr("armory.no_gear").to_string()
         } else if let Some(p) = path {
             p.tiers
                 .get((current_tier - 1) as usize)
                 .map(|t| t.name.clone())
-                .unwrap_or_else(|| format!("Tier {}", current_tier))
+                .unwrap_or_else(|| trf("armory.tier_n", &[("tier", &current_tier.to_string())]))
         } else {
-            "None".to_string()
+            tr("armory.no_gear").to_string()
         };
 
         card = card.child(
@@ -289,16 +290,16 @@ fn build_gear_panel(
         if let Some(p) = path {
             let next_tier = current_tier + 1;
             if let Some(tier_def) = p.tiers.get((next_tier - 1) as usize) {
-                let mut cost_str = format!("Next: {} ({}g", tier_def.name, tier_def.gold_cost);
+                let mut cost_str = trf("armory.next_tier", &[("name", &tier_def.name), ("gold", &tier_def.gold_cost.to_string())]);
                 for &(mat, amt) in &tier_def.material_cost {
-                    cost_str.push_str(&format!(", {} {}", amt, mat.name()));
+                    cost_str.push_str(&trf("armory.cost_material", &[("amount", &amt.to_string()), ("name", mat.name())]));
                 }
                 cost_str.push(')');
 
                 if tier_def.armory_level_required > armory_level {
-                    cost_str.push_str(&format!(
-                        " [Armory Lv {} req]",
-                        tier_def.armory_level_required
+                    cost_str.push_str(&trf(
+                        "armory.level_req",
+                        &[("level", &tier_def.armory_level_required.to_string())],
                     ));
                 }
 
@@ -324,7 +325,7 @@ fn build_gear_panel(
                         .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_craft_click)
                         .child(
-                            text("Craft")
+                            text(tr("armory.craft"))
                                 .font_size(16.0)
                                 .color(BUTTON_TEXT)
                                 .insert(Pickable::IGNORE),
@@ -332,7 +333,7 @@ fn build_gear_panel(
                 );
             } else {
                 card = card.child(
-                    text("Max Tier")
+                    text(tr("armory.max_tier"))
                         .font_size(14.0)
                         .color(Color::srgba(0.5, 0.8, 0.5, 1.0)),
                 );

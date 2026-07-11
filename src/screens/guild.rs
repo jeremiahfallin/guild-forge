@@ -7,6 +7,7 @@ use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
 use crate::{
+    localization::{tr, trf},
     buildings::{BuildingDatabase, BuildingType, GuildBuildings, UpgradeBuilding},
     economy::Gold,
     materials::{ConversionDatabase, ConvertMaterials, MaterialType, Materials},
@@ -88,7 +89,7 @@ fn build_guild_ui(
         .w_full()
         .items_center()
         .p(px(16.0))
-        .child(widgets::header("Guild Hall"));
+        .child(widgets::header(tr("guild.header")));
 
     root = root.child(top_bar);
 
@@ -122,7 +123,7 @@ fn build_guild_ui(
             .rounded(px(8.0))
             .insert(BorderColor::all(BORDER_BRONZE));
         stockpile.style_mut().border = UiRect::all(Val::Px(1.5));
-        stockpile = stockpile.child(text("Stockpile").font_size(22.0).color(HEADER_TEXT));
+        stockpile = stockpile.child(text(tr("guild.stockpile")).font_size(22.0).color(HEADER_TEXT));
 
         // Grid-like layout: wrap rows of material entries
         let mut row = div().row().w_full().gap(px(8.0)).insert(Node {
@@ -192,7 +193,7 @@ fn build_guild_ui(
                         .color(HEADER_TEXT),
                 )
                 .child(
-                    text(format!("Lv {} / {}", current_level, max_level))
+                    text(trf("guild.level", &[("cur", &current_level.to_string()), ("max", &max_level.to_string())]))
                         .font_size(18.0)
                         .color(LABEL_TEXT),
                 ),
@@ -209,9 +210,9 @@ fn build_guild_ui(
         if current_level < max_level {
             if let Some(def) = def {
                 let cost = &def.level_costs[current_level as usize];
-                let mut cost_str = format!("Next: {}g", cost.gold);
+                let mut cost_str = trf("guild.next_cost", &[("gold", &cost.gold.to_string())]);
                 for &(mat, amt) in &cost.materials {
-                    cost_str.push_str(&format!(" + {} {}", amt, mat.name()));
+                    cost_str.push_str(&trf("guild.cost_material", &[("amount", &amt.to_string()), ("name", mat.name())]));
                 }
 
                 card = card.child(text(cost_str).font_size(14.0).color(LABEL_TEXT));
@@ -232,7 +233,7 @@ fn build_guild_ui(
                         .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                         .on_click(on_upgrade_click)
                         .child(
-                            text("Upgrade")
+                            text(tr("guild.upgrade"))
                                 .font_size(18.0)
                                 .color(BUTTON_TEXT)
                                 .insert(Pickable::IGNORE),
@@ -241,7 +242,7 @@ fn build_guild_ui(
             }
         } else {
             card = card.child(
-                text("Max Level")
+                text(tr("guild.max_level"))
                     .font_size(14.0)
                     .color(Color::srgba(0.5, 0.8, 0.5, 1.0)),
             );
@@ -261,7 +262,7 @@ fn build_guild_ui(
         );
 
         content = content.child(
-            text("Workshop Conversions")
+            text(tr("guild.workshop_conversions"))
                 .font_size(22.0)
                 .color(HEADER_TEXT),
         );
@@ -271,12 +272,14 @@ fn build_guild_ui(
                 continue;
             }
 
-            let recipe_text = format!(
-                "{} {} -> {} {}",
-                recipe.input_count,
-                recipe.input_type.name(),
-                recipe.output_count,
-                recipe.output_type.name(),
+            let recipe_text = trf(
+                "guild.recipe",
+                &[
+                    ("in_count", &recipe.input_count.to_string()),
+                    ("in_name", recipe.input_type.name()),
+                    ("out_count", &recipe.output_count.to_string()),
+                    ("out_name", recipe.output_type.name()),
+                ],
             );
 
             let available = materials.get(recipe.input_type);
@@ -318,7 +321,7 @@ fn build_guild_ui(
                             .interaction_palette(BUTTON_BACKGROUND, BUTTON_HOVERED_BACKGROUND, BUTTON_PRESSED_BACKGROUND)
                             .on_click(on_convert_click)
                             .child(
-                                text("Convert")
+                                text(tr("guild.convert"))
                                     .font_size(16.0)
                                     .color(BUTTON_TEXT)
                                     .insert(Pickable::IGNORE),

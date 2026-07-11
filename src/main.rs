@@ -12,6 +12,7 @@ mod dev_tools;
 mod economy;
 mod equipment;
 mod hero;
+mod localization;
 mod materials;
 mod menus;
 mod mission;

@@ -165,7 +165,7 @@
   Touches: `party_select.rs`, `missions.rs`, `buildings.rs` · Design: scale doc, roadmap Phase 1 · Needs: —
   Decision inside: which building/tier gates the cap → resolved: new War Room building.
 
-- [ ] **TI-6 · String externalization** — move user-facing strings to a lookup table now; EFIGS localization is an EA-era decision but retrofitting strings is the painful part. Mechanical, high-volume, ideal LLM work. The earlier the cheaper — slot any time after the fun-proof milestone.
+- [x] **TI-6 · String externalization** *(✓ 2026-07-11 — all player-visible strings live in `assets/locales/en-US.ron` (~290 keys), accessed via `tr()`/`trf()` in `src/localization.rs`; a set-equality coverage test keeps code and table in lockstep both directions; enum `name()`/Display impls (materials, buildings, classes, traits, enemies, modifiers, perks, epithets, rarities) externalized too; RON data files and narrative_templates.ron stay as-is — EFIGS-era work is per-locale variants of those. Design: docs/plans/2026-07-10-string-externalization-design.md. Hand-verified every screen live incl. tutorial, mission feed, pause/settings)* — move user-facing strings to a lookup table now; EFIGS localization is an EA-era decision but retrofitting strings is the painful part. Mechanical, high-volume, ideal LLM work. The earlier the cheaper — slot any time after the fun-proof milestone.
   Touches: every screen, feed templates · Design: roadmap Phase 5 note · Needs: UX-1 (so feed templates externalize once)
 
 - [ ] **TI-7 · Performance baseline** — tracy profiling pass, a bench for sim ticks, budget written down for 50+ concurrent missions (the EA scale story), top offenders fixed.
