@@ -22,7 +22,7 @@ impl Default for HeroHistory {
             rescues_given: 0,
             rescues_received: 0,
             lifetime_gold: 0,
-            timeline: vec!["Joined the guild".to_string()],
+            timeline: vec![crate::localization::tr("timeline.joined").to_string()],
         }
     }
 }

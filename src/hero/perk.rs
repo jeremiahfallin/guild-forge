@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::localization::tr;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub enum VeteranPerk {
     RescueSpecialist, // Survived 3 rescues given: +10% Max HP
@@ -13,21 +15,21 @@ pub enum VeteranPerk {
 impl VeteranPerk {
     pub fn name(&self) -> &'static str {
         match self {
-            VeteranPerk::RescueSpecialist => "Rescue Specialist",
-            VeteranPerk::DeathDefier => "Death Defier",
-            VeteranPerk::Slayer => "Monster Slayer",
-            VeteranPerk::DungeonVanguard => "Dungeon Vanguard",
-            VeteranPerk::TreasureHunter => "Treasure Hunter",
+            VeteranPerk::RescueSpecialist => tr("perk.rescue_specialist"),
+            VeteranPerk::DeathDefier => tr("perk.death_defier"),
+            VeteranPerk::Slayer => tr("perk.slayer"),
+            VeteranPerk::DungeonVanguard => tr("perk.dungeon_vanguard"),
+            VeteranPerk::TreasureHunter => tr("perk.treasure_hunter"),
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
-            VeteranPerk::RescueSpecialist => "Survived 3 rescues: +10% HP",
-            VeteranPerk::DeathDefier => "Survived 3 near-deaths: +2 Defense",
-            VeteranPerk::Slayer => "Defeated 20 enemies: +2 Attack",
-            VeteranPerk::DungeonVanguard => "Completed 10 missions: +1 Speed",
-            VeteranPerk::TreasureHunter => "Amassed 1000 lifetime gold: +1 Attack, +5% HP",
+            VeteranPerk::RescueSpecialist => tr("perk.rescue_specialist.desc"),
+            VeteranPerk::DeathDefier => tr("perk.death_defier.desc"),
+            VeteranPerk::Slayer => tr("perk.slayer.desc"),
+            VeteranPerk::DungeonVanguard => tr("perk.dungeon_vanguard.desc"),
+            VeteranPerk::TreasureHunter => tr("perk.treasure_hunter.desc"),
         }
     }
 

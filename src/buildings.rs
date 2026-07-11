@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::economy::Gold;
+use crate::localization::{tr, trf};
 use crate::materials::{MaterialType, Materials};
 use crate::ui::toast::{ToastEvent, ToastKind};
 
@@ -30,25 +31,25 @@ impl BuildingType {
 
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Armory => "Armory",
-            Self::TrainingGrounds => "Training Grounds",
-            Self::Barracks => "Barracks",
-            Self::RecruitmentOffice => "Recruitment Office",
-            Self::Workshop => "Workshop",
-            Self::Tavern => "Tavern",
-            Self::WarRoom => "War Room",
+            Self::Armory => tr("building.armory"),
+            Self::TrainingGrounds => tr("building.training_grounds"),
+            Self::Barracks => tr("building.barracks"),
+            Self::RecruitmentOffice => tr("building.recruitment_office"),
+            Self::Workshop => tr("building.workshop"),
+            Self::Tavern => tr("building.tavern"),
+            Self::WarRoom => tr("building.war_room"),
         }
     }
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::Armory => "Craft and upgrade equipment for your heroes.",
-            Self::TrainingGrounds => "Heroes gain passive XP while idle.",
-            Self::Barracks => "Increases your guild's roster capacity.",
-            Self::RecruitmentOffice => "More applicants with better quality.",
-            Self::Workshop => "Convert raw materials into refined ones.",
-            Self::Tavern => "Accelerates hero stamina recovery when resting.",
-            Self::WarRoom => "Coordinate more expeditions in the field at once.",
+            Self::Armory => tr("building.armory.desc"),
+            Self::TrainingGrounds => tr("building.training_grounds.desc"),
+            Self::Barracks => tr("building.barracks.desc"),
+            Self::RecruitmentOffice => tr("building.recruitment_office.desc"),
+            Self::Workshop => tr("building.workshop.desc"),
+            Self::Tavern => tr("building.tavern.desc"),
+            Self::WarRoom => tr("building.war_room.desc"),
         }
     }
 }
@@ -150,8 +151,8 @@ fn handle_upgrade_building(
     buildings.0.insert(building_type, new_level);
 
     commands.trigger(ToastEvent {
-        title: format!("{} upgraded!", building_type.name()),
-        body: format!("Now at level {new_level}"),
+        title: trf("building.upgraded_toast", &[("name", building_type.name())]),
+        body: trf("building.upgraded_body", &[("level", &new_level.to_string())]),
         kind: ToastKind::Success,
         action: None,
     });

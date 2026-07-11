@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+
 use super::history::HeroHistory;
+use crate::localization::tr;
 
 #[derive(Component, Debug, Clone, Reflect, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[reflect(Component)]
@@ -8,7 +10,9 @@ pub struct Epithet(pub Option<String>);
 
 pub fn format_hero_name(name: &str, epithet: Option<&Epithet>) -> String {
     if let Some(Epithet(Some(ep))) = epithet {
-        if ep == "Hundred-Mission" {
+        // Epithets are persisted strings; the prefix style compares against
+        // the same table entry that generated it.
+        if ep == tr("epithet.hundred_mission") {
             format!("{} {}", ep, name)
         } else {
             format!("{} {}", name, ep)
@@ -20,19 +24,19 @@ pub fn format_hero_name(name: &str, epithet: Option<&Epithet>) -> String {
 
 pub fn check_epithet(history: &HeroHistory) -> Option<String> {
     if history.near_deaths >= 3 {
-        Some("the Undying".to_string())
+        Some(tr("epithet.undying").to_string())
     } else if history.near_deaths >= 2 || history.rescues_received >= 2 {
-        Some("the Twice-Lost".to_string())
+        Some(tr("epithet.twice_lost").to_string())
     } else if history.missions_run >= 100 {
-        Some("Hundred-Mission".to_string())
+        Some(tr("epithet.hundred_mission").to_string())
     } else if history.kills >= 10 {
-        Some("Slimebane".to_string())
+        Some(tr("epithet.slimebane").to_string())
     } else if history.rescues_given >= 1 {
-        Some("the Savior".to_string())
+        Some(tr("epithet.savior").to_string())
     } else if history.missions_run >= 5 {
-        Some("the Veteran".to_string())
+        Some(tr("epithet.veteran").to_string())
     } else if history.lifetime_gold >= 1000 {
-        Some("Goldfinder".to_string())
+        Some(tr("epithet.goldfinder").to_string())
     } else {
         None
     }

@@ -291,8 +291,11 @@ fn handle_hire_applicant(
     ));
 
     commands.trigger(crate::ui::toast::ToastEvent {
-        title: format!("{hero_name} joined the guild!"),
-        body: format!("{hero_class} — hired for {cost}g"),
+        title: crate::localization::trf("recruit.hired_toast", &[("name", &hero_name)]),
+        body: crate::localization::trf(
+            "recruit.hired_body",
+            &[("class", &hero_class.to_string()), ("cost", &cost.to_string())],
+        ),
         kind: crate::ui::toast::ToastKind::Success,
         action: None,
     });

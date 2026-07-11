@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::buildings::{BuildingType, GuildBuildings};
 use crate::economy::Gold;
 use crate::hero::data::HeroClass;
+use crate::localization::{tr, trf};
 use crate::materials::{MaterialType, Materials};
 
 // ── Data types ─────────────────────────────────────────────────────
@@ -30,6 +31,16 @@ pub enum GearRarity {
 }
 
 impl GearRarity {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Common => tr("rarity.common"),
+            Self::Uncommon => tr("rarity.uncommon"),
+            Self::Rare => tr("rarity.rare"),
+            Self::Epic => tr("rarity.epic"),
+            Self::Legendary => tr("rarity.legendary"),
+        }
+    }
+
     pub fn stat_multiplier(&self) -> f32 {
         match self {
             Self::Common => 1.0,
@@ -56,9 +67,9 @@ impl GearSlot {
 impl std::fmt::Display for GearSlot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Weapon => write!(f, "Weapon"),
-            Self::Armor => write!(f, "Armor"),
-            Self::Accessory => write!(f, "Accessory"),
+            Self::Weapon => write!(f, "{}", tr("equipment.weapon")),
+            Self::Armor => write!(f, "{}", tr("equipment.armor")),
+            Self::Accessory => write!(f, "{}", tr("equipment.accessory")),
         }
     }
 }
@@ -259,8 +270,8 @@ fn handle_craft_gear(
     equipment.set_tier(event.slot, next_tier);
 
     commands.trigger(crate::ui::toast::ToastEvent {
-        title: format!("Crafted {}!", tier_def.name),
-        body: format!("Equipped to {}", info.name),
+        title: trf("equipment.crafted_toast", &[("name", &tier_def.name)]),
+        body: trf("equipment.crafted_body", &[("hero", &info.name)]),
         kind: crate::ui::toast::ToastKind::Success,
         action: None,
     });

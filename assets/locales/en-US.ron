@@ -1,5 +1,117 @@
 {
+    // ── buildings ──
+    "building.armory": "Armory",
+    "building.armory.desc": "Craft and upgrade equipment for your heroes.",
+    "building.barracks": "Barracks",
+    "building.barracks.desc": "Increases your guild's roster capacity.",
+    "building.recruitment_office": "Recruitment Office",
+    "building.recruitment_office.desc": "More applicants with better quality.",
+    "building.tavern": "Tavern",
+    "building.tavern.desc": "Accelerates hero stamina recovery when resting.",
+    "building.training_grounds": "Training Grounds",
+    "building.training_grounds.desc": "Heroes gain passive XP while idle.",
+    "building.upgraded_body": "Now at level {level}",
+    "building.upgraded_toast": "{name} upgraded!",
+    "building.war_room": "War Room",
+    "building.war_room.desc": "Coordinate more expeditions in the field at once.",
+    "building.workshop": "Workshop",
+    "building.workshop.desc": "Convert raw materials into refined ones.",
+
+    // ── classes ──
+    "class.cleric": "Cleric",
+    "class.mage": "Mage",
+    "class.ranger": "Ranger",
+    "class.rogue": "Rogue",
+    "class.warrior": "Warrior",
+
+    // ── epithets (persisted on heroes in saves) ──
+    "epithet.goldfinder": "Goldfinder",
+    "epithet.hundred_mission": "Hundred-Mission",
+    "epithet.savior": "the Savior",
+    "epithet.slimebane": "Slimebane",
+    "epithet.twice_lost": "the Twice-Lost",
+    "epithet.undying": "the Undying",
+    "epithet.veteran": "the Veteran",
+
+    // ── equipment ──
+    "equipment.accessory": "Accessory",
+    "equipment.armor": "Armor",
+    "equipment.crafted_body": "Equipped to {hero}",
+    "equipment.crafted_toast": "Crafted {name}!",
+    "equipment.weapon": "Weapon",
+
+    // ── materials ──
+    "material.arcane_wood": "Arcane Wood",
+    "material.converted_body": "{in_count} {in_name} \u{2192} {out_count} {out_name}",
+    "material.converted_toast": "Materials converted!",
+    "material.cured_leather": "Cured Leather",
+    "material.cut_gem": "Cut Gem",
+    "material.dragon_leather": "Dragon Leather",
+    "material.elixir_of_power": "Elixir of Power",
+    "material.enchanted_steel": "Enchanted Steel",
+    "material.iron_ore": "Iron Ore",
+    "material.lumber": "Lumber",
+    "material.potion": "Potion",
+    "material.prismatic_gem": "Prismatic Gem",
+    "material.raw_herbs": "Raw Herbs",
+    "material.raw_leather": "Raw Leather",
+    "material.rough_gems": "Rough Gems",
+    "material.steel_ingot": "Steel Ingot",
+    "material.wood": "Wood",
+
+    // ── veteran perks ──
+    "perk.death_defier": "Death Defier",
+    "perk.death_defier.desc": "Survived 3 near-deaths: +2 Defense",
+    "perk.dungeon_vanguard": "Dungeon Vanguard",
+    "perk.dungeon_vanguard.desc": "Completed 10 missions: +1 Speed",
+    "perk.rescue_specialist": "Rescue Specialist",
+    "perk.rescue_specialist.desc": "Survived 3 rescues: +10% HP",
+    "perk.slayer": "Monster Slayer",
+    "perk.slayer.desc": "Defeated 20 enemies: +2 Attack",
+    "perk.treasure_hunter": "Treasure Hunter",
+    "perk.treasure_hunter.desc": "Amassed 1000 lifetime gold: +1 Attack, +5% HP",
+
+    // ── gear rarity ──
+    "rarity.common": "Common",
+    "rarity.epic": "Epic",
+    "rarity.legendary": "Legendary",
+    "rarity.rare": "Rare",
+    "rarity.uncommon": "Uncommon",
+
+    // ── recruiting ──
+    "recruit.hired_body": "{class} — hired for {cost}g",
+    "recruit.hired_toast": "{name} joined the guild!",
+
+    // ── hero status ──
+    "status.returned_body": "Injured — stats reduced while they recover.",
+    "status.returned_toast": "{name} has returned",
+
+    // ── hero timeline (persisted in saves) ──
+    "timeline.boss_defeated": "Defeated the boss {boss}",
+    "timeline.boss_defeated_in": "Defeated the boss {boss} in {mission}",
+    "timeline.chest_gold": "Found {gold} gold in a loot chest",
+    "timeline.defeated": "Defeated {name}",
+    "timeline.earned_title": "Earned the title: {title}",
+    "timeline.event": "Event: {event} — {outcome}",
+    "timeline.gear_drop": "Found a {rarity} {item}",
+    "timeline.joined": "Joined the guild",
+    "timeline.mission_complete": "Completed mission: {mission}",
+    "timeline.near_death": "Survived a near-death experience in {mission}",
+    "timeline.returned_missing": "Returned after being missing (gear lost)",
+    "timeline.signature": "Landed signature move: {ability}",
+    "timeline.sole_survivor": "Survived the {mission} wipe — sole survivor",
+    "timeline.went_missing": "Went missing in mission: {mission}",
+
+    // ── personality traits ──
+    "trait.brave": "Brave",
+    "trait.cautious": "Cautious",
+    "trait.cursed": "Cursed",
+    "trait.greedy": "Greedy",
+    "trait.leader": "Leader",
+    "trait.loner": "Loner",
+    "trait.lucky": "Lucky",
+
     // ── test fixtures (allowed as orphans by the coverage test) ──
-    "test.probe": "probe value",
     "test.greet": "Hello {name}, you have {n} quests",
+    "test.probe": "probe value",
 }

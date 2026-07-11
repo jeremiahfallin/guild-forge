@@ -255,7 +255,7 @@ fn load_save(
                 rescues_received: dto.history.rescues_received,
                 lifetime_gold: dto.history.lifetime_gold,
                 timeline: if dto.history.timeline.is_empty() {
-                    vec!["Joined the guild".to_string()]
+                    vec![crate::localization::tr("timeline.joined").to_string()]
                 } else {
                     dto.history.timeline.clone()
                 },

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::buildings::{BuildingType, GuildBuildings};
+use crate::localization::{tr, trf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum MaterialType {
@@ -30,21 +31,21 @@ impl MaterialType {
 
     pub fn name(&self) -> &'static str {
         match self {
-            Self::IronOre => "Iron Ore",
-            Self::RawLeather => "Raw Leather",
-            Self::Wood => "Wood",
-            Self::RawHerbs => "Raw Herbs",
-            Self::RoughGems => "Rough Gems",
-            Self::SteelIngot => "Steel Ingot",
-            Self::CuredLeather => "Cured Leather",
-            Self::Lumber => "Lumber",
-            Self::Potion => "Potion",
-            Self::CutGem => "Cut Gem",
-            Self::EnchantedSteel => "Enchanted Steel",
-            Self::DragonLeather => "Dragon Leather",
-            Self::ArcaneWood => "Arcane Wood",
-            Self::ElixirOfPower => "Elixir of Power",
-            Self::PrismaticGem => "Prismatic Gem",
+            Self::IronOre => tr("material.iron_ore"),
+            Self::RawLeather => tr("material.raw_leather"),
+            Self::Wood => tr("material.wood"),
+            Self::RawHerbs => tr("material.raw_herbs"),
+            Self::RoughGems => tr("material.rough_gems"),
+            Self::SteelIngot => tr("material.steel_ingot"),
+            Self::CuredLeather => tr("material.cured_leather"),
+            Self::Lumber => tr("material.lumber"),
+            Self::Potion => tr("material.potion"),
+            Self::CutGem => tr("material.cut_gem"),
+            Self::EnchantedSteel => tr("material.enchanted_steel"),
+            Self::DragonLeather => tr("material.dragon_leather"),
+            Self::ArcaneWood => tr("material.arcane_wood"),
+            Self::ElixirOfPower => tr("material.elixir_of_power"),
+            Self::PrismaticGem => tr("material.prismatic_gem"),
         }
     }
 }
@@ -139,13 +140,15 @@ fn handle_convert_materials(
     materials.add(recipe.output_type, output_total);
 
     commands.trigger(crate::ui::toast::ToastEvent {
-        title: "Materials converted!".to_string(),
-        body: format!(
-            "{} {} \u{2192} {} {}",
-            input_total,
-            recipe.input_type.name(),
-            output_total,
-            recipe.output_type.name()
+        title: tr("material.converted_toast").to_string(),
+        body: trf(
+            "material.converted_body",
+            &[
+                ("in_count", &input_total.to_string()),
+                ("in_name", recipe.input_type.name()),
+                ("out_count", &output_total.to_string()),
+                ("out_name", recipe.output_type.name()),
+            ],
         ),
         kind: crate::ui::toast::ToastKind::Info,
         action: None,

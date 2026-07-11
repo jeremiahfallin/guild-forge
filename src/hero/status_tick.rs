@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use super::status::{Injured, Missing, INJURED_DURATION_SECS};
 use super::{Favorite, HeroInfo, Fatigue, Hero, HeroStats, Epithet, format_hero_name};
 use crate::buildings::{BuildingType, GuildBuildings};
+use crate::localization::{tr, trf};
 use crate::mission::OnMission;
 use crate::screens::Screen;
 use crate::ui::toast::{ToastEvent, ToastKind};
@@ -68,13 +69,16 @@ pub(crate) fn tick_missing(
             .insert(Injured { expires_at: now + INJURED_DURATION_SECS });
 
         if let Ok(mut hist) = histories.get_mut(entity) {
-            hist.add_timeline_entry(format!("Returned after being missing (gear lost)"));
+            hist.add_timeline_entry(tr("timeline.returned_missing").to_string());
         }
 
         let kind = if is_favorite { ToastKind::Success } else { ToastKind::Info };
         commands.trigger(ToastEvent {
-            title: format!("{} has returned", format_hero_name(&info.name, epithet)),
-            body: "Injured — stats reduced while they recover.".to_string(),
+            title: trf(
+                "status.returned_toast",
+                &[("name", &format_hero_name(&info.name, epithet))],
+            ),
+            body: tr("status.returned_body").to_string(),
             kind,
             action: None,
         });

@@ -3,6 +3,8 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::localization::tr;
+
 /// The class of a hero, determining their stat growth and abilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect)]
 pub enum HeroClass {
@@ -16,11 +18,11 @@ pub enum HeroClass {
 impl std::fmt::Display for HeroClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Warrior => write!(f, "Warrior"),
-            Self::Rogue => write!(f, "Rogue"),
-            Self::Mage => write!(f, "Mage"),
-            Self::Cleric => write!(f, "Cleric"),
-            Self::Ranger => write!(f, "Ranger"),
+            Self::Warrior => write!(f, "{}", tr("class.warrior")),
+            Self::Rogue => write!(f, "{}", tr("class.rogue")),
+            Self::Mage => write!(f, "{}", tr("class.mage")),
+            Self::Cleric => write!(f, "{}", tr("class.cleric")),
+            Self::Ranger => write!(f, "{}", tr("class.ranger")),
         }
     }
 }
@@ -40,13 +42,13 @@ pub enum HeroTrait {
 impl std::fmt::Display for HeroTrait {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Brave => write!(f, "Brave"),
-            Self::Cautious => write!(f, "Cautious"),
-            Self::Greedy => write!(f, "Greedy"),
-            Self::Loner => write!(f, "Loner"),
-            Self::Leader => write!(f, "Leader"),
-            Self::Cursed => write!(f, "Cursed"),
-            Self::Lucky => write!(f, "Lucky"),
+            Self::Brave => write!(f, "{}", tr("trait.brave")),
+            Self::Cautious => write!(f, "{}", tr("trait.cautious")),
+            Self::Greedy => write!(f, "{}", tr("trait.greedy")),
+            Self::Loner => write!(f, "{}", tr("trait.loner")),
+            Self::Leader => write!(f, "{}", tr("trait.leader")),
+            Self::Cursed => write!(f, "{}", tr("trait.cursed")),
+            Self::Lucky => write!(f, "{}", tr("trait.lucky")),
         }
     }
 }
