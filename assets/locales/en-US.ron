@@ -1,0 +1,5 @@
+{
+    // ── test fixtures (allowed as orphans by the coverage test) ──
+    "test.probe": "probe value",
+    "test.greet": "Hello {name}, you have {n} quests",
+}
