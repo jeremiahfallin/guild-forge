@@ -7,18 +7,19 @@ use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::{tr, trf};
 use crate::hero::Hero;
 use crate::mission::{Mission, MissionProgress, active_mission_count};
 use crate::screens::{GameTab, Screen};
 use crate::theme::widgets;
 
-/// Prompt text per step. Index = step.
+/// Prompt key per step. Index = step.
 pub const TUTORIAL_STEPS: [&str; 5] = [
-    "Welcome, guildmaster! You have two heroes and 60 gold. Hire a third at the Recruiting office.",
-    "A full party of three! Open the Mission Board and pick a contract.",
-    "Add all three heroes to the party, then hit Dispatch!",
-    "Watch the run: exploration is brisk, combat slows time, and the log narrates the fight.",
-    "Mission resolved and rewards collected. Upgrade buildings, take harder contracts, recruit again — the guild is yours.",
+    "tutorial.step0",
+    "tutorial.step1",
+    "tutorial.step2",
+    "tutorial.step3",
+    "tutorial.step4",
 ];
 
 /// Guided-first-mission progress. `step`/`done` persist in the save;
@@ -100,7 +101,7 @@ fn render_tutorial_panel(
 
     let step_text = TUTORIAL_STEPS
         .get(state.step as usize)
-        .copied()
+        .map(|key| tr(key))
         .unwrap_or("");
     let is_last = state.step as usize == TUTORIAL_STEPS.len() - 1;
     let accent = Color::srgba(0.8, 0.55, 0.05, 0.9);
@@ -117,7 +118,7 @@ fn render_tutorial_panel(
 
     panel_box = panel_box
         .child(
-            text(format!("Guide {}/{}", state.step + 1, TUTORIAL_STEPS.len()))
+            text(trf("tutorial.guide_counter", &[("step", &(state.step + 1).to_string()), ("total", &TUTORIAL_STEPS.len().to_string())]))
                 .font_size(13.0)
                 .color(accent),
         )
@@ -127,7 +128,7 @@ fn render_tutorial_panel(
                 .color(Color::srgb(0.92, 0.92, 0.95)),
         );
 
-    let button_label = if is_last { "Done" } else { "Skip Tutorial" };
+    let button_label = if is_last { tr("tutorial.done") } else { tr("tutorial.skip") };
     panel_box = panel_box.child(
         div().row().justify_end().child(
             div()
@@ -229,7 +230,7 @@ mod tests {
     #[test]
     fn every_step_has_text() {
         for step in 0..TUTORIAL_STEPS.len() as u32 {
-            assert!(!TUTORIAL_STEPS[step as usize].is_empty());
+            assert!(!tr(TUTORIAL_STEPS[step as usize]).is_empty());
         }
     }
 }

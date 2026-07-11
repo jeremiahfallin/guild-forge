@@ -3,6 +3,7 @@
 
 use bevy::prelude::*;
 
+use crate::localization::tr;
 use crate::{asset_tracking::ResourceHandles, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
@@ -17,7 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 fn spawn_loading_screen(mut commands: Commands) {
     widgets::ui_root("Loading Screen")
         .insert(DespawnOnExit(Screen::Loading))
-        .child(widgets::label("Loading..."))
+        .child(widgets::label(tr("loading.label")))
         .spawn(&mut commands);
 }
 

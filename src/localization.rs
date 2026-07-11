@@ -53,11 +53,23 @@ mod tests {
         );
     }
 
+    /// Keys passed to tr() through a variable rather than a literal, so the
+    /// source scan can't see them. Keep in sync with their definition sites.
+    const DYNAMIC_KEYS: &[&str] = &[
+        // src/tutorial.rs TUTORIAL_STEPS
+        "tutorial.step0",
+        "tutorial.step1",
+        "tutorial.step2",
+        "tutorial.step3",
+        "tutorial.step4",
+    ];
+
     /// Every tr()/trf() key literal in src/ must exist in en-US.ron and
     /// vice versa. Dynamically built keys are disallowed.
     #[test]
     fn coverage_set_equality() {
-        let keys_in_code = scan_src_for_keys();
+        let mut keys_in_code = scan_src_for_keys();
+        keys_in_code.extend(DYNAMIC_KEYS.iter().map(|k| k.to_string()));
         let keys_in_table: std::collections::BTreeSet<String> = STRINGS.keys().cloned().collect();
         let missing: Vec<_> = keys_in_code.difference(&keys_in_table).collect();
         let orphaned: Vec<_> = keys_in_table

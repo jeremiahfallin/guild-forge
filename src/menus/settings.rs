@@ -7,6 +7,7 @@ use bevy_declarative::element::div::{Div, div};
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::tr;
 use crate::{menus::Menu, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
@@ -34,32 +35,32 @@ pub(super) fn plugin(app: &mut App) {
 fn spawn_settings_menu(mut commands: Commands) {
     widgets::ui_root("Settings Menu")
         .insert((GlobalZIndex(2), DespawnOnExit(Menu::Settings)))
-        .child(widgets::header("Settings"))
+        .child(widgets::header(tr("settings.header")))
         .child(settings_grid())
-        .child(widgets::game_button("Back", go_back_on_click))
+        .child(widgets::game_button(tr("common.back"), go_back_on_click))
         .spawn(&mut commands);
 }
 
 fn settings_grid() -> Div {
-    let mut volume_label = widgets::label("Master Volume");
+    let mut volume_label = widgets::label(tr("settings.master_volume"));
     volume_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut music_label = widgets::label("Music Volume");
+    let mut music_label = widgets::label(tr("settings.music_volume"));
     music_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut sfx_label = widgets::label("SFX Volume");
+    let mut sfx_label = widgets::label(tr("settings.sfx_volume"));
     sfx_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut density_label = widgets::label("Ember Density");
+    let mut density_label = widgets::label(tr("settings.ember_density"));
     density_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut warmth_label = widgets::label("Ember Warmth");
+    let mut warmth_label = widgets::label(tr("settings.ember_warmth"));
     warmth_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut mode_label = widgets::label("Window Mode");
+    let mut mode_label = widgets::label(tr("settings.window_mode"));
     mode_label.style_mut().justify_self = JustifySelf::End;
 
-    let mut resolution_label = widgets::label("Resolution");
+    let mut resolution_label = widgets::label(tr("settings.resolution"));
     resolution_label.style_mut().justify_self = JustifySelf::End;
 
     let mut grid = div().grid().gap_y(px(10.0)).gap_x(px(30.0));
@@ -344,9 +345,9 @@ fn update_window_mode_label(
     mut label: Single<&mut Text, With<WindowModeLabel>>,
 ) {
     label.0 = if settings.fullscreen {
-        "Fullscreen".into()
+        tr("settings.fullscreen").into()
     } else {
-        "Windowed".into()
+        tr("settings.windowed").into()
     };
 }
 

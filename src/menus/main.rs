@@ -7,6 +7,7 @@ use bevy_declarative::element::text::text;
 use bevy_declarative::style::styled::Styled;
 use bevy_declarative::style::values::px;
 
+use crate::localization::tr;
 use crate::{asset_tracking::ResourceHandles, menus::Menu, screens::Screen, theme::widgets};
 
 #[derive(Component)]
@@ -48,13 +49,13 @@ fn spawn_main_menu(
                 )
                 // Pulsing game title
                 .child(
-                    text("GUILD FORGE")
+                    text(tr("menu.title"))
                         .font_size(68.0)
                         .insert(TitleText { phase: 0.0 })
                 )
                 // Tagline
                 .child(
-                    text("Forge your heroes. Command your guild.")
+                    text(tr("menu.tagline"))
                         .font_size(22.0)
                         .color(Color::srgba(0.65, 0.65, 0.65, 0.7))
                 )
@@ -67,13 +68,13 @@ fn spawn_main_menu(
                 .bg(Color::srgba(0.85, 0.25, 0.05, 0.35))
         )
         // Forge themed buttons
-        .child(forge_button("Play", enter_loading_or_gameplay_screen))
-        .child(forge_button("Settings", open_settings_menu))
-        .child(forge_button("Credits", open_credits_menu));
+        .child(forge_button(tr("menu.play"), enter_loading_or_gameplay_screen))
+        .child(forge_button(tr("menu.settings"), open_settings_menu))
+        .child(forge_button(tr("menu.credits"), open_credits_menu));
 
     #[cfg(not(target_family = "wasm"))]
     {
-        menu = menu.child(forge_button("Exit", exit_app));
+        menu = menu.child(forge_button(tr("menu.exit"), exit_app));
     }
 
     // Absolute positioned footer

@@ -23,8 +23,55 @@
     "banner.rescue_closing": "RESCUE WINDOW CLOSING",
 
     // ── shared/common ──
+    "common.back": "Back",
     "common.hero_level_class": "Lv.{level} {class}",
     "common.unknown": "Unknown",
+
+    // ── credits menu ──
+    "credits.assets": "Assets",
+    "credits.created_by": "Created by",
+
+    // ── loading screen ──
+    "loading.label": "Loading...",
+
+    // ── main menu ──
+    "menu.credits": "Credits",
+    "menu.exit": "Exit",
+    "menu.play": "Play",
+    "menu.settings": "Settings",
+    "menu.tagline": "Forge your heroes. Command your guild.",
+    "menu.title": "GUILD FORGE",
+
+    // ── pause menu ──
+    "pause.continue": "Continue",
+    "pause.header": "Game paused",
+    "pause.quit_to_title": "Quit to title",
+
+    // ── save/load ──
+    "save.banked_time": "Banked time: {time}",
+    "save.welcome_back": "Welcome Back!",
+
+    // ── settings menu ──
+    "settings.ember_density": "Ember Density",
+    "settings.ember_warmth": "Ember Warmth",
+    "settings.fullscreen": "Fullscreen",
+    "settings.header": "Settings",
+    "settings.master_volume": "Master Volume",
+    "settings.music_volume": "Music Volume",
+    "settings.resolution": "Resolution",
+    "settings.sfx_volume": "SFX Volume",
+    "settings.window_mode": "Window Mode",
+    "settings.windowed": "Windowed",
+
+    // ── tutorial (FT-1 guided first mission) ──
+    "tutorial.done": "Done",
+    "tutorial.guide_counter": "Guide {step}/{total}",
+    "tutorial.skip": "Skip Tutorial",
+    "tutorial.step0": "Welcome, guildmaster! You have two heroes and 60 gold. Hire a third at the Recruiting office.",
+    "tutorial.step1": "A full party of three! Open the Mission Board and pick a contract.",
+    "tutorial.step2": "Add all three heroes to the party, then hit Dispatch!",
+    "tutorial.step3": "Watch the run: exploration is brisk, combat slows time, and the log narrates the fight.",
+    "tutorial.step4": "Mission resolved and rewards collected. Upgrade buildings, take harder contracts, recruit again — the guild is yours.",
 
     // ── armory screen ──
     "armory.cost_material": ", {amount} {name}",

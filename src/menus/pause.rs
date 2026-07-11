@@ -2,6 +2,7 @@
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
+use crate::localization::tr;
 use crate::{menus::Menu, screens::Screen, theme::widgets};
 
 pub(super) fn plugin(app: &mut App) {
@@ -15,10 +16,10 @@ pub(super) fn plugin(app: &mut App) {
 fn spawn_pause_menu(mut commands: Commands) {
     widgets::ui_root("Pause Menu")
         .insert((GlobalZIndex(2), DespawnOnExit(Menu::Pause)))
-        .child(widgets::header("Game paused"))
-        .child(widgets::game_button("Continue", close_menu))
-        .child(widgets::game_button("Settings", open_settings_menu))
-        .child(widgets::game_button("Quit to title", quit_to_title))
+        .child(widgets::header(tr("pause.header")))
+        .child(widgets::game_button(tr("pause.continue"), close_menu))
+        .child(widgets::game_button(tr("menu.settings"), open_settings_menu))
+        .child(widgets::game_button(tr("pause.quit_to_title"), quit_to_title))
         .spawn(&mut commands);
 }
 

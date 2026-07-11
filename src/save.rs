@@ -485,8 +485,8 @@ fn load_save(
     // Fire toast with banked time info.
     let formatted = crate::time_bank::format_banked_time(new_banked);
     commands.trigger(ToastEvent {
-        title: "Welcome Back!".to_string(),
-        body: format!("Banked time: {formatted}"),
+        title: crate::localization::tr("save.welcome_back").to_string(),
+        body: crate::localization::trf("save.banked_time", &[("time", &formatted)]),
         kind: ToastKind::Info,
         action: None,
     });
