@@ -354,10 +354,9 @@ fn spawn_enemies_for_mission(
             } else {
                 enemy_rooms[rng.random_range(0..enemy_rooms.len())]
             };
-            let room = &map.rooms[room_idx];
-
-            let ex = room.x + rng.random_range(0..room.w);
-            let ey = room.y + rng.random_range(0..room.h);
+            let (ex, ey) = map
+                .random_walkable_in_room(room_idx, &mut rng)
+                .unwrap_or_else(|| map.rooms[room_idx].center());
 
             let enemy_speed = match enemy_type {
                 EnemyType::Goblin => 14,

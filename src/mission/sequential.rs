@@ -598,10 +598,10 @@ pub fn process_sequential_turn(
                         });
 
                         if let Some(r_idx) = current_room {
-                            let room = &map.rooms[r_idx];
                             for _ in 0..2 {
-                                let rx = room.x + rng.random_range(0..room.w);
-                                let ry = room.y + rng.random_range(0..room.h);
+                                let (rx, ry) = map
+                                    .random_walkable_in_room(r_idx, &mut rng)
+                                    .unwrap_or_else(|| map.rooms[r_idx].center());
                                 
                                 let rat_token = commands.spawn((
                                     Name::new("Giant Rat"),
